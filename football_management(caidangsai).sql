@@ -1,1 +1,0 @@
-SELECT * FROM football_management.users;

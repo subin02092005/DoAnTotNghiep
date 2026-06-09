@@ -23,12 +23,6 @@ data class LoginResponse(
     val user: User?
 )
 
-data class AuthLoginResponse(
-    val success: Boolean,
-    val message: String,
-    val token: String?, // Đổi tên thành token ở đây
-    val user: User? // Khai báo thêm nếu bạn muốn nhận thông tin user
-)
 data class RegisterRequest(
     val name: String,
     val email: String,
@@ -65,10 +59,7 @@ data class GenericResponse(
 )
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // Dữ liệu gửi lên API login
-data class AuthLoginRequest(
-    val email: String,
-    val password: String // API C# viết chữ thường nên ở đây ta map cho đúng
-)
+
 
 // 2. Tạo Class hứng dữ liệu C# trả về
 
@@ -85,7 +76,10 @@ data class FootballNews(
     val summary: String,
     val time: String,
     val source: String,
-    val imageUrl: String = "" // Bạn có thể tích hợp thư viện Coil để tải ảnh sau
+    val imageUrl: String = "",
+    val content: String = "",
+    val category: String = "Tin Tức",
+    val author: String = "Ban Biên Tập"// Bạn có thể tích hợp thư viện Coil để tải ảnh sau
 )
 data class PlayerInfo(
     val number: String,
@@ -119,7 +113,8 @@ data class FullMatchDetail(
     val PossessionB: String,
     val ShotsA: String,
     val ShotsB: String,
-    val mvp: String
+    val mvp: String,
+    val isHot: Boolean = false
 )
 data class DetailedStanding(
     val rank: Int,

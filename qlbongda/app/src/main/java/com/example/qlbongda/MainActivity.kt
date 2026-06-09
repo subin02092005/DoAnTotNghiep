@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,7 +26,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     // Quản lý trạng thái các màn hình: "login", "home", "standing_detail"
-                    var currentScreen by remember { mutableStateOf("login") }
+                    var currentScreen by remember { mutableStateOf("home")}
 
                     // DỮ LIỆU ĐẦY ĐỦ CHO MÀN HÌNH XẾP HẠNG CHI TIẾT
                     // Gồm các chỉ số: Hạng, Tên, Ảnh, Số trận, Thắng, Hòa, Thua, Bàn thắng, Bàn thua, Hiệu số, Điểm, Phong độ 5 trận
@@ -55,12 +56,28 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-
+                    val globalMatchList = remember {
+                        mutableStateListOf(
+                            com.example.qlbongda.data.model.FullMatchDetail(
+                                id = 1, teamA = "Arsenal", teamB = "Chelsea", isStarted = true, scoreA = "2", scoreB = "1", time = "19:00", date = "06/06", stadium = "Emirates Stadium",
+                                events = emptyList(), lineupA = emptyList(), lineupB = emptyList(), subsA = emptyList(), subsB = emptyList(), PossessionA = "55%", PossessionB = "45%", ShotsA = "14", ShotsB = "9", mvp = "Saka", isHot = false
+                            ),
+                            com.example.qlbongda.data.model.FullMatchDetail(
+                                id = 2, teamA = "MU", teamB = "Man City", isStarted = false, scoreA = "0", scoreB = "0", time = "21:30", date = "07/06", stadium = "Old Trafford",
+                                events = emptyList(), lineupA = emptyList(), lineupB = emptyList(), subsA = emptyList(), subsB = emptyList(), PossessionA = "0%", PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = "", isHot = true
+                            )
+                        )
+                    }
                     when (currentScreen) {
-                        "admin"->{
-                            AdminScreen({ Toast.makeText(this, "Đã đăng xuất!", Toast.LENGTH_SHORT).show()
-                                // Chuyển ngược về màn đăng nhập
-                                currentScreen = "login"})
+                        "admin" -> {
+                            AdminScreen(
+                                matchList = globalMatchList, // 🌟 TRUYỀN DANH SÁCH SỬ DỤNG CHUNG VÀO ĐÂY
+                                onLogout = {
+                                    Toast.makeText(this, "Đã đăng xuất!", Toast.LENGTH_SHORT).show()
+                                    // Chuyển ngược về màn đăng nhập
+                                    currentScreen = "login"
+                                }
+                            )
                         }
                         "login" -> {
                             LoginScreen(
@@ -96,7 +113,7 @@ class MainActivity : ComponentActivity() {
                         }
                         "home" -> {
                             // Gọi màn hình chính và truyền thêm sự kiện onNavigateToStandingDetail
-                            HomeScreen(
+                            HomeScreen(matchList = globalMatchList,
                                 onLogout = {
                                     Toast.makeText(this, "Đã đăng xuất!", Toast.LENGTH_SHORT).show()
                                     // Chuyển ngược về màn đăng nhập

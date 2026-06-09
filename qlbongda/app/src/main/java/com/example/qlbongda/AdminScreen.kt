@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList // 🌟 THÊM IMPORT NÀY ĐỂ QUẢN LÝ DANH SÁCH STATE
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,13 +27,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.qlbongda.data.model.FullMatchDetail
+import com.example.qlbongda.data.model.PlayerInfo
 
-// Tái sử dụng màu sắc chủ đạo của ứng dụng
-// val NeonGreen = Color(0xFF00FF00) // Đã được định nghĩa ở file khác trong cùng package
+// Giả định màu sắc NeonGreen nếu chưa định nghĩa toàn cục ở file khác
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdminScreen(onLogout: () -> Unit) {
+fun AdminScreen(
+    matchList: SnapshotStateList<FullMatchDetail>, // 🌟 NHẬN DANH SÁCH DÙNG CHUNG TỪ NGOÀI TRUYỀN VÀO
+    onLogout: () -> Unit
+) {
     var currentSection by remember { mutableStateOf(AdminSection.DASHBOARD) }
     val context = LocalContext.current
 
@@ -77,7 +83,8 @@ fun AdminScreen(onLogout: () -> Unit) {
                 AdminSection.TEAMS -> TeamManagementScreen()
                 AdminSection.LEAGUES -> LeagueManagementScreen()
                 AdminSection.PLAYERS -> PlayerManagementAdminScreen()
-                AdminSection.SCHEDULE -> MatchScheduleManagementScreen()
+                // 🌟 TRUYỀN DANH SÁCH VÀO MÀN HÌNH QUẢN LÝ LỊCH ĐẤU ĐỂ SWITCH
+                AdminSection.SCHEDULE -> MatchScheduleManagementScreen(matchList = matchList)
                 AdminSection.STATS -> StatisticsScreen()
                 AdminSection.PAYMENTS -> PaymentConfirmationScreen()
             }
@@ -103,7 +110,7 @@ fun AdminDashboard(onSectionSelect: (AdminSection) -> Unit) {
         AdminMenuItem("Quản lý Đội bóng", "Duyệt và chỉnh sửa các đội tham gia", Icons.Default.Groups, AdminSection.TEAMS),
         AdminMenuItem("Quản lý Giải đấu", "Thiết lập mùa giải và vòng đấu", Icons.Default.EmojiEvents, AdminSection.LEAGUES),
         AdminMenuItem("Quản lý Cầu thủ", "Cơ sở dữ liệu cầu thủ toàn hệ thống", Icons.Default.Person, AdminSection.PLAYERS),
-        AdminMenuItem("Lịch thi đấu", "Sắp xếp và cập nhật kết quả trận đấu", Icons.Default.CalendarMonth, AdminSection.SCHEDULE),
+        AdminMenuItem("Lịch thi đấu", "Sắp xếp và cập nhật trạng thái HOT", Icons.Default.CalendarMonth, AdminSection.SCHEDULE),
         AdminMenuItem("Thống kê & Báo cáo", "Xem hiệu suất và dữ liệu giải đấu", Icons.Default.Assessment, AdminSection.STATS),
         AdminMenuItem("Xác nhận Thanh toán", "Phê duyệt lệ phí tham gia của các đội", Icons.Default.Payments, AdminSection.PAYMENTS, Color.Yellow)
     )
@@ -162,12 +169,98 @@ fun AdminMenuCard(item: AdminMenuItem, onClick: () -> Unit) {
     }
 }
 
-// Các màn hình con (Placeholders)
+// ==========================================
+// THIẾT LẬP MÀN HÌNH QUẢN LÝ LỊCH ĐẤU (BẬT/TẮT HOT THẬT)
+// ==========================================
+@Composable
+fun MatchScheduleManagementScreen(matchList: SnapshotStateList<FullMatchDetail>) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        ManagementHeader("QUẢN LÝ LỊCH THI ĐẤU", "Bật/Tắt trạng thái trận đấu HOT nổi bật nhanh")
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(matchList) { match ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (match.isHot) Color.Red else Color(0xFF222222)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (match.isHot) {
+                                    Text("⭐ ", fontSize = 14.sp)
+                                }
+                                Text(
+                                    text = "${match.teamA} VS ${match.teamB}",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Thời gian: ${match.time} - Ngày: ${match.date}",
+                                color = Color.Gray,
+                                fontSize = 12.sp
+                            )
+                        }
+
+                        // Cột điều khiển Switch Bật/Tắt HOT
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = if (match.isHot) "HOT 🔥" else "Thường",
+                                color = if (match.isHot) Color.Red else Color.Gray,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+
+                            // 🌟 TÌM ĐẾN COMPOSABLE SWITCH TRONG FILE MatchScheduleManagementScreen.kt
+                            Switch(
+                                checked = match.isHot,
+                                onCheckedChange = { isChecked ->
+                                    val index = matchList.indexOf(match)
+                                    if (index != -1) {
+                                        // Đổi thuộc tính và thay thế phần tử cũ để kích hoạt trigger vẽ lại giao diện
+                                        matchList[index] = match.copy(isHot = isChecked)
+
+                                        // 🔥 THÊM 2 DÒNG NÀY ĐỂ ÉP COMPOSE CẬP NHẬT TRẠNG THÁI TOÀN CỤC
+                                        val updatedList = matchList.toList()
+                                        matchList.clear()
+                                        matchList.addAll(updatedList)
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color.Red,
+                                    uncheckedThumbColor = Color.Gray,
+                                    uncheckedTrackColor = Color(0xFF222222)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Các màn hình con (Placeholders & Hoàn thiện UI)
 
 @Composable
 fun TeamManagementScreen() {
     ManagementHeader("QUẢN LÝ ĐỘI BÓNG", "Danh sách 24 đội bóng đã đăng ký")
-    // Ở đây sẽ có LazyColumn hiển thị danh sách đội bóng với các nút Duyệt/Xóa/Sửa
 }
 
 @Composable
@@ -178,11 +271,6 @@ fun LeagueManagementScreen() {
 @Composable
 fun PlayerManagementAdminScreen() {
     ManagementHeader("QUẢN LÝ CẦU THỦ", "Tìm kiếm và quản lý thông tin cầu thủ")
-}
-
-@Composable
-fun MatchScheduleManagementScreen() {
-    ManagementHeader("LỊCH THI ĐẤU", "Cập nhật thời gian và tỉ số trận đấu")
 }
 
 @Composable
@@ -239,7 +327,7 @@ fun ManagementHeader(title: String, subtitle: String) {
     }
 }
 
-// ---- MÀN HÌNH ĐĂNG NHẬP ADMIN (Nếu cần tách biệt) ----
+// ---- MÀN HÌNH ĐĂNG NHẬP ADMIN ----
 @Composable
 fun AdminLoginScreen(onLoginSuccess: () -> Unit) {
     var adminCode by remember { mutableStateOf("") }
@@ -274,7 +362,7 @@ fun AdminLoginScreen(onLoginSuccess: () -> Unit) {
         Button(
             onClick = {
                 if(adminCode == "admin" && password == "123") onLoginSuccess()
-                else { /* Toast error */ }
+                else { /* Xử lý báo lỗi */ }
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),

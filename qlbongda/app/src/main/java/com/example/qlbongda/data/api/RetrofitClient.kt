@@ -11,10 +11,7 @@ object RetrofitClient {
 
     private var retrofit: Retrofit? = null
 
-    /**
-     * Hàm lấy ApiService duy nhất phục vụ toàn bộ ứng dụng.
-     * Truyền [context] vào để sau này nếu bạn cần cấu hình thêm Interceptor (như tự động đính kèm Token) sẽ tiện quản lý.
-     */
+
     fun getClient(context: Context): ApiService {
         if (retrofit == null) {
             retrofit = Retrofit.Builder()

@@ -37,27 +37,34 @@ val NeonGreen = Color(0xFF00FF00)
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
-    onForgotPasswordClick: () -> Unit // 🌟 Nhận tham số điều hướng từ MainActivity
+    onForgotPasswordClick: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleScope = LocalLifecycleOwner.current.lifecycleScope
+
+    // Khởi tạo SharedPreferences để đọc/ghi nhớ tài khoản
+    val sharedPref = remember {
+        context.getSharedPreferences("AUTH_PREF", android.content.Context.MODE_PRIVATE)
+    }
+
+    // 🌟 ĐỌC DỮ LIỆU ĐÃ LƯU TRƯỚC ĐÓ KHI MÀN HÌNH KHỞI CHẠY 🌟
+    var email by remember { mutableStateOf(sharedPref.getString("REMEMBERED_EMAIL", "") ?: "") }
+    var password by remember { mutableStateOf(sharedPref.getString("REMEMBERED_PASSWORD", "") ?: "") }
+    var isRememberMeChecked by remember { mutableStateOf(sharedPref.getBoolean("IS_REMEMBERED", false)) }
+
     var isPasswordVisible by remember { mutableStateOf(false) }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
 
-    // ---- QUẢN LÝ HIỆU ỨNG NÚT ĐĂNG NHẬP ----
+    // ---- QUẢN LÝ HIỆU ỨNG NÚT BẤM ----
     val loginInteractionSource = remember { MutableInteractionSource() }
     val isLoginPressed by loginInteractionSource.collectIsPressedAsState()
     val loginScale by animateFloatAsState(if (isLoginPressed) 0.95f else 1.0f)
 
-    // ---- QUẢN LÝ HIỆU ỨNG NÚT ĐĂNG KÝ ----
     val registerInteractionSource = remember { MutableInteractionSource() }
     val isRegisterPressed by registerInteractionSource.collectIsPressedAsState()
     val registerScale by animateFloatAsState(if (isRegisterPressed) 0.95f else 1.0f)
 
-    // ---- QUẢN LÝ HIỆU ỨNG NÚT QUÊN MẬT KHẨU ----
     val forgotInteractionSource = remember { MutableInteractionSource() }
     val isForgotPressed by forgotInteractionSource.collectIsPressedAsState()
     val forgotScale by animateFloatAsState(if (isForgotPressed) 0.92f else 1.0f)
@@ -137,17 +144,38 @@ fun LoginScreen(
             Text(text = errorMessage, color = Color.Red, fontSize = 14.sp)
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Nút Quên mật khẩu lệch phải
-        Box(
+        // 🌟 THANH ĐIỀU KHIỂN: GHI NHỚ MẬT KHẨU & QUÊN MẬT KHẨU 🌟
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.CenterEnd
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Khối nút Checkbox Ghi nhớ tài khoản (Bên trái)
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = isRememberMeChecked,
+                    onCheckedChange = { isRememberMeChecked = it },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = NeonGreen,
+                        uncheckedColor = NeonGreen,
+                        checkmarkColor = Color.Black
+                    )
+                )
+                Text(
+                    text = "Ghi nhớ",
+                    color =NeonGreen,
+                    fontSize = 14.sp
+                )
+            }
+
+            // Nút Quên mật khẩu (Bên phải)
             TextButton(
                 onClick = {
                     if (!isLoading) {
-                        // 🌟 ĐÃ SỬA: Thay thế Toast cũ bằng hàm chuyển hướng màn hình quên mật khẩu
                         onForgotPasswordClick()
                     }
                 },
@@ -174,7 +202,10 @@ fun LoginScreen(
             // NÚT ĐĂNG NHẬP (Bên trái)
             Button(
                 onClick = {
-                    if (email.trim().isEmpty() || password.trim().isEmpty()) {
+                    val inputEmail = email.trim()
+                    val inputPassword = password.trim()
+
+                    if (inputEmail.isEmpty() || inputPassword.isEmpty()) {
                         errorMessage = "Vui lòng nhập đầy đủ tài khoản và mật khẩu!"
                     } else if (!isLoading) {
                         errorMessage = ""
@@ -183,8 +214,8 @@ fun LoginScreen(
                         lifecycleScope.launch {
                             try {
                                 val loginRequest = LoginRequest(
-                                    email = email.trim(),
-                                    password = password.trim()
+                                    email = inputEmail,
+                                    password = inputPassword
                                 )
                                 val apiService = RetrofitClient.getClient(context)
                                 val response = apiService.login(loginRequest)
@@ -192,8 +223,22 @@ fun LoginScreen(
                                 if (response.isSuccessful && response.body() != null) {
                                     val loginResult = response.body()!!
 
-                                    val sharedPref = context.getSharedPreferences("AUTH_PREF", android.content.Context.MODE_PRIVATE)
-                                    sharedPref.edit().putString("ACCESS_TOKEN", loginResult.token).apply()
+                                    // 🌟 XỬ LÝ LƯU HOẶC XÓA TÀI KHOẢN THEO TRẠNG THÁI CHECKBOX 🌟
+                                    sharedPref.edit().apply {
+                                        putString("ACCESS_TOKEN", loginResult.token).apply() // Lưu token hệ thống
+
+                                        if (isRememberMeChecked) {
+                                            putString("REMEMBERED_EMAIL", inputEmail)
+                                            putString("REMEMBERED_PASSWORD", inputPassword)
+                                            putBoolean("IS_REMEMBERED", true)
+                                        } else {
+                                            // Nếu không chọn "Ghi nhớ", dọn dẹp bộ nhớ cũ liền
+                                            remove("REMEMBERED_EMAIL")
+                                            remove("REMEMBERED_PASSWORD")
+                                            putBoolean("IS_REMEMBERED", false)
+                                        }
+                                        apply()
+                                    }
 
                                     Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
                                     onLoginSuccess()
