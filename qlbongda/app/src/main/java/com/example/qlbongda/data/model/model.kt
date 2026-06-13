@@ -62,7 +62,16 @@ data class GenericResponse(
 
 
 // 2. Tạo Class hứng dữ liệu C# trả về
-
+data class StandingItem(
+    val rank: Int,
+    val teamName: String,
+    val played: Int,
+    val goalDifference: String,
+    val points: Int,
+    val coachName: String = "Chưa cập nhật",   // 🌟 Thêm HLV
+    val captainName: String = "Chưa cập nhật", // 🌟 Thêm Đội trưởng
+    val players: List<PlayerInfo> = emptyList() // 🌟 Thêm danh sách cầu thủ
+)
 data class StandingRow(
     val rank: Int,
     val teamName: String,
