@@ -33,7 +33,31 @@ data class RegisterResponse(
     val success: Boolean,
     val message: String
 )
+data class ProfileData(
+    val name: String,
+    val email: String,
+    val phone: String,
+    val email_verified: Int, // Nhận về 0 (chưa kích hoạt) hoặc 1 (đã kích hoạt)
+    val role: String
+)
 
+// Khối phản hồi tổng khi lấy dữ liệu Profile
+data class ProfileResponse(
+    val success: Boolean,
+    val data: ProfileData?
+)
+
+// Khối dữ liệu truyền lên API khi thực hiện Xác thực OTP tại Profile
+data class VerifyOtpRequest(
+    val email: String,
+    val otp: String
+)
+
+// Khối phản hồi dùng chung khi xác thực OTP thành công/thất bại
+data class VerifyOtpResponse(
+    val success: Boolean,
+    val message: String
+)
 // Khối dữ liệu gửi đi ở Bước 1
 data class VerifyEmailRequest(
     val email: String

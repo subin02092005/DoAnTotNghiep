@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var currentScreen by remember { mutableStateOf("home") }
-                    var previousScreen by remember { mutableStateOf("home") }
+                   var previousScreen by remember { mutableStateOf("home") }
 
                     // 🌟 HOISTING STATE: Đưa toàn bộ trạng thái đội bóng lên MainActivity quản lý chung
                     var isTeamRegistered by remember { mutableStateOf(false) }
