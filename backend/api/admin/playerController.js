@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
 
-// Cấu hình kết nối Database của bạn
+// Cấu hình kết nối Database
 const dbConfig = {
     host: 'localhost',
     user: 'root',
