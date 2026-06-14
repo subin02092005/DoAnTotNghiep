@@ -16,13 +16,13 @@ import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingRow
+import com.example.qlbongda.data.model.TournamentPhase // 🌟 THÊM IMPORT NÀY
 import androidx.compose.runtime.snapshots.SnapshotStateList
-
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    phaseList: List<TournamentPhase>, // 🌟 1. THÊM THAM SỐ ĐỂ ĐÓN MẢNG VÒNG ĐẤU ĐỘNG TỪ MAINACTIVITY
     matchList: List<FullMatchDetail>,
     onLogout: () -> Unit,
     onNavigateToStandingDetail: () -> Unit,
@@ -81,35 +81,27 @@ fun HomeScreen(
                         icon = { Icon(Icons.Default.DateRange, contentDescription = "Lịch thi đấu") },
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.Black, unselectedIconColor = Color.LightGray, indicatorColor = NeonGreen)
                     )
-
                     NavigationBarItem(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        label = { Text("Đội bóng", color = if (selectedTab == 2) NeonGreen else Color.LightGray, fontSize = 11.sp) },
-                        icon = { Icon(Icons.Default.List, contentDescription = "Chi tiết đội bóng") },
+                        label = { Text("Tin tức", color = if (selectedTab == 2) NeonGreen else Color.LightGray, fontSize = 11.sp) },
+                        icon = { Text("📰", fontSize = 20.sp) },
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.Black, unselectedIconColor = Color.LightGray, indicatorColor = NeonGreen)
                     )
                     NavigationBarItem(
                         selected = selectedTab == 3,
                         onClick = { selectedTab = 3 },
-                        label = { Text("Cá nhân", color = if (selectedTab == 3) NeonGreen else Color.LightGray, fontSize = 11.sp) },
-                        icon = { Icon(Icons.Default.Info, contentDescription = "Trang cá nhân") },
+                        label = { Text("Đội bóng", color = if (selectedTab == 3) NeonGreen else Color.LightGray, fontSize = 11.sp) },
+                        icon = { Icon(Icons.Default.List, contentDescription = "Chi tiết đội bóng") },
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.Black, unselectedIconColor = Color.LightGray, indicatorColor = NeonGreen)
                     )
                     NavigationBarItem(
-                            selected = selectedTab == 4,
-                    onClick = { selectedTab = 4 },
-                    label = { Text("Tin tức", color = if (selectedTab == 4) NeonGreen else Color.LightGray, fontSize = 11.sp) },
-                    icon = { Text("📰", fontSize = 20.sp) },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.Black, unselectedIconColor = Color.LightGray, indicatorColor = NeonGreen)
+                        selected = selectedTab == 4,
+                        onClick = { selectedTab = 4 },
+                        label = { Text("Cá nhân", color = if (selectedTab == 4) NeonGreen else Color.LightGray, fontSize = 11.sp) },
+                        icon = { Icon(Icons.Default.Info, contentDescription = "Trang cá nhân") },
+                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.Black, unselectedIconColor = Color.LightGray, indicatorColor = NeonGreen)
                     )
-//                    NavigationBarItem(
-//                        selected = selectedTab == 5,
-//                        onClick = { selectedTab = 5 },
-//                        label = { Text("Giải Cúp", color = if (selectedTab == 5) NeonGreen else Color.LightGray, fontSize = 11.sp) },
-//                        icon = { Text("🏆", fontSize = 20.sp) }, // Icon chiếc cúp
-//                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.Black, unselectedIconColor = Color.LightGray, indicatorColor = NeonGreen)
-//                    )
                 }
             }
         ) { innerPadding ->
@@ -121,19 +113,21 @@ fun HomeScreen(
             ) {
                 when (selectedTab) {
                     0 -> HomeTabContent(
+                        phaseList = phaseList, // 🌟 2. TIẾP TỤC ĐẨY PHACELIST VÀO ĐỂ KHỚP LƯỜNG VỚI HOMETABCONTENT
                         standingList = standingList,
                         teamName = teamName,
                         coachName = coachName,
                         leaderName = leaderName,
                         playerList = playerList,
                         onNavigateToStandingDetail = onNavigateToStandingDetail,
-                        onTeamClick = onTeamClick // 🌟 Thêm dòng này để truyền sự kiện lên MainActivity
+                        onTeamClick = onTeamClick
                     )
                     1 -> ScheduleTabContent(
                         matchList = matchList,
                         onMatchClick = { activeDetailMatch = it }
                     )
-                    2 -> TeamTabContent(
+                    2 -> NewsTabContent()
+                    3 -> TeamTabContent(
                         playerList = playerList,
                         isTeamRegistered = isTeamRegistered,
                         onTeamRegisteredChange = onTeamRegisteredChange,
@@ -146,9 +140,7 @@ fun HomeScreen(
                         isLeagueRegistered = isLeagueRegistered,
                         onLeagueRegisteredChange = onLeagueRegisteredChange
                     )
-                    3 -> ProfileTabContent(onLogout = onLogout)
-                    4 -> NewsTabContent()
-                   // 5 -> KnockoutBracketScreen()
+                    4 -> ProfileTabContent(onLogout = onLogout)
                 }
             }
         }

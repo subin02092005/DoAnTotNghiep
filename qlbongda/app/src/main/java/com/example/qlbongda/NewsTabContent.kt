@@ -14,23 +14,39 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext // 🌟 ĐÃ THÊM: Để lấy context trong Jetpack Compose
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.FootballNews
 import androidx.compose.foundation.border
+import com.example.qlbongda.data.api.RetrofitClient
+
 @Composable
 fun NewsTabContent() {
     var activeDetailNews by remember { mutableStateOf<FootballNews?>(null) }
 
-    val newsList = remember {
-        listOf(
-            FootballNews(id = 1, title = "Arsenal giành chiến thắng kịch tính phút bù giờ cuối cùng", summary = "Trận đấu nghẹt thở kết thúc với tỷ số 3-2 nghiêng về Pháo thủ.", time = "10 phút trước", source = "Sky Sports", category = "Ngoại Hạng Anh", content = "Trận đấu muộn vòng 34 đã diễn ra vô cùng kịch tính tại thánh địa Emirates. Dù bị dẫn trước từ sớm, các cầu thủ Arsenal vẫn kiên trì lội ngược dòng thành công. Bàn thắng quyết định được ghi do công của đội trưởng ở phút bù giờ thứ 5, đem về 3 điểm quý giá giữ vững ngôi đầu bảng cho Pháo Thủ."),
-            FootballNews(id = 2, title = "Siêu máy tính dự đoán nhà vô địch Ngoại Hạng Anh 2026", summary = "Tỷ lệ vô địch của Man City giảm mạnh sau chuỗi trận hòa.", time = "1 giờ trước", source = "BBC Sport", category = "Phân Tích", content = "Theo mô phỏng mới nhất từ siêu máy tính Opta, tỷ lệ bảo vệ ngôi vương của Manchester City đã sụt giảm nghiêm trọng xuống còn 42.5%. Trong khi đó, phong độ hủy diệt của các câu lạc bộ bám đuổi đã đẩy cục diện cuộc đua vô địch năm nay trở nên căng thẳng và khó lường hơn bao giờ hết."),
-            FootballNews(id = 3, title = "Chấn thương của ngôi sao MU nghiêm trọng hơn dự kiến", summary = "Tiền đạo chủ lực phải nghỉ thi đấu ít nhất 3 tuần.", time = "3 giờ trước", source = "ESPN", category = "Chấn Thương", content = "Tin không vui dành cho người hâm mộ Quỷ Đỏ khi bộ phận y tế xác nhận tiền đạo chủ lực đã gặp phải một chấn thương gân khoeo cấp độ 2. Anh chắc chắn sẽ vắng mặt trong chuỗi 4 trận đấu quan trọng sắp tới, bao gồm cả trận derby rực lửa vào tuần sau."),
-            FootballNews(id = 4, title = "Thị trường chuyển nhượng: Chelsea nhắm bom tấn 100 triệu Euro", summary = "Đội bóng quyết tâm bổ sung một trung phong đẳng cấp.", time = "5 giờ trước", source = "Romano", category = "Chuyển Nhượng", content = "Chuyên gia săn tin chuyển nhượng Fabrizio Romano vừa độc quyền tiết lộ ban lãnh đạo Chelsea đang rục rịch đàm phán kích hoạt điều khoản giải phóng hợp đồng của tiền đạo hot nhất châu Âu hiện tại. Dự kiến thương vụ bom tấn này có mức phí không dưới 100 triệu Euro nhằm sửa chữa hàng công cho câu lạc bộ.")
-        )
+    // 🌟 ĐÃ THÊM: Lấy Context hiện tại của màn hình ứng dụng để truyền vào Retrofit
+    val context = LocalContext.current
+
+    var newsList by remember { mutableStateOf<List<FootballNews>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    // TỰ ĐỘNG GỌI API KHI CHUYỂN QUA TAB TIN TỨC
+    LaunchedEffect(Unit) {
+        try {
+            // 🌟 ĐÃ SỬA: Truyền 'context' vào hàm getClient() để sửa triệt để lỗi biên dịch
+            val response = RetrofitClient.getClient(context).getNews()
+
+            if (response.isSuccessful && response.body()?.status == "success") {
+                newsList = response.body()?.data ?: emptyList()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isLoading = false
+        }
     }
 
     if (activeDetailNews != null) {
@@ -38,9 +54,20 @@ fun NewsTabContent() {
     } else {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Text(text = "TIN TỨC HOT", color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
-            LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(newsList) { item ->
-                    NewsItemRow(news = item, onClick = { activeDetailNews = item })
+
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+            } else if (newsList.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Không có tin tức nào mới.", color = Color.Gray, fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    items(newsList) { item ->
+                        NewsItemRow(news = item, onClick = { activeDetailNews = item })
+                    }
                 }
             }
         }

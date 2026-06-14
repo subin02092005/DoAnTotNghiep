@@ -1,6 +1,12 @@
 package com.example.qlbongda.data.model
 
-// Dữ liệu gửi lên API
+import com.google.gson.annotations.SerializedName
+
+// =================================================================
+// 1. AUTHENTICATION & USER MODELS
+// =================================================================
+
+// Dữ liệu gửi lên API login
 data class LoginRequest(
     val email: String,
     val password: String
@@ -15,7 +21,7 @@ data class User(
     val email_verified: Int
 )
 
-// Response tổng từ API
+// Response tổng từ API login
 data class LoginResponse(
     val success: Boolean,
     val message: String,
@@ -23,16 +29,25 @@ data class LoginResponse(
     val user: User?
 )
 
+// Dữ liệu gửi lên API đăng ký
 data class RegisterRequest(
     val name: String,
     val email: String,
     val phone: String,
     val password: String
 )
+
+// Response từ API đăng ký
 data class RegisterResponse(
     val success: Boolean,
     val message: String
 )
+
+
+// =================================================================
+// 2. PROFILE MODELS
+// =================================================================
+
 data class ProfileData(
     val name: String,
     val email: String,
@@ -58,7 +73,13 @@ data class VerifyOtpResponse(
     val success: Boolean,
     val message: String
 )
-// Khối dữ liệu gửi đi ở Bước 1
+
+
+// =================================================================
+// 3. PASSWORD RESET MODELS (QUÊN MẬT KHẨU)
+// =================================================================
+
+// Khối dữ liệu gửi đi ở Bước 1 (Gửi email yêu cầu OTP)
 data class VerifyEmailRequest(
     val email: String
 )
@@ -70,7 +91,7 @@ data class VerifyEmailResponse(
     val message: String
 )
 
-// Khối dữ liệu gửi đi ở Bước 2
+// Khối dữ liệu gửi đi ở Bước 2 (Đặt lại mật khẩu)
 data class ResetPasswordRequest(
     val email: String,
     val password: String
@@ -81,21 +102,53 @@ data class GenericResponse(
     val success: Boolean,
     val message: String
 )
-/////////////////////////////////////////////////////////////////////////////////////////////////
-// Dữ liệu gửi lên API login
 
 
-// 2. Tạo Class hứng dữ liệu C# trả về
+// =================================================================
+// 4. 🌟 TOURNAMENT & PHASES MODELS (ĐỒNG BỘ VÒNG ĐẤU ĐỘNG TỪ ADMIN)
+// =================================================================
+
+// Khối phản hồi tổng thể của mùa giải từ API
+data class SeasonResponse(
+    @SerializedName("status") val status: String,
+    @SerializedName("data") val data: SeasonDataResponse?
+)
+
+// 🌟 THÊM CHO ĐẦY ĐỦ: Khối dữ liệu chứa ID mùa giải và mảng các vòng đấu
+data class SeasonDataResponse(
+    @SerializedName("season_id") val seasonId: Int,
+    @SerializedName("phases") val phases: List<TournamentPhase>
+)
+
+// Model chi tiết của từng vòng đấu (Vòng Bảng, Tứ Kết, Bán Kết, Chung Kết...)
+data class TournamentPhase(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,         // Tên hiển thị (Ví dụ: "Vòng Bảng")
+    @SerializedName("format") val format: String        // Thể thức: "round_robin" hoặc "knockout"
+)
+
+
+// =================================================================
+// 5. MATCH & STANDINGS MODELS (BẢNG XẾP HẠNG & TRẬN ĐẤU)
+// =================================================================
+
+// Tạo Class hứng dữ liệu C# trả về
 data class StandingItem(
     val rank: Int,
     val teamName: String,
     val played: Int,
     val goalDifference: String,
     val points: Int,
-    val coachName: String = "Chưa cập nhật",   // 🌟 Thêm HLV
-    val captainName: String = "Chưa cập nhật", // 🌟 Thêm Đội trưởng
-    val players: List<PlayerInfo> = emptyList() // 🌟 Thêm danh sách cầu thủ
+    val coachName: String = "Chưa cập nhật",   // Thêm HLV
+    val captainName: String = "Chưa cập nhật", // Thêm Đội trưởng
+    val players: List<PlayerInfo> = emptyList() // Thêm danh sách cầu thủ
 )
+data class TeamDetailResponse(
+    val status: String,
+    val message: String,
+    val data: StandingItem // Trả về object StandingItem chứa list cầu thủ, tên HLV, Đội trưởng
+)
+// Model dòng bảng xếp hạng rút gọn hiển thị ở Home
 data class StandingRow(
     val rank: Int,
     val teamName: String,
@@ -103,23 +156,39 @@ data class StandingRow(
     val goalDifference: String,
     val points: Int
 )
-data class FootballNews(
-    val id: Int,
-    val title: String,
-    val summary: String,
-    val time: String,
-    val source: String,
-    val imageUrl: String = "",
-    val content: String = "",
-    val category: String = "Tin Tức",
-    val author: String = "Ban Biên Tập"// Bạn có thể tích hợp thư viện Coil để tải ảnh sau
+
+// Model chi tiết bảng xếp hạng đầy đủ
+data class DetailedStanding(
+    val rank: Int,
+    val teamName: String,
+    val logoUrl: String,
+    val played: Int,
+    val won: Int,
+    val drawn: Int,
+    val lost: Int,
+    val goalsFor: Int,
+    val goalsAgainst: Int,
+    val goalDifference: String,
+    val points: Int,
+    val form: List<String>
 )
+data class DetailedStandingResponse(
+    val status: String,
+    val message: String,
+    val data: List<GroupStanding> // Thay vì List<DetailedStanding>, giờ là danh sách các Bảng
+)
+data class GroupStanding(
+    val groupName: String,          // "Bảng A", "Bảng B", "Bảng C"...
+    val standings: List<DetailedStanding> // Danh sách các đội thuộc bảng này
+)
+// Cầu thủ
 data class PlayerInfo(
     val number: String,
     val name: String,
     val position: String
 )
 
+// Sự kiện trong trận đấu
 data class MatchEvent(
     val minute: String,
     val team: String,
@@ -127,6 +196,7 @@ data class MatchEvent(
     val playerName: String
 )
 
+// Chi tiết toàn bộ trận đấu (Gồm cả thông số sút bóng, kiểm soát bóng,...)
 data class FullMatchDetail(
     val id: Int,
     val teamA: String,
@@ -149,17 +219,25 @@ data class FullMatchDetail(
     val mvp: String,
     val isHot: Boolean = false
 )
-data class DetailedStanding(
-    val rank: Int,
-    val teamName: String,
-    val logoUrl: String,
-    val played: Int,
-    val won: Int,
-    val drawn: Int,
-    val lost: Int,
-    val goalsFor: Int,
-    val goalsAgainst: Int,
-    val goalDifference: String,
-    val points: Int,
-    val form: List<String>
+
+
+// =================================================================
+// 6. NEWS MODELS (TIN TỨC BÓNG ĐÁ)
+// =================================================================
+
+data class FootballNews(
+    val id: Int,
+    val title: String,
+    val summary: String,
+    val time: String,
+    val source: String,
+    val imageUrl: String = "",
+    val content: String = "",
+    val category: String = "Tin Tức",
+    val author: String = "Ban Biên Tập"
+)
+data class NewsResponse(
+    val status: String,
+    val message: String,
+    val data: List<FootballNews>
 )

@@ -5,11 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items // 🌟 Cần import cái này để sử dụng items(playerList)
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -21,20 +21,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.qlbongda.data.model.PlayerInfo
-// Giả định màu NeonGreen được định nghĩa ở đâu đó trong project, ví dụ:
-
+import com.example.qlbongda.data.model.StandingItem // 🌟 ĐÃ THÊM: Import Model chuẩn nhận từ API MySQL của bạn
 
 val DarkBackground = Color(0xFF0A0A0A)
 val CardBackground = Color(0xFF121212)
 
-@OptIn(ExperimentalMaterial3Api::class)// 🌟 1. Sửa lỗi viết sai từ khóa 'class' thành tên annotation chuẩn của Material 3
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TeamDetailScreen(
-    teamName: String,
-    coachName: String,
-    captainName: String,
-    playerList: List<PlayerInfo>,
+    team: StandingItem, // 🌟 ĐÃ SỬA: Nhận trực tiếp gói dữ liệu động tải từ MySQL về thay vì truyền rời rạc các biến tĩnh
     onBackClick: () -> Unit
 ) {
     Scaffold(
@@ -45,7 +40,7 @@ fun TeamDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại", tint = NeonGreen)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = NeonGreen)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground)
@@ -74,7 +69,7 @@ fun TeamDetailScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = teamName.take(2).uppercase(),
+                            text = team.teamName.take(2).uppercase(),
                             color = NeonGreen,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black
@@ -82,7 +77,7 @@ fun TeamDetailScreen(
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = teamName.uppercase(),
+                        text = team.teamName.uppercase(),
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
@@ -107,7 +102,7 @@ fun TeamDetailScreen(
                     Card(
                         modifier = Modifier.weight(1f),
                         colors = CardDefaults.cardColors(containerColor = CardBackground),
-                        border = BorderStroke(1.dp, Color.Yellow)
+                        border = BorderStroke(1.dp, Color(0xFF333333))
                     ) {
                         Column(
                             modifier = Modifier.padding(12.dp),
@@ -123,7 +118,7 @@ fun TeamDetailScreen(
                             Text("HUẤN LUYỆN VIÊN", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (coachName.trim().isEmpty()) "Chưa cập nhật" else coachName,
+                                text = if (team.coachName.trim().isEmpty()) "Chưa cập nhật" else team.coachName,
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
@@ -137,7 +132,7 @@ fun TeamDetailScreen(
                     Card(
                         modifier = Modifier.weight(1f),
                         colors = CardDefaults.cardColors(containerColor = CardBackground),
-                        border = BorderStroke(1.dp, NeonGreen)
+                        border = BorderStroke(1.dp, Color(0xFF333333))
                     ) {
                         Column(
                             modifier = Modifier.padding(12.dp),
@@ -153,7 +148,7 @@ fun TeamDetailScreen(
                             Text("ĐỘI TRƯỞNG (C)", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (captainName.trim().isEmpty()) "Chưa cập nhật" else captainName,
+                                text = if (team.captainName.trim().isEmpty()) "Chưa cập nhật" else team.captainName,
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
@@ -168,7 +163,7 @@ fun TeamDetailScreen(
             // --- TIÊU ĐỀ DANH SÁCH THÀNH VIÊN ---
             item {
                 Text(
-                    text = "DANH SÁCH CẦU THỦ (${playerList.size})",
+                    text = "DANH SÁCH CẦU THỦ (${team.players.size})",
                     color = NeonGreen,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
@@ -176,8 +171,8 @@ fun TeamDetailScreen(
                 )
             }
 
-            // Nếu đội bóng chưa có cầu thủ nào đăng ký
-            if (playerList.isEmpty()) {
+            // Nếu đội bóng chưa có cầu thủ nào đăng ký từ Database
+            if (team.players.isEmpty()) {
                 item {
                     Text(
                         text = "Danh sách cầu thủ đang được cập nhật...",
@@ -190,14 +185,14 @@ fun TeamDetailScreen(
             }
 
             // --- DANH SÁCH CẦU THỦ CHI TIẾT ---
-            // 🌟 2. Sửa lỗi ép kiểu: Sử dụng extension function `items(playerList)` đúng chuẩn
-            items(playerList) { player ->
+            items(team.players) { player ->
+                val isCaptain = player.name == team.captainName
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(CardBackground, RoundedCornerShape(8.dp))
                         .border(
-                            border = if (player.name == captainName) BorderStroke(1.dp, NeonGreen.copy(alpha = 0.5f)) else BorderStroke(0.dp, Color.Transparent),
+                            border = if (isCaptain) BorderStroke(1.dp, NeonGreen.copy(alpha = 0.4f)) else BorderStroke(1.dp, Color(0xFF1F1F1F)),
                             shape = RoundedCornerShape(8.dp)
                         )
                         .padding(12.dp),
@@ -220,31 +215,36 @@ fun TeamDetailScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(text = player.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
 
-                            if (player.name == captainName) {
+                            if (isCaptain) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "C",
                                     color = Color.Black,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier // 🌟 3. SỬA LỖI CHÍNH: Thêm từ khóa Modifier gốc vào đây (Bạn viết thiếu chữ Modifier. khiến code bị crash)
+                                    modifier = Modifier
                                         .background(NeonGreen, RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
                                 )
                             }
                         }
-                        Text(text = "Vị trí: ${player.position}", color = Color.LightGray, fontSize = 12.sp)
+                        Text(text = "Vị trí: ${player.position}", color = Color.Gray, fontSize = 12.sp)
                     }
 
-                    // Hiển thị tag vị trí bên góc phải (GK, DF, MF, FW)
+                    // Hiển thị tag vị trí bên góc phải màu sắc sinh động (Tiền đạo - FW, Tiền vệ - MF, v.v)
                     Text(
-                        text = player.position,
+                        text = when(player.position) {
+                            "Tiền đạo", "FW" -> "FW"
+                            "Tiền vệ", "MF" -> "MF"
+                            "Hậu vệ", "DF" -> "DF"
+                            else -> "GK"
+                        },
                         color = when(player.position) {
-                            "GK" -> Color.Yellow
-                            "DF" -> Color.Cyan
-                            "MF" -> Color.Green
-                            else -> Color.Red
-                        }.copy(alpha = 0.8f),
+                            "Tiền đạo", "FW" -> Color(0xFFFF5252)
+                            "Tiền vệ", "MF" -> Color(0xFF69F0AE)
+                            "Hậu vệ", "DF" -> Color(0xFF40C4FF)
+                            else -> Color(0xFFFFD740)
+                        },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )

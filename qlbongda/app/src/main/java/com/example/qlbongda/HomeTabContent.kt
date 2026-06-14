@@ -19,11 +19,11 @@ import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingRow
 import androidx.compose.foundation.lazy.LazyRow
-
-
+import com.example.qlbongda.data.model.TournamentPhase
 @Composable
 fun HomeTabContent(
-    standingList: List<StandingRow>, // Giữ nguyên để tránh lỗi đối chiếu ở các file khác
+    phaseList: List<TournamentPhase>, // 🌟 Nhận danh sách vòng đấu động từ API
+    standingList: List<StandingRow>,  // Giữ nguyên để tránh lỗi đối chiếu ở các file khác
     teamName: String,
     coachName: String,
     leaderName: String,
@@ -31,13 +31,11 @@ fun HomeTabContent(
     onNavigateToStandingDetail: () -> Unit,
     onTeamClick: (String) -> Unit
 ) {
-    // 🌟 1. Biến quản lý chế độ chơi lớn: false = Hiện BXH, true = Hiện đấu Cúp
-    var isCupMode by remember { mutableStateOf(false) }
-
-    // 🌟 2. Biến quản lý tên Bảng đang được chọn xem (Mặc định hiển thị Bảng A)
+    // Tự chọn vòng đấu đầu tiên từ API làm mặc định khi mở app
+    var selectedPhase by remember(phaseList) { mutableStateOf(phaseList.firstOrNull()) }
     var selectedGroupName by remember { mutableStateOf("BẢNG A") }
 
-    // 🌟 3. DỮ LIỆU MOCK THEO THỂ THỨC WORLD CUP (4 đội/bảng)
+    // Bản đồ Mock dữ liệu nhóm bảng theo thiết kế cũ
     val groupDataMap = remember {
         mapOf(
             "BẢNG A" to listOf(
@@ -48,32 +46,19 @@ fun HomeTabContent(
             ),
             "BẢNG B" to listOf(
                 StandingRow(1, "Anh", 3, "+6", 7),
-                StandingRow(2, "Mỹ", 3, "+1", 5),
+                StandingRow(2, "Mỹ", 3, "+2", 5),
                 StandingRow(3, "Iran", 3, "-3", 3),
-                StandingRow(4, "Xứ Wales", 3, "-4", 1)
-            ),
-            "BẢNG C" to listOf(
-                StandingRow(1, "Argentina", 3, "+3", 6),
-                StandingRow(2, "Ba Lan", 3, "0", 4),
-                StandingRow(3, "Mexico", 3, "-1", 4),
-                StandingRow(4, "Ả Rập Xê Út", 3, "-2", 3)
-            ),
-            "BẢNG D" to listOf(
-                StandingRow(1, "Nhật Bản", 3, "+1", 6),
-                StandingRow(2, "Tây Ban Nha", 3, "+6", 4),
-                StandingRow(3, "Đức", 3, "+1", 4),
-                StandingRow(4, "Costa Rica", 3, "-8", 3)
+                StandingRow(4, "Xứ Wales", 3, "-5", 1)
             )
         )
     }
 
-    // Lấy ra danh sách 4 đội tương ứng với bảng đang được người dùng bấm chọn
     val currentGroupStandings = groupDataMap[selectedGroupName] ?: emptyList()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
-        // ---- THANH CHỌN CHẾ ĐỘ ĐẤU CHÍNH ----
-        Row(
+        // 🌟 1. THANH TABS CHỌN VÒNG ĐẤU ĐỘNG (ĐỒNG BỘ THEO ADMIN CHỌN)
+        LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -81,34 +66,38 @@ fun HomeTabContent(
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(
-                onClick = { isCupMode = false },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = if (!isCupMode) NeonGreen else Color.Transparent),
-                shape = RoundedCornerShape(6.dp)
-            ) {
-                Text("Vòng Bảng", color = if (!isCupMode) Color.Black else Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-
-            Button(
-                onClick = { isCupMode = true },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = if (isCupMode) NeonGreen else Color.Transparent),
-                shape = RoundedCornerShape(6.dp)
-            ) {
-                Text("Vòng Đo ván (Cup)", color = if (isCupMode) Color.Black else Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            items(phaseList) { phase ->
+                val isSelected = selectedPhase?.id == phase.id
+                Button(
+                    onClick = { selectedPhase = phase },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) NeonGreen else Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = phase.name, // "Vòng Bảng", "Tứ Kết", "Bán Kết", "Chung Kết"...
+                        color = if (isSelected) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
             }
         }
 
-        // ---- HIỂN THỊ NỘI DUNG ----
-        if (isCupMode) {
+        // 🌟 2. PHÂN CHIA GIAO DIỆN THEO THỂ THỨC (FORMAT) ĐƯỢC CHỌN
+        if (selectedPhase?.format == "knockout") {
+
+            // 👉 NẾU ADMIN CÀI ĐẶT LÀ KNOCKOUT: Gọi trực tiếp màn hình cây nhánh đấu cúp của bạn
             Box(modifier = Modifier.fillMaxSize()) {
                 KnockoutBracketScreen()
             }
-        } else {
-            // ---- CHẾ ĐỘ XEM CÁC BẢNG ĐẤU ----
 
-            // 🌟 THANH CUỘN NGANG CHỌN BẢNG (Bảng A, B, C, D)
+        } else {
+
+            // 👉 NẾU ADMIN CÀI ĐẶT LÀ ROUND_ROBIN (VÒNG TRÒN / BXH): Hiện bảng xếp hạng tính điểm
+            // Thanh chọn danh sách các Bảng đấu (A, B, C...)
             LazyRow(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -135,26 +124,26 @@ fun HomeTabContent(
                 }
             }
 
-            // BẢNG XẾP HẠNG CHI TIẾT CỦA BẢNG ĐƯỢC CHỌN
+            // Danh sách hiển thị Bảng Xếp Hạng chi tiết
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(bottom = 16.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        Column {
-                            Text(text = "BẢNG XẾP HẠNG $selectedGroupName", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Mỗi bảng đấu lấy 2 đội dẫn đầu đi tiếp", color = Color.LightGray, fontSize = 11.sp)
-                        }
+                    Column {
+                        // Tên tiêu đề đổi động theo Vòng đấu của Admin chọn
+                        Text(
+                            text = "${selectedPhase?.name?.uppercase()} - $selectedGroupName",
+                            color = NeonGreen,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(text = "Mỗi bảng đấu lấy 2 đội dẫn đầu đi tiếp", color = Color.LightGray, fontSize = 11.sp)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Tiêu đề các cột
+                // Header tiêu đề cột dữ liệu của bảng xếp hạng
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -162,47 +151,49 @@ fun HomeTabContent(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
                         border = BorderStroke(1.dp, Color(0xFF222222))
                     ) {
-                        Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 4.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("STT", color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                                Text("ĐỘI BÓNG", color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                Text("TRẬN", color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
-                                Text("HS", color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
-                                Text("ĐIỂM", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Hạng", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.width(40.dp))
+                            Text(text = "Đội bóng", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.weight(1F))
+                            Row(horizontalArrangement = Arrangement.End) {
+                                Text(text = "ST", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
+                                Text(text = "HS", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
+                                Text(text = "Điểm", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
                             }
-                            HorizontalDivider(color = Color(0xFF222222), thickness = 1.dp)
                         }
                     }
                 }
 
-                // Danh sách các đội trong bảng hiện tại
+                // Đổ các hàng dữ liệu đội bóng ra giao diện công khai
                 items(currentGroupStandings) { row ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().clickable { onNavigateToStandingDetail() },
                         shape = RoundedCornerShape(0.dp),
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
-                        border = BorderStroke(1.dp, Color(0xFF222222))
+                        border = BorderStroke(0.5.dp, Color(0xFF222222))
                     ) {
-                        Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
                                     text = row.rank.toString(),
-                                    color = if (row.rank <= 2) NeonGreen else Color.White, // Nhất nhì bảng tô xanh lá để biểu thị đi tiếp
+                                    color = if (row.rank <= 2) NeonGreen else Color.White,
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
-                                    modifier = Modifier.width(40.dp).clickable { onNavigateToStandingDetail() },
-                                    textAlign = TextAlign.Center
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.width(40.dp)
                                 )
-
                                 Text(
                                     text = row.teamName,
                                     color = Color.White,
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.Medium,
                                     modifier = Modifier.weight(1f).clickable { onTeamClick(row.teamName) }
                                 )
-
-                                Row(modifier = Modifier.wrapContentWidth().clickable { onNavigateToStandingDetail() }, verticalAlignment = Alignment.CenterVertically) {
+                                Row(horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                                     Text(text = row.played.toString(), color = Color.White, fontSize = 14.sp, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
                                     Text(text = row.goalDifference, color = Color.LightGray, fontSize = 14.sp, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
                                     Text(text = row.points.toString(), color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(45.dp), textAlign = TextAlign.Center)
@@ -213,7 +204,7 @@ fun HomeTabContent(
                     }
                 }
 
-                // Thẻ bo góc dưới
+                // Đóng góc chân bảng xếp hạng bo tròn
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth().height(8.dp),
@@ -225,10 +216,4 @@ fun HomeTabContent(
             }
         }
     }
-}
-
-// Hàm bọc bổ trợ để gọi màn hình nhánh đấu cúp mà không sợ bị lệch giao diện
-@Composable
-fun KnoutBracketScreenWrapper() {
-    KnockoutBracketScreen()
 }
