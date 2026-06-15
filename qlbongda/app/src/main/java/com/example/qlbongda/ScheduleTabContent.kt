@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.FullMatchDetail
+import com.example.qlbongda.ui.theme.NeonGreen
 
 @Composable
 fun ScheduleTabContent(

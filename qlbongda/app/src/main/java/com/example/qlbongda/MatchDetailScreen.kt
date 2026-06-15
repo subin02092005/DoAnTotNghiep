@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.data.model.MatchEvent
 import com.example.qlbongda.data.model.PlayerInfo
+import com.example.qlbongda.ui.theme.NeonGreen
 
 // Định nghĩa cấu trúc dữ liệu chi tiết cho trận đấu
 

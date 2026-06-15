@@ -101,6 +101,7 @@ class MainActivity : ComponentActivity() {
 
                     val apiService = remember { RetrofitClient.getClient(this@MainActivity) }
                     val homeViewModel = remember { HomeViewModel(apiService) }
+                    val adminViewModel = remember { AdminViewModel(apiService) }
 
                     when (currentScreen) {
                         "admin" -> {
@@ -109,7 +110,8 @@ class MainActivity : ComponentActivity() {
                                 onLogout = {
                                     Toast.makeText(this, "Đã đăng xuất!", Toast.LENGTH_SHORT).show()
                                     currentScreen = "login"
-                                }
+                                },
+                                adminViewModel = adminViewModel
                             )
                         }
 

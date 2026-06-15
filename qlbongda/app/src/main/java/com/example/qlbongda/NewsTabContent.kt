@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.FootballNews
 import androidx.compose.foundation.border
 import com.example.qlbongda.data.api.RetrofitClient
+import com.example.qlbongda.ui.theme.NeonGreen
 
 @Composable
 fun NewsTabContent() {

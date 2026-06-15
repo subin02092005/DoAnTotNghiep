@@ -18,6 +18,7 @@ import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingRow
 import com.example.qlbongda.data.model.TournamentPhase // 🌟 THÊM IMPORT NÀY
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.example.qlbongda.ui.theme.NeonGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

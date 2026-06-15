@@ -20,6 +20,8 @@ import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingRow
 import androidx.compose.foundation.lazy.LazyRow
 import com.example.qlbongda.data.model.TournamentPhase
+import com.example.qlbongda.ui.theme.NeonGreen
+
 @Composable
 fun HomeTabContent(
     phaseList: List<TournamentPhase>, // 🌟 Nhận danh sách vòng đấu động từ API

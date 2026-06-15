@@ -29,9 +29,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.LoginRequest
+import com.example.qlbongda.ui.theme.NeonGreen
 import kotlinx.coroutines.launch
-
-val NeonGreen = Color(0xFF00FF00)
 
 @Composable
 fun LoginScreen(

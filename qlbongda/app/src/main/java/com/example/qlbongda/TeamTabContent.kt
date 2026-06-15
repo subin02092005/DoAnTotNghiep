@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.example.qlbongda.data.model.PlayerInfo
+import com.example.qlbongda.ui.theme.NeonGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

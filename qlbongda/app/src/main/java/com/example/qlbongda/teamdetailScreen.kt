@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.StandingItem // 🌟 ĐÃ THÊM: Import Model chuẩn nhận từ API MySQL của bạn
+import com.example.qlbongda.ui.theme.NeonGreen
 
 val DarkBackground = Color(0xFF0A0A0A)
 val CardBackground = Color(0xFF121212)
