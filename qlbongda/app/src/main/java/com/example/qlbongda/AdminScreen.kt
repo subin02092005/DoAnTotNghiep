@@ -38,7 +38,7 @@ import com.example.qlbongda.ui.theme.NeonGreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminScreen(
-    matchList: SnapshotStateList<FullMatchDetail>, // 🌟 NHẬN DANH SÁCH DÙNG CHUNG TỪ NGOÀI TRUYỀN VÀO
+    matchList: List<FullMatchDetail>, // 🌟 NHẬN DANH SÁCH DÙNG CHUNG TỪ NGOÀI TRUYỀN VÀO
     onLogout: () -> Unit,
     adminViewModel: AdminViewModel // 🌟 THÊM VIEWMODEL VÀO ĐÂY
 ) {

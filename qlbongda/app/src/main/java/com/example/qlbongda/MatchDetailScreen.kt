@@ -33,7 +33,7 @@ import com.example.qlbongda.ui.theme.NeonGreen
 fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
     // Quản lý 3 trạng thái của thẻ Tag nội dung (0: Diễn biến, 1: Sơ đồ/Đội hình, 2: Thống kê)
     var selectedSubTab by remember { mutableStateOf(0) }
-
+    android.util.Log.d("DEBUG_DETAIL", "Events: ${match.events}")
     Scaffold(
         topBar = {
             TopAppBar(

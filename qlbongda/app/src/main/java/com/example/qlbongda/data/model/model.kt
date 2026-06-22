@@ -143,6 +143,7 @@ data class StandingItem(
     val captainName: String = "Chưa cập nhật", // Thêm Đội trưởng
     val players: List<PlayerInfo> = emptyList() // Thêm danh sách cầu thủ
 )
+
 data class TeamDetailResponse(
     val status: String,
     val message: String,
@@ -172,6 +173,7 @@ data class DetailedStanding(
     val points: Int,
     val form: List<String>
 )
+
 data class DetailedStandingResponse(
     val status: String,
     val message: String,
@@ -218,6 +220,26 @@ data class FullMatchDetail(
     val ShotsB: String,
     val mvp: String,
     val isHot: Boolean = false
+)
+// Trong file model.kt
+data class MatchDto(
+    val id: Int,
+    val teamA: String, // Khớp với SQL alias
+    val teamB: String, // Khớp với SQL alias
+    val home_score: Int?,
+    val away_score: Int?,
+    val match_date: String, // Khớp với cột trong SQL
+    val stadium: String?
+)
+
+// Wrapper này để hứng cấu trúc { status: "...", data: [...] }
+data class MatchResponse(
+    @SerializedName("status") val status: String,
+    @SerializedName("data") val data: List<MatchDto> // 🌟 Dùng MatchDto ở đây
+)
+data class MatchDetailResponse(
+    val status: String,
+    val data: FullMatchDetail // Đây chính là class bạn dùng trong App
 )
 
 

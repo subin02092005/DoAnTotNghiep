@@ -45,7 +45,8 @@ interface ApiService {
     suspend fun getSeasonPhases(@Query("season_id") seasonId: Int): Response<SeasonResponse>
     @GET("api/news")
     suspend fun getNews(): Response<NewsResponse>
-
+    @GET("match/detail")
+    suspend fun getMatchDetail(@Query("id") matchId: Int): Response<MatchDetailResponse>
     // ---- ADMIN SECTION ----
     @GET("players")
     suspend fun getPlayersAdmin(@Query("name") name: String? = null): Response<AdminPlayerResponse>
@@ -78,6 +79,9 @@ interface ApiService {
 
     @PATCH("teams/{id}/reject")
     suspend fun rejectTeam(@Path("id") id: Int): Response<GenericAdminResponse>
+
+    @GET("api/matches")
+    suspend fun getMatches(): Response<MatchResponse>
 
     // ---- ADMIN MATCHES ----
     @GET("matches")

@@ -18,6 +18,7 @@ import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingRow
 import com.example.qlbongda.data.model.TournamentPhase // 🌟 THÊM IMPORT NÀY
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.example.qlbongda.data.model.GroupStanding
 import com.example.qlbongda.ui.theme.NeonGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,10 +26,11 @@ import com.example.qlbongda.ui.theme.NeonGreen
 fun HomeScreen(
     phaseList: List<TournamentPhase>, // 🌟 1. THÊM THAM SỐ ĐỂ ĐÓN MẢNG VÒNG ĐẤU ĐỘNG TỪ MAINACTIVITY
     matchList: List<FullMatchDetail>,
-    onLogout: () -> Unit,
+    onNavigateToMatchDetail: (FullMatchDetail) -> Unit,
+    standingList: List<GroupStanding>, // 🌟 Thêm tham số này
     onNavigateToStandingDetail: () -> Unit,
+    onLogout: () -> Unit,
     onTeamClick: (String) -> Unit,
-
     // Nhận dữ liệu Hoisted từ MainActivity truyền xuống
     isTeamRegistered: Boolean,
     onTeamRegisteredChange: (Boolean) -> Unit,
@@ -44,20 +46,6 @@ fun HomeScreen(
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var activeDetailMatch by remember { mutableStateOf<FullMatchDetail?>(null) }
-
-    val standingList = remember {
-        listOf(
-            StandingRow(1, "Arsenal", 1, "+1", 3),
-            StandingRow(2, "Man City", 0, "0", 0),
-            StandingRow(3, "MU", 0, "0", 0),
-            StandingRow(4, "Chelsea", 1, "-1", 0),
-            StandingRow(5, "Liverpool", 0, "0", 0),
-            StandingRow(6, "Tottenham", 0, "0", 0),
-            StandingRow(7, "Aston Villa", 0, "0", 0),
-            StandingRow(8, "Newcastle", 0, "0", 0)
-        )
-    }
-
     if (activeDetailMatch != null) {
         MatchDetailScreen(
             match = activeDetailMatch!!,
@@ -115,17 +103,15 @@ fun HomeScreen(
                 when (selectedTab) {
                     0 -> HomeTabContent(
                         phaseList = phaseList, // 🌟 2. TIẾP TỤC ĐẨY PHACELIST VÀO ĐỂ KHỚP LƯỜNG VỚI HOMETABCONTENT
-                        standingList = standingList,
-                        teamName = teamName,
-                        coachName = coachName,
-                        leaderName = leaderName,
-                        playerList = playerList,
+                        standings = standingList,
                         onNavigateToStandingDetail = onNavigateToStandingDetail,
                         onTeamClick = onTeamClick
                     )
                     1 -> ScheduleTabContent(
                         matchList = matchList,
-                        onMatchClick = { activeDetailMatch = it }
+                        onMatchClick = { clickedMatch -> // 🌟 Khai báo biến 'clickedMatch' ở đây
+                            onNavigateToMatchDetail(clickedMatch)
+                        }
                     )
                     2 -> NewsTabContent()
                     3 -> TeamTabContent(

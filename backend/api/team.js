@@ -9,16 +9,16 @@ const dbConfig = {
     database: 'football_management'
 };
 
-// API lấy chi tiết đội bóng theo ID
-// URL: http://localhost:3000/api/teams/:id
+// API lấy chi tiết đội bóng và danh sách cầu thủ
 router.get('/teams/:id/detail', async (req, res) => {
     const teamId = req.params.id;
     try {
         const connection = await mysql.createConnection(dbConfig);
         
-        // 1. Lấy thông tin đội bóng
+        // 1. Lấy thông tin đội bóng (bao gồm tên đội và HLV)
         const [teamRows] = await connection.execute(
-            'SELECT * FROM teams WHERE id = ?', [teamId]
+            'SELECT id, name, coach_name, description FROM teams WHERE id = ?', 
+            [teamId]
         );
 
         if (teamRows.length === 0) {
@@ -26,9 +26,16 @@ router.get('/teams/:id/detail', async (req, res) => {
             return res.status(404).json({ status: "error", message: "Không tìm thấy đội bóng" });
         }
 
-        // 2. Lấy danh sách cầu thủ thuộc đội bóng này
+        // 2. Lấy danh sách cầu thủ thuộc đội bóng này 
+        // Kết hợp bảng team_players và bảng users (để lấy tên người dùng) 
+        // hoặc bảng players nếu cần thông tin chi tiết cầu thủ
         const [playerRows] = await connection.execute(
-            'SELECT * FROM players WHERE team_id = ?', [teamId]
+            `SELECT tp.player_id, u.name as player_name, tp.position, tp.jersey_number, tp.role 
+             FROM team_players tp
+             JOIN players p ON tp.player_id = p.id
+             JOIN users u ON p.user_id = u.id
+             WHERE tp.team_id = ? AND tp.is_active = 1`, 
+            [teamId]
         );
 
         await connection.end();
@@ -38,7 +45,7 @@ router.get('/teams/:id/detail', async (req, res) => {
             status: "success",
             data: {
                 ...teamRows[0],
-                players: playerRows // Trả về danh sách cầu thủ bên trong object đội bóng
+                players: playerRows 
             }
         });
 

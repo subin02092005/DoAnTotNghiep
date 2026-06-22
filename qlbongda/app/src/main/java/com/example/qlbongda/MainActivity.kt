@@ -23,7 +23,9 @@ import androidx.compose.ui.graphics.Color
 import com.example.qlbongda.data.api.HomeViewModel
 import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.DetailedStanding
+import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.data.model.GroupStanding
+import com.example.qlbongda.data.model.MatchEvent
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingItem
 import com.example.qlbongda.data.model.StandingRow
@@ -40,6 +42,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var currentScreen by remember { mutableStateOf("home") }
+
                     var previousScreen by remember { mutableStateOf("home") }
 
                     // 🌟 KHỞI TẠO COROUTINE SCOPE CHUẨN TRONG COMPOSE
@@ -87,26 +90,64 @@ class MainActivity : ComponentActivity() {
                     var selectedTeamObjectForDetail by remember { mutableStateOf<StandingItem?>(null) }
 
                     val globalMatchList = remember {
-                        mutableStateListOf(
-                            com.example.qlbongda.data.model.FullMatchDetail(
-                                id = 1, teamA = "Arsenal", teamB = "Chelsea", isStarted = true, scoreA = "2", scoreB = "1", time = "19:00", date = "06/06", stadium = "Emirates Stadium",
-                                events = emptyList(), lineupA = emptyList(), lineupB = emptyList(), subsA = emptyList(), subsB = emptyList(), PossessionA = "55%", PossessionB = "45%", ShotsA = "14", ShotsB = "9", mvp = "Saka", isHot = false
-                            ),
-                            com.example.qlbongda.data.model.FullMatchDetail(
-                                id = 2, teamA = "MU", teamB = "Man City", isStarted = false, scoreA = "0", scoreB = "0", time = "21:30", date = "07/06", stadium = "Old Trafford",
-                                events = emptyList(), lineupA = emptyList(), lineupB = emptyList(), subsA = emptyList(), subsB = emptyList(), PossessionA = "0%", PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = "", isHot = true
-                            )
-                        )
+                        listOf(  com.example.qlbongda.data.model.FullMatchDetail(
+                        id = 1,
+                        teamA = "Arsenal",
+                        teamB = "Man City",
+                        isStarted = true,
+                        scoreA = "2",
+                        scoreB = "1",
+                        time = "22:00",
+                        date = "07/06/2026",
+                        stadium = "Emirates Stadium",
+                        events = listOf(
+                            MatchEvent("15", "Arsenal", "Ghi bàn", "Bukayo Saka"),
+                            MatchEvent("42", "Man City", "Thẻ Vàng", "Ruben Dias"),
+                            MatchEvent("55", "Man City", "Ghi bàn", "Erling Haaland"),
+                            MatchEvent("89", "Arsenal", "Ghi bàn", "Martin Odegaard")
+                        ),
+                        lineupA = listOf(
+                            PlayerInfo("22", "Raya", "GK"),
+                            PlayerInfo("2", "Saliba", "DF"),
+                            PlayerInfo("6", "Gabriel", "DF"),
+                            PlayerInfo("4", "White", "DF"),
+                            PlayerInfo("41", "Rice", "MF"),
+                            PlayerInfo("8", "Odegaard", "MF"),
+                            PlayerInfo("7", "Saka", "FW")
+                        ),
+                        lineupB = listOf(
+                            PlayerInfo("31", "Ederson", "GK"),
+                            PlayerInfo("3", "Dias", "DF"),
+                            PlayerInfo("25", "Akanji", "DF"),
+                            PlayerInfo("16", "Rodri", "MF"),
+                            PlayerInfo("17", "De Bruyne", "MF"),
+                            PlayerInfo("47", "Foden", "FW"),
+                            PlayerInfo("9", "Haaland", "FW")
+                        ),
+                        subsA = listOf(
+                            PlayerInfo("29", "Havertz", "FW"),
+                            PlayerInfo("11", "Martinelli", "FW")
+                        ),
+                        subsB = listOf(
+                            PlayerInfo("10", "Grealish", "FW"),
+                            PlayerInfo("19", "Alvarez", "FW")
+                        ),
+                        PossessionA = "45%", PossessionB = "55%",
+                        ShotsA = "12", ShotsB = "14",
+                        mvp = "Martin Odegaard (Arsenal)",
+                                isHot = false
+                        ))
                     }
 
                     val apiService = remember { RetrofitClient.getClient(this@MainActivity) }
                     val homeViewModel = remember { HomeViewModel(apiService) }
                     val adminViewModel = remember { AdminViewModel(apiService) }
-
+                    var selectedMatch by remember { mutableStateOf<FullMatchDetail?>(null) }
+                    val matches by homeViewModel.matchList.collectAsState()
                     when (currentScreen) {
                         "admin" -> {
                             AdminScreen(
-                                matchList = globalMatchList,
+                                matchList =globalMatchList,
                                 onLogout = {
                                     Toast.makeText(this, "Đã đăng xuất!", Toast.LENGTH_SHORT).show()
                                     currentScreen = "login"
@@ -149,16 +190,33 @@ class MainActivity : ComponentActivity() {
                                 HomeScreen(
                                     phaseList = phaseList,
                                     matchList = globalMatchList,
-                                    onLogout = { currentScreen = "login" },
+                                    onNavigateToMatchDetail = { match ->
+                                        // 1. Lưu trận đấu vào biến state
+                                        selectedMatch = match
+                                        // 2. Chuyển màn hình
+                                        currentScreen = "match_detail"
+
+                                        // 3. Gọi API lấy dữ liệu chi tiết
+                                        scope.launch {
+                                            try {
+                                                val response = apiService.getMatchDetail(match.id)
+                                                if (response.isSuccessful && response.body()?.status == "success") {
+                                                    // Cập nhật lại với dữ liệu chi tiết từ server
+                                                    selectedMatch = response.body()?.data
+                                                }
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("API_ERROR", "Không thể lấy chi tiết trận đấu: ${e.message}")
+                                            }
+                                        }
+                                    },
+                                    standingList = detailedStandingsList,
                                     onNavigateToStandingDetail = {
                                         previousScreen = "home"
                                         isStandingLoading = true
                                         currentScreen = "standing_detail"
 
-                                        // 🌟 SỬA ĐOẠN NÀY: Thay coroutineScope thành scope kế thừa từ rememberCoroutineScope()
                                         scope.launch {
                                             try {
-                                                // Bạn lưu ý sửa tên hàm api thành hàm lấy BXH chi tiết (ví dụ: getDetailedStandings())
                                                 val response = RetrofitClient.getClient(this@MainActivity).getDetailedStandings()
                                                 if (response.isSuccessful && response.body()?.status == "success") {
                                                     detailedStandingsList.clear()
@@ -166,17 +224,35 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             } catch (e: Exception) {
                                                 e.printStackTrace()
-                                                Toast.makeText(this@MainActivity, "Không thể tải bảng xếp hạng chi tiết!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(this@MainActivity, "Không thể tải bảng xếp hạng!", Toast.LENGTH_SHORT).show()
                                             } finally {
                                                 isStandingLoading = false
                                             }
                                         }
                                     },
-                                    onTeamClick = { _ ->
-                                        selectedTeamObjectForDetail = StandingItem(
-                                            rank = 1, teamName = "Man City", played = 38, goalDifference = "+62", points = 88,
-                                            coachName = "Pep Guardiola", captainName = "Kyle Walker", players = emptyList()
-                                        )
+                                    onLogout = { currentScreen = "login" },
+
+                                    onTeamClick = {teamNameClicked ->
+                                        val clickedTeam = detailedStandingsList.flatMap { it.standings }
+                                        .find { it.teamName.equals(teamNameClicked, ignoreCase = true) }
+                                        selectedTeamObjectForDetail = if (clickedTeam != null) {
+                                            StandingItem(
+                                                rank = clickedTeam.rank,
+                                                teamName = clickedTeam.teamName,
+                                                played = clickedTeam.played,
+                                                goalDifference = clickedTeam.goalDifference,
+                                                points = clickedTeam.points,
+                                                coachName = "Đang cập nhật",
+                                                captainName = "Đang cập nhật",
+                                                players = emptyList()
+                                            )
+                                        } else {
+                                            // Trường hợp dự phòng nếu không tìm thấy trong list
+                                            StandingItem(
+                                                rank = 0, teamName = teamNameClicked, played = 0, goalDifference = "0", points = 0,
+                                                coachName = "Đang cập nhật", captainName = "Đang cập nhật", players = emptyList()
+                                            )
+                                        }
                                         previousScreen = "home"
                                         currentScreen = "team_detail"
                                     },
@@ -190,11 +266,19 @@ class MainActivity : ComponentActivity() {
                                     onCoachNameChange = { coachName = it },
                                     isLeagueRegistered = isLeagueRegistered,
                                     onLeagueRegisteredChange = { isLeagueRegistered = it },
-                                    playerList = playerList
+                                    playerList = playerList,
+
+                                )
+                            }
+}
+                        "match_detail" -> {
+                            selectedMatch?.let { match ->
+                                MatchDetailScreen(
+                                    match = match,
+                                    onBack = { currentScreen = "home" }
                                 )
                             }
                         }
-
                         "standing_detail" -> {
                             if (isStandingLoading) {
                                 Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
@@ -203,16 +287,29 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 StandingDetailScreen(
                                     standings = detailedStandingsList,
-                                    teamName = teamName,
-                                    coachName = coachName,
-                                    leaderName = leaderName,
-                                    playerList = playerList,
-                                    onBack = {
-                                        currentScreen = "home"
-                                    },
-                                    onTeamClick = { _ ->
-                                        previousScreen = "standing_detail"
-                                        currentScreen = "team_detail"
+                                    onBack = { currentScreen = "home" },
+                                    onTeamClick = { teamName ->
+                                        // 1. TÌM DỮ LIỆU ĐỘI TRONG LIST
+                                        val clickedTeam = detailedStandingsList.flatMap { it.standings }
+                                            .find { it.teamName.equals(teamName, ignoreCase = true) }
+
+                                        // 2. GÁN DỮ LIỆU VÀO STATE ĐỂ TRANG TEAM CHI TIẾT HIỂN THỊ
+                                        if (clickedTeam != null) {
+                                            // Lưu ý: Map dữ liệu từ DetailedStanding sang StandingItem
+                                            selectedTeamObjectForDetail = StandingItem(
+                                                rank = clickedTeam.rank,
+                                                teamName = clickedTeam.teamName,
+                                                played = clickedTeam.played,
+                                                goalDifference = clickedTeam.goalDifference,
+                                                points = clickedTeam.points,
+                                                coachName = "Đang cập nhật", // Hoặc gọi API lấy chi tiết
+                                                captainName = "Đang cập nhật",
+                                                players = emptyList()
+                                            )
+                                            // 3. CHUYỂN TRANG
+                                            previousScreen = "standing_detail"
+                                            currentScreen = "team_detail"
+                                        }
                                     }
                                 )
                             }
