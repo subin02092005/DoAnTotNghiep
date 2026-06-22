@@ -94,4 +94,17 @@ interface ApiService {
 
     @PATCH("matches/{id}/cancel")
     suspend fun cancelMatch(@Path("id") id: Int): Response<GenericAdminResponse>
+
+    // ---- ADMIN FEATURED MATCHES ----
+    @PATCH("api/admin/matches/{id}/featured")
+    suspend fun updateFeaturedMatch(
+        @Path("id") id: Int,
+        @Body request: FeaturedMatchRequest
+    ): Response<FeaturedMatchResponse>
+
+    @GET("api/admin/matches/featured")
+    suspend fun getFeaturedMatches(
+        @Query("limit") limit: Int? = 10,
+        @Query("offset") offset: Int? = 0
+    ): Response<FeaturedMatchesListResponse>
 }

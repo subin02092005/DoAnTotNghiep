@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList // 🌟 THÊM IMPORT NÀY ĐỂ QUẢN LÝ DANH SÁCH STATE
 import androidx.compose.ui.Alignment
@@ -186,29 +187,65 @@ fun AdminMenuCard(item: AdminMenuItem, onClick: () -> Unit) {
 @Composable
 fun MatchScheduleManagementScreen(viewModel: AdminViewModel) {
     val matches by viewModel.matches.collectAsStateWithLifecycle()
+    val featuredMatches by viewModel.featuredMatches.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchMatches()
+        viewModel.fetchFeaturedMatches()
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
         ManagementHeader("QUẢN LÝ LỊCH THI ĐẤU", "Cập nhật kết quả và trạng thái trận đấu")
+
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.Black,
+            contentColor = NeonGreen,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    color = NeonGreen
+                )
+            }
+        ) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Tất cả", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Nổi bật", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            )
+        }
 
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NeonGreen)
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(matches) { match ->
-                    MatchAdminCard(
-                        match = match,
-                        onStatusChange = { newStatus -> viewModel.updateMatchStatus(match.id, newStatus) }
-                    )
+            val displayList = if (selectedTab == 0) matches else featuredMatches
+            
+            if (displayList.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Không có trận đấu nào", color = Color.Gray)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(displayList) { match ->
+                        MatchAdminCard(
+                            match = match,
+                            onStatusChange = { newStatus -> viewModel.updateMatchStatus(match.id, newStatus) },
+                            onToggleFeatured = { viewModel.toggleFeatured(match.id, match.isFeatured == 0) }
+                        )
+                    }
                 }
             }
         }
@@ -216,7 +253,11 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel) {
 }
 
 @Composable
-fun MatchAdminCard(match: com.example.qlbongda.data.model.AdminMatchItem, onStatusChange: (String) -> Unit) {
+fun MatchAdminCard(
+    match: com.example.qlbongda.data.model.AdminMatchItem, 
+    onStatusChange: (String) -> Unit,
+    onToggleFeatured: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -225,7 +266,6 @@ fun MatchAdminCard(match: com.example.qlbongda.data.model.AdminMatchItem, onStat
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -248,7 +288,17 @@ fun MatchAdminCard(match: com.example.qlbongda.data.model.AdminMatchItem, onStat
                 )
             }
 
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onToggleFeatured) {
+                    Icon(
+                        imageVector = if (match.isFeatured == 1) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = "Toggle Featured",
+                        tint = NeonGreen
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+
                 if (match.status == "scheduled") {
                     Button(
                         onClick = { onStatusChange("live") },

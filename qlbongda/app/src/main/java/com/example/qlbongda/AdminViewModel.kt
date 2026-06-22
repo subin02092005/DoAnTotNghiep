@@ -193,4 +193,44 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
+
+    // ---- FEATURED MATCHES ----
+    private val _featuredMatches = MutableStateFlow<List<AdminMatchItem>>(emptyList())
+    val featuredMatches: StateFlow<List<AdminMatchItem>> = _featuredMatches
+
+    fun fetchFeaturedMatches(limit: Int = 10, offset: Int = 0) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.getFeaturedMatches(limit, offset)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _featuredMatches.value = response.body()?.data ?: emptyList()
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi tải danh sách nổi bật"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun toggleFeatured(id: Int, isFeatured: Boolean) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.updateFeaturedMatch(id, FeaturedMatchRequest(isFeatured))
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = response.body()?.message
+                    // Cập nhật lại danh sách matches và featuredMatches
+                    fetchMatches()
+                    fetchFeaturedMatches()
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi khi cập nhật"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
 }

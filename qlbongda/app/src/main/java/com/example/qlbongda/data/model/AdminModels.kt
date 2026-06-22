@@ -54,8 +54,10 @@ data class AdminMatchItem(
     @SerializedName("group_id") val groupId: Int?,
     @SerializedName("home_team_id") val homeTeamId: Int,
     @SerializedName("home_team_name") val homeTeamName: String,
+    @SerializedName("home_team_logo") val homeTeamLogo: String?,
     @SerializedName("away_team_id") val awayTeamId: Int,
     @SerializedName("away_team_name") val awayTeamName: String,
+    @SerializedName("away_team_logo") val awayTeamLogo: String?,
     @SerializedName("scheduled_at") val scheduledAt: String,
     @SerializedName("played_at") val playedAt: String?,
     @SerializedName("home_score") val homeScore: Int?,
@@ -67,8 +69,33 @@ data class AdminMatchItem(
     val referee: String?,
     @SerializedName("season_id") val seasonId: Int?,
     @SerializedName("is_published") val isPublished: Int,
+    @SerializedName("is_featured") val isFeatured: Int,
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("updated_at") val updatedAt: String?
+)
+
+data class FeaturedMatchRequest(
+    @SerializedName("is_featured") val isFeatured: Boolean
+)
+
+data class FeaturedMatchResponse(
+    val success: Boolean,
+    val message: String,
+    val data: AdminMatchItem? = null
+)
+
+data class FeaturedMatchesListResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val data: List<AdminMatchItem>? = null,
+    val pagination: PaginationInfo? = null
+)
+
+data class PaginationInfo(
+    val total: Int,
+    val limit: Int,
+    val offset: Int,
+    val hasMore: Boolean
 )
 
 data class AdminMatchResponse(
