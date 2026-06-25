@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onLoginAdminSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onForgotPasswordClick: () -> Unit
 ) {
@@ -239,8 +240,15 @@ fun LoginScreen(
                                         apply()
                                     }
 
+                                    val isAdmin = loginResult.user?.isAdmin ?: false
+                                    
                                     Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-                                    onLoginSuccess()
+
+                                    if (isAdmin) {
+                                        onLoginAdminSuccess()
+                                    } else {
+                                        onLoginSuccess()
+                                    }
                                 } else {
                                     errorMessage = "Tài khoản hoặc mật khẩu không chính xác."
                                 }

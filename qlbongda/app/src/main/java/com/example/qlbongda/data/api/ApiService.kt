@@ -16,8 +16,12 @@ interface ApiService {
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
+    
     @POST("api/register")
     suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
+
+    @POST("api/check-admin-email")
+    suspend fun checkAdminEmail(@Body request: CheckAdminRequest): Response<CheckAdminResponse>
 
     // ---- QUÊN MẬT KHẨU ----
     @POST("api/verify-email")

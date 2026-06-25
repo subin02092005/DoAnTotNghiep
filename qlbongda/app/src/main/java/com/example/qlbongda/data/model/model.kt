@@ -18,7 +18,8 @@ data class User(
     val name: String,
     val email: String,
     val phone: String?,
-    val email_verified: Int
+    val email_verified: Int,
+    @SerializedName("is_admin") val isAdmin: Boolean? = false
 )
 
 // Response tổng từ API login
@@ -41,6 +42,17 @@ data class RegisterRequest(
 data class RegisterResponse(
     val success: Boolean,
     val message: String
+)
+
+// Khối dữ liệu check admin email
+data class CheckAdminRequest(
+    val email: String
+)
+
+data class CheckAdminResponse(
+    val success: Boolean,
+    @SerializedName("is_admin") val isAdmin: Boolean,
+    val message: String? = null
 )
 
 

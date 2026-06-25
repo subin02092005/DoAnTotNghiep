@@ -20,7 +20,7 @@ const newsRouter = require('./api/new/new'); // Nạp file news phẳng
 const standingsRoutes = require('./api/standings');
 const teamRoutes = require('./api/team');// import file bạn vừa tạo
 const matchRoutes = require('./api/matches');
-const matchDetailRoutes = require('./api/matchdetail');
+const matchDetailRoutes = require('./api/matchesdetail');
 
 // 1. Thêm dòng require ở đầu file
 

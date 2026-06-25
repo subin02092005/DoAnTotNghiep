@@ -81,3 +81,5 @@ router.get('/match/detail', async (req, res) => {
         return res.status(500).json({ status: "error", message: "Lỗi Server" });
     }
 });
+
+module.exports = router;

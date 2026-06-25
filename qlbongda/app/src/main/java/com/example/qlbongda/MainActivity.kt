@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var currentScreen by remember { mutableStateOf("home") }
+                    var currentScreen by remember { mutableStateOf("login") }
 
                     var previousScreen by remember { mutableStateOf("home") }
 
@@ -159,6 +159,7 @@ class MainActivity : ComponentActivity() {
                         "login" -> {
                             LoginScreen(
                                 onLoginSuccess = { currentScreen = "home" },
+                                onLoginAdminSuccess = {currentScreen = "admin"},
                                 onNavigateToRegister = { currentScreen = "register" },
                                 onForgotPasswordClick = { currentScreen = "forgot_password" }
                             )
