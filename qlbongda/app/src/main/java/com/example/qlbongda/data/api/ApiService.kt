@@ -38,19 +38,25 @@ interface ApiService {
     @POST("api/profile/verify-otp")
     suspend fun verifyOtpProfile(@Body request: VerifyOtpRequest): Response<VerifyOtpResponse>
 
-   //chitietcauthu vs bxh
+
+
+    //chitietcauthu vs bxh
     @GET("api/team/{teamId}/detail")
     suspend fun getTeamDetail(
         @Path("teamId") teamId: Int
     ): Response<TeamDetailResponse>
-
     @GET("api/standings")
     suspend fun getDetailedStandings(): Response<DetailedStandingResponse>
+
+
+
     @GET("api/season/get-phases")
     suspend fun getSeasonPhases(@Query("season_id") seasonId: Int): Response<SeasonResponse>
     @GET("api/notifications")
     suspend fun getNotifications(): retrofit2.Response<NotificationResponse>
-    @GET("match/detail")
+    @GET("api/matches")
+    suspend fun getMatches(): Response<MatchResponse>
+    @GET("api/match/detail")
     suspend fun getMatchDetail(@Query("id") matchId: Int): Response<MatchDetailResponse>
     // ---- ADMIN SECTION ----
     @GET("players")
@@ -85,8 +91,7 @@ interface ApiService {
     @PATCH("teams/{id}/reject")
     suspend fun rejectTeam(@Path("id") id: Int): Response<GenericAdminResponse>
 
-    @GET("api/matches")
-    suspend fun getMatches(): Response<MatchResponse>
+
 
     // ---- ADMIN MATCHES ----
     @GET("matches")

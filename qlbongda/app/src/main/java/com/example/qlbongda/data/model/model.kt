@@ -198,21 +198,17 @@ data class GroupStanding(
 
 
 // Sự kiện trong trận đấu
-data class MatchEvent(
-    val minute: String,
-    val team: String,
-    val type: String,
-    val playerName: String
-)
+
 
 // Chi tiết toàn bộ trận đấu (Gồm cả thông số sút bóng, kiểm soát bóng,...)
 data class FullMatchDetail(
     val id: Int,
     val teamA: String,
     val teamB: String,
+    val status: String, // <--- THÊM DÒNG NÀY VÀO
     val isStarted: Boolean,
-    val scoreA: String,
-    val scoreB: String,
+    val scoreA: Int = 0,
+    val scoreB: Int = 0,
     val time: String,
     val date: String,
     val stadium: String,
@@ -221,23 +217,49 @@ data class FullMatchDetail(
     val lineupB: List<PlayerInfo>,
     val subsA: List<PlayerInfo>,
     val subsB: List<PlayerInfo>,
-    val PossessionA: String,
-    val PossessionB: String,
-    val ShotsA: String,
-    val ShotsB: String,
-    val mvp: String,
+    val PossessionA: String = "0%",
+    val PossessionB: String = "0%",
+    val ShotsA: String = "0",
+    val ShotsB: String = "0",
+    val mvp: String = "Chưa xác định",
     val isHot: Boolean = false
 )
+data class MatchEvent(
+    val minute: String,
+    val team: String,
+    val type: String,
+    val playerName: String
+)
 // Trong file model.kt
+enum class MatchStatus {
+    PENDING, ONGOING, FINISHED
+}
+
 data class MatchDto(
     val id: Int,
-    val teamA: String, // Khớp với SQL alias
-    val teamB: String, // Khớp với SQL alias
-    val home_score: Int?,
-    val away_score: Int?,
-    val match_date: String, // Khớp với cột trong SQL
-    val stadium: String?
-)
+    val teamA: String,
+    val teamB: String,
+    @SerializedName("home_final_score") val home_score: Int?,
+    @SerializedName("away_final_score") val away_score: Int?,
+    val scheduled_at: String?,
+    @SerializedName("status") val status: String // Nhận về "pending", "ongoing", "finished"
+) {
+    // 1. Chuyển đổi String sang Enum để dễ dùng
+    val matchStatus: MatchStatus
+        get() = when (status.lowercase()) {
+            "ongoing" -> MatchStatus.ONGOING
+            "finished" -> MatchStatus.FINISHED
+            else -> MatchStatus.PENDING
+        }
+
+    // 2. Các flag tiện lợi cho UI
+    val isFinished: Boolean get() = matchStatus == MatchStatus.FINISHED
+    val isLive: Boolean get() = matchStatus == MatchStatus.ONGOING
+    val isUpcoming: Boolean get() = matchStatus == MatchStatus.PENDING
+
+    // Giữ lại nếu bạn vẫn muốn kiểm tra nhanh "đã bắt đầu hay chưa"
+    val isStarted: Boolean get() = isFinished || isLive
+}
 
 // Wrapper này để hứng cấu trúc { status: "...", data: [...] }
 data class MatchResponse(

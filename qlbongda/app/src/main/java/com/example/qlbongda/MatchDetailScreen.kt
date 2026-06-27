@@ -18,11 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.data.model.MatchEvent
 import com.example.qlbongda.data.model.PlayerInfo
+import com.example.qlbongda.utils.DateUtils
 import com.example.qlbongda.ui.theme.NeonGreen
 
 // Định nghĩa cấu trúc dữ liệu chi tiết cho trận đấu
@@ -31,9 +33,8 @@ import com.example.qlbongda.ui.theme.NeonGreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
-    // Quản lý 3 trạng thái của thẻ Tag nội dung (0: Diễn biến, 1: Sơ đồ/Đội hình, 2: Thống kê)
     var selectedSubTab by remember { mutableStateOf(0) }
-    android.util.Log.d("DEBUG_DETAIL", "Events: ${match.events}")
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -54,51 +55,52 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // 📊 [PHẦN 1]: BẢNG TỈ SỐ HOẶC GIỜ GIẤC THEO TRẠNG THÁI TRẬN ĐẤU
+            // 📊 [PHẦN 1]: BẢNG TỈ SỐ HOẶC GIỜ GIẤC
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(1.dp, NeonGreen),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF121212))
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = match.teamA, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                        // Team A
+                        Text(text = match.teamA, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.4f), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
 
-                        // Kiểm tra trạng thái trận đấu để hiển thị giao diện phù hợp
-                        if (match.isStarted) {
-                            // Nếu ĐÃ DIỄN RA -> Hiện tỉ số đậm chất thể thao
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = match.scoreA, color = NeonGreen, fontSize = 36.sp, fontWeight = FontWeight.Black)
-                                Text(text = " - ", color = Color.Gray, fontSize = 28.sp)
-                                Text(text = match.scoreB, color = NeonGreen, fontSize = 36.sp, fontWeight = FontWeight.Black)
-                            }
-                        } else {
-                            // Nếu CHƯA DIỄN RA -> Hiện ngày giờ đếm ngược kèm chữ "CHƯA ĐÁ"
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = match.time, color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                                Text(text = match.date, color = Color.LightGray, fontSize = 14.sp)
-                                Text(text = "CHƯA DIỄN RA", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                        // Khu vực trung tâm - Giới hạn độ rộng cố định để tránh vỡ giao diện
+                        Box(modifier = Modifier.weight(0.2f), contentAlignment = Alignment.Center) {
+                            if (match.isStarted) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = match.scoreA.toString(), color = NeonGreen, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                                    Text(text = ":", color = Color.Gray, fontSize = 24.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                                    Text(text = match.scoreB.toString(), color = NeonGreen, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                                }
+                            } else {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 80.dp)) {
+                                    Text(text = DateUtils.formatTime(match.time), color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center, maxLines = 1)
+                                    Text(text = DateUtils.formatDate(match.date), color = Color.LightGray, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
+                                    Surface(color = Color(0xFF333333), shape = RoundedCornerShape(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                        Text("SẮP ĐÁ", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                    }
+                                }
                             }
                         }
 
-                        Text(text = match.teamB, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                        // Team B
+                        Text(text = match.teamB, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.4f), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = "Sân vận động: ${match.stadium}", color = Color.Gray, fontSize = 12.sp)
+                    Text(text = "Sân: ${match.stadium}", color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center)
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 🎯 [PHẦN 2]: THANH 3 TAGS ĐIỀU HƯỚNG CON
+            // 🎯 [PHẦN 2]: THANH TABS
             TabRow(
                 selectedTabIndex = selectedSubTab,
                 containerColor = Color(0xFF121212),
@@ -114,7 +116,7 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 📦 [PHẦN 3]: NỘI DUNG CHI TIẾT PHỤ THUỘC VÀO TAG ĐƯỢC CHỌN
+            // 📦 [PHẦN 3]: NỘI DUNG TABS
             Box(modifier = Modifier.fillMaxSize().weight(1f)) {
                 when (selectedSubTab) {
                     0 -> TagDiEnBien(match)
@@ -254,9 +256,10 @@ fun MatchDetailScreenStartedPreview() {
         id = 1,
         teamA = "Arsenal",
         teamB = "Man City",
+        status = "finished",
         isStarted = true,
-        scoreA = "2",
-        scoreB = "1",
+        scoreA = 2,
+        scoreB = 1,
         time = "22:00",
         date = "07/06/2026",
         stadium = "Emirates Stadium",
@@ -288,8 +291,9 @@ fun MatchDetailScreenStartedPreview() {
         subsB = listOf(PlayerInfo("10", "Grealish", "FW"), PlayerInfo("19", "Alvarez", "FW")),
         PossessionA = "45%", PossessionB = "55%",
         ShotsA = "12", ShotsB = "14",
-        mvp = "Martin Odegaard (Arsenal)"
-    )
+        mvp = "Martin Odegaard (Arsenal)",
+
+        )
 
     // Gọi màn hình hiển thị dữ liệu test
     MatchDetailScreen(match = dummyMatchStarted, onBack = {})

@@ -1,5 +1,6 @@
 package com.example.qlbongda.data.api
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.qlbongda.data.model.FullMatchDetail
@@ -25,6 +26,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
         loadTournamentPhases(seasonId = 1)
         loadMatches()
         loadStandings()
+
     }
 
     // --- CÁC HÀM GỌI API ---
@@ -59,19 +61,38 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
                             id = dto.id,
                             teamA = dto.teamA, // Lấy từ MatchDto
                             teamB = dto.teamB, // Lấy từ MatchDto
-                            scoreA = dto.home_score?.toString() ?: "0",
-                            scoreB = dto.away_score?.toString() ?: "0",
-                            time = dto.match_date,
-                            date = dto.match_date,
-                            stadium = dto.stadium ?: "",
+                            status = dto.status, // <--- THÊM DÒNG NÀY VÀO ĐỂ TRUYỀN DỮ LIỆU
+                            scoreA = dto.home_score ?: 0,
+                            scoreB = dto.away_score ?: 0,
+                            time = dto.scheduled_at ?: "",
+                            date = dto.scheduled_at ?: "",
+                            stadium = "Chưa cập nhật",
+                            isStarted = dto.isStarted,
                             // Các trường mặc định để hiển thị UI
-                            isStarted = false,
+
                             events = emptyList(), lineupA = emptyList(), lineupB = emptyList(),
                             subsA = emptyList(), subsB = emptyList(), PossessionA = "0%",
-                            PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = ""
+                            PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = "",
+                            isHot = true
                         )
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    private val _selectedMatchDetail = MutableStateFlow<FullMatchDetail?>(null)
+    val selectedMatchDetail: StateFlow<FullMatchDetail?> = _selectedMatchDetail
+    fun fetchMatchDetail(matchId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getMatchDetail(matchId)
+                Log.d("API_CHECK_FULL", "Raw Body: ${response.body()}")
+                if (response.isSuccessful) {
+                    _selectedMatchDetail.value = response.body()?.data
+                }
+                Log.d("API_CHECK", "Data nhận được: ${response.body()?.data}")
             } catch (e: Exception) {
                 e.printStackTrace()
             }

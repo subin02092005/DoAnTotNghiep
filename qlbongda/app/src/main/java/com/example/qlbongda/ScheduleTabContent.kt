@@ -16,10 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.ui.theme.NeonGreen
+import com.example.qlbongda.utils.DateUtils
 
 @Composable
 fun ScheduleTabContent(
@@ -81,16 +83,54 @@ fun ScheduleTabContent(
                             HorizontalDivider(color = Color(0xFF222222))
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            Text(
-                                text = match.time,
-                                color = if (isFeatured) Color.Red else NeonGreen,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Black
-                            )
+                            when {
+                                // 1. TRẬN ĐANG DIỄN RA
+                                match.status == "ongoing" -> {
+                                    Text(
+                                        text = "LIVE",
+                                        color = Color.Red,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${match.scoreA} - ${match.scoreB}",
+                                        color = Color.White,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
 
-                            Text(text = match.date, color = Color.LightGray, fontSize = 11.sp)
+                                // 2. TRẬN ĐÃ KẾT THÚC
+                                match.status == "finished" -> {
+                                    Text(
+                                        text = "${match.scoreA} - ${match.scoreB}",
+                                        color = NeonGreen,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    Text(
+                                        text = DateUtils.formatDate(match.date),
+                                        color = Color.LightGray,
+                                        fontSize = 10.sp
+                                    )
+                                }
+
+                                // 3. TRẬN CHƯA ĐÁ (PENDING)
+                                else -> {
+                                    Text(
+                                        text = DateUtils.formatTime(match.time),
+                                        color = NeonGreen,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    Text(
+                                        text = DateUtils.formatDate(match.date),
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
                         }
-
                         if (isFeatured) {
                             Text(
                                 text = "⭐",
@@ -103,4 +143,61 @@ fun ScheduleTabContent(
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PreviewScheduleTabContent() {
+    val mockMatchList = listOf(
+        FullMatchDetail(
+            id = 1,
+            teamA = "Arsenal",
+            teamB = "Man City",status="",
+            isStarted = true,
+            scoreA = 1,
+            scoreB = 2,
+            time = "2026-06-28T22:00:00.000Z",
+            date = "2026-06-28T22:00:00.000Z",
+            stadium = "Emirates Stadium",
+            events = emptyList(),
+            lineupA = emptyList(),
+            lineupB = emptyList(),
+            subsA = emptyList(),
+            subsB = emptyList(),
+            PossessionA = "50%",
+            PossessionB = "50%",
+            ShotsA = "10",
+            ShotsB = "12",
+            mvp = "",
+            isHot = true
+        ),
+        FullMatchDetail(
+            id = 2,
+            teamA = "Liverpool",
+            teamB = "Chelsea",
+            status="",
+            isStarted = false,
+            scoreA = 0,
+            scoreB = 0,
+            time = "2026-06-29T19:30:00.000Z",
+            date = "2026-06-29T19:30:00.000Z",
+            stadium = "Anfield",
+            events = emptyList(),
+            lineupA = emptyList(),
+            lineupB = emptyList(),
+            subsA = emptyList(),
+            subsB = emptyList(),
+            PossessionA = "0%",
+            PossessionB = "0%",
+            ShotsA = "0",
+            ShotsB = "0",
+            mvp = "",
+            isHot = false
+        )
+    )
+
+    ScheduleTabContent(
+        matchList = mockMatchList,
+        onMatchClick = {}
+    )
 }

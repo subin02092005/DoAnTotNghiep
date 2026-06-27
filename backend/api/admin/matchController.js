@@ -13,7 +13,7 @@ const dbConfig = {
 const pool = mysql.createPool(dbConfig);
 
 // Lấy danh sách lịch thi đấu
-router.get('/matches', async (req, res) => {
+router.get('/matchesadmin', async (req, res) => {
     try {
         const { teamId, status, phaseId, seasonId, dateFrom, dateTo } = req.query;
         let query = `
