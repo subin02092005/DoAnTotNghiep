@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,7 +30,7 @@ import com.example.qlbongda.data.model.GroupStanding
 import com.example.qlbongda.data.model.MatchEvent
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingItem
-import com.example.qlbongda.data.model.StandingRow
+
 import com.example.qlbongda.ui.theme.QlbongdaTheme
 import kotlinx.coroutines.launch // 🌟 Giữ lại để dùng launch
 
@@ -59,35 +61,12 @@ class MainActivity : ComponentActivity() {
 
 
                     // 🌟 DỮ LIỆU ẢO PHÂN CHIA BẢNG A & BẢNG B ĐỂ BẠN TEST GIAO DIỆN
-                    val detailedStandingsList = remember {
-                        mutableStateListOf(
-                            // --- DỮ LIỆU CỦA BẢNG A ---
-                            GroupStanding(
-                                groupName = "Bảng A",
-                                standings = listOf(
-                                    DetailedStanding(1, "Arsenal", "", 38, 28, 5, 5, 91, 29, "+62", 89, listOf("W", "W", "W", "W", "W")),
-                                    DetailedStanding(2, "Man City", "", 38, 27, 7, 4, 96, 34, "+62", 88, listOf("W", "W", "W", "D", "L")),
-                                    DetailedStanding(3, "MU", "", 38, 24, 10, 4, 86, 41, "+45", 82, listOf("W", "D", "W", "L", "D")),
-                                    DetailedStanding(4, "Chelsea", "", 38, 20, 11, 7, 77, 63, "+14", 71, listOf("W", "W", "W", "W", "W"))
-                                )
-                            ),
-                            // --- DỮ LIỆU CỦA BẢNG B ---
-                            GroupStanding(
-                                groupName = "Bảng B",
-                                standings = listOf(
-                                    DetailedStanding(1, "Liverpool", "", 38, 24, 10, 4, 86, 41, "+45", 82, listOf("W", "D", "W", "L", "D")),
-                                    DetailedStanding(2, "Tottenham", "", 38, 20, 6, 12, 74, 61, "+13", 66, listOf("W", "L", "W", "L", "L")),
-                                    DetailedStanding(3, "Aston Villa", "", 38, 20, 8, 10, 76, 61, "+15", 68, listOf("L", "D", "L", "W", "W")),
-                                    DetailedStanding(4, "Newcastle", "", 38, 18, 6, 14, 85, 62, "+23", 60, listOf("D", "W", "D", "L", "W"))
-                                )
-                            )
-                        )
-                    }
+                    val detailedStandingsList = remember { mutableStateListOf<GroupStanding>() }
 
-// Giữ nguyên trạng thái loading bằng false để dữ liệu ảo hiển thị lên luôn
+
 
                     var isStandingLoading by remember { mutableStateOf(false) }
-                    var selectedTeamObjectForDetail by remember { mutableStateOf<StandingItem?>(null) }
+
 
                     val globalMatchList = remember {
                         listOf(  com.example.qlbongda.data.model.FullMatchDetail(
@@ -138,12 +117,14 @@ class MainActivity : ComponentActivity() {
                                 isHot = false
                         ))
                     }
-
+                    var selectedTab by remember { mutableIntStateOf(0) }
+                    var selectedMatch by remember { mutableStateOf<FullMatchDetail?>(null) }
+                    var selectedTeamObjectForDetail by remember { mutableStateOf<StandingItem?>(null) }
                     val apiService = remember { RetrofitClient.getClient(this@MainActivity) }
                     val homeViewModel = remember { HomeViewModel(apiService) }
                     val adminViewModel = remember { AdminViewModel(apiService) }
-                    var selectedMatch by remember { mutableStateOf<FullMatchDetail?>(null) }
-                    val matches by homeViewModel.matchList.collectAsState()
+
+                    var currentStandingTabIndex by remember { mutableIntStateOf(0) }
                     when (currentScreen) {
                         "admin" -> {
                             AdminScreen(
@@ -157,9 +138,11 @@ class MainActivity : ComponentActivity() {
                         }
 
                         "login" -> {
+
                             LoginScreen(
+
                                 onLoginSuccess = { currentScreen = "home" },
-                                onLoginAdminSuccess = {currentScreen = "admin"},
+                                onLoginAdminSuccess = { currentScreen = "admin" },
                                 onNavigateToRegister = { currentScreen = "register" },
                                 onForgotPasswordClick = { currentScreen = "forgot_password" }
                             )
@@ -180,6 +163,20 @@ class MainActivity : ComponentActivity() {
                         }
 
                         "home" -> {
+                            LaunchedEffect(Unit) {
+                                isStandingLoading = true
+                                try {
+                                    val response = RetrofitClient.getClient(this@MainActivity).getDetailedStandings()
+                                    if (response.isSuccessful && response.body()?.status == "success") {
+                                        detailedStandingsList.clear()
+                                        response.body()?.data?.let { detailedStandingsList.addAll(it) }
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("API_ERROR", "Lỗi tải bảng xếp hạng: ${e.message}")
+                                } finally {
+                                    isStandingLoading = false
+                                }
+                            }
                             val phaseList by homeViewModel.phases.collectAsState()
                             val isLoading by homeViewModel.isLoading.collectAsState()
 
@@ -189,6 +186,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             } else {
                                 HomeScreen(
+                                    selectedTab = selectedTab, // Truyền biến state vừa tạo
+                                    onTabSelected = { selectedTab = it }, // Truyền hàm xử lý khi click tab
                                     phaseList = phaseList,
                                     matchList = globalMatchList,
                                     onNavigateToMatchDetail = { match ->
@@ -211,6 +210,8 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     standingList = detailedStandingsList,
+                                    selectedStandingTab = currentStandingTabIndex,
+                                    onStandingTabSelected = { currentStandingTabIndex = it },
                                     onNavigateToStandingDetail = {
                                         previousScreen = "home"
                                         isStandingLoading = true
@@ -231,7 +232,15 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     },
-                                    onLogout = { currentScreen = "login" },
+                                    onLogout = {
+                                        selectedMatch = null
+                                        selectedTeamObjectForDetail = null
+                                        selectedTab = 0
+                                        // 3. Chuyển màn hình về login
+                                        currentScreen = "login"
+
+                                        Toast.makeText(this@MainActivity, "Đã đăng xuất thành công!", Toast.LENGTH_SHORT).show()
+                                     },
 
                                     onTeamClick = {teamNameClicked ->
                                         val clickedTeam = detailedStandingsList.flatMap { it.standings }
@@ -288,6 +297,7 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 StandingDetailScreen(
                                     standings = detailedStandingsList,
+                                    initialTabIndex = currentStandingTabIndex, // <--- Truyền đúng tab đó vào
                                     onBack = { currentScreen = "home" },
                                     onTeamClick = { teamName ->
                                         // 1. TÌM DỮ LIỆU ĐỘI TRONG LIST

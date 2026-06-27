@@ -13,12 +13,13 @@ const teamApi = require('./api/admin/teamController');
 const playerApi = require('./api/admin/playerController');
 const matchApi = require('./api/admin/matchController');
 const tournamentApi = require('./api/admin/tournamentController');
+const forgotpasswordRouter = require('./api/forgotPassword'); // Đảm bảo đường dẫn đúng đến file này
 
 // 🌟 ĐÃ SỬA: Đường dẫn nạp file phases nằm cùng cấp trong thư mục api
 const phasesRouter = require('./api/phases');
-const newsRouter = require('./api/new/new'); // Nạp file news phẳng
+const notificationsRouter = require('./api/notification/notifications'); // Nạp file news phẳng
 const standingsRoutes = require('./api/standings');
-const teamRoutes = require('./api/team');// import file bạn vừa tạo
+const teamRoutes = require('./api/teamplayer');// import file bạn vừa tạo
 const matchRoutes = require('./api/matches');
 const matchDetailRoutes = require('./api/matchesdetail');
 
@@ -38,10 +39,10 @@ app.use('/api', teamApi);
 app.use('/api', playerApi);   
 app.use('/api', matchApi);    
 app.use('/api', tournamentApi);
-
+app.use('/api', forgotpasswordRouter);
 
 app.use('/api', phasesRouter);
-app.use('/api', newsRouter);
+app.use('/api', notificationsRouter);
 app.use('/api', standingsRoutes);
 app.use('/api', teamRoutes);
 app.use('/api', matchRoutes);

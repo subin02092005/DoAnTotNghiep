@@ -19,8 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingItem // 🌟 ĐÃ THÊM: Import Model chuẩn nhận từ API MySQL của bạn
 import com.example.qlbongda.ui.theme.NeonGreen
 
@@ -33,6 +35,7 @@ fun TeamDetailScreen(
     team: StandingItem, // 🌟 ĐÃ SỬA: Nhận trực tiếp gói dữ liệu động tải từ MySQL về thay vì truyền rời rạc các biến tĩnh
     onBackClick: () -> Unit
 ) {
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -251,6 +254,37 @@ fun TeamDetailScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PreviewTeamDetailScreen() {
+    // 1. Tạo dữ liệu giả khớp với data class của bạn
+    val mockTeam = StandingItem(
+        rank = 1,
+        teamName = "FC BONG DA",
+        played = 5,
+        goalDifference = "+5",
+        points = 15,
+        coachName = "Park Hang Seo",
+        captainName = "Nguyen Van A",
+        players = listOf(
+            PlayerInfo(number = "10", name = "Nguyen Van A", position = "FW"),
+            PlayerInfo(number = "7", name = "Tran Van B", position = "MF"),
+            PlayerInfo(number = "3", name = "Le Van C", position = "DF"),
+            PlayerInfo(number = "1", name = "Pham Van D", position = "GK")
+        )
+    )
+
+    // 2. Bọc trong MaterialTheme và Surface để Preview hiển thị đúng màu nền DarkBackground
+    MaterialTheme {
+        Surface(color = DarkBackground) {
+            TeamDetailScreen(
+                team = mockTeam,
+                onBackClick = {}
+            )
         }
     }
 }

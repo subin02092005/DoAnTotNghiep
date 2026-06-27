@@ -1,5 +1,6 @@
 package com.example.qlbongda.data.model
 
+import android.R
 import com.google.gson.annotations.SerializedName
 
 // =================================================================
@@ -155,20 +156,17 @@ data class StandingItem(
     val captainName: String = "Chưa cập nhật", // Thêm Đội trưởng
     val players: List<PlayerInfo> = emptyList() // Thêm danh sách cầu thủ
 )
-
+data class PlayerInfo(
+    val number: String,
+    val name: String,
+    val position: String
+)
 data class TeamDetailResponse(
     val status: String,
     val message: String,
     val data: StandingItem // Trả về object StandingItem chứa list cầu thủ, tên HLV, Đội trưởng
 )
-// Model dòng bảng xếp hạng rút gọn hiển thị ở Home
-data class StandingRow(
-    val rank: Int,
-    val teamName: String,
-    val played: Int,
-    val goalDifference: String,
-    val points: Int
-)
+
 
 // Model chi tiết bảng xếp hạng đầy đủ
 data class DetailedStanding(
@@ -183,8 +181,9 @@ data class DetailedStanding(
     val goalsAgainst: Int,
     val goalDifference: String,
     val points: Int,
-    val form: List<String>
+    val form: List<String>?
 )
+
 
 data class DetailedStandingResponse(
     val status: String,
@@ -196,11 +195,7 @@ data class GroupStanding(
     val standings: List<DetailedStanding> // Danh sách các đội thuộc bảng này
 )
 // Cầu thủ
-data class PlayerInfo(
-    val number: String,
-    val name: String,
-    val position: String
-)
+
 
 // Sự kiện trong trận đấu
 data class MatchEvent(
@@ -259,19 +254,15 @@ data class MatchDetailResponse(
 // 6. NEWS MODELS (TIN TỨC BÓNG ĐÁ)
 // =================================================================
 
-data class FootballNews(
+data class Notification(
     val id: Int,
-    val title: String,
-    val summary: String,
-    val time: String,
-    val source: String,
-    val imageUrl: String = "",
-    val content: String = "",
-    val category: String = "Tin Tức",
-    val author: String = "Ban Biên Tập"
+    val title: String,        // Map với tieu_de
+    val content: String,      // Map với noi_dung
+    val time: String          // Map với ngay_tao
 )
-data class NewsResponse(
+
+data class NotificationResponse(
     val status: String,
     val message: String,
-    val data: List<FootballNews>
+    val data: List<Notification>
 )

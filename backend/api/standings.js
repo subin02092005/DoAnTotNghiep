@@ -2,65 +2,87 @@ const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
 
-// Cấu hình kết nối DB
-const dbConfig = {
+// Cấu hình pool kết nối
+const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
     password: '123456',
-    database: 'football_management'
-};
+    database: 'football_management',
+    waitForConnections: true,
+    connectionLimit: 10
+});
 
-// API lấy BXH chi tiết
-// URL: http://localhost:3000/api/standings/detailed
-router.get('/detailed', async (req, res) => {
+router.get('/standings', async (req, res) => {
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        
-        // 1. Truy vấn lấy dữ liệu (cần JOIN với bảng teams để lấy tên đội)
         const query = `
-            SELECT s.*, t.name as team_name 
-            FROM standings s 
-            JOIN teams t ON s.team_id = t.id 
-            ORDER BY s.group_name ASC, s.points DESC
+            SELECT 
+                s.team_id,
+                s.matches_played AS played, 
+                s.wins AS won, 
+                s.draws AS drawn, 
+                s.losses AS lost, 
+                s.goals_for, 
+                s.goals_against, 
+                (s.goals_for - s.goals_against) AS goal_difference, 
+                s.points,
+                t.name AS team_name, 
+                g.name AS group_name
+            FROM team_standings s
+            JOIN teams t ON s.team_id = t.id
+            JOIN \`groups\` g ON s.group_id = g.id
+            WHERE s.is_active = 1
+            ORDER BY g.name ASC, s.points DESC, goal_difference DESC
         `;
-        const [rows] = await connection.execute(query);
-        await connection.end();
+        
+        const [rows] = await pool.query(query);
+        const formattedData = [];
+        const groups = {};
 
-        // 2. Logic gom nhóm (như cũ)
-        const groupedData = rows.reduce((acc, curr) => {
-            let group = acc.find(g => g.groupName === curr.group_name);
-            if (!group) {
-                group = { groupName: curr.group_name, standings: [] };
-                acc.push(group);
+        for (const row of rows) {
+            // Lấy 5 trận gần nhất đã kết thúc
+            const [recentMatches] = await pool.query(
+                `SELECT home_team_id, away_team_id, home_score, away_score 
+                 FROM matches 
+                 WHERE (home_team_id = ? OR away_team_id = ?) 
+                 AND status = 'finished' 
+                 ORDER BY played_at DESC LIMIT 5`,
+                [row.team_id, row.team_id]
+            );
+
+            // Tính toán W, D, L cho đội dựa trên home_score và away_score
+            const formArray = recentMatches.map(m => {
+                const isHome = (m.home_team_id === row.team_id);
+                const teamScore = isHome ? m.home_score : m.away_score;
+                const oppScore = isHome ? m.away_score : m.home_score;
+
+                if (teamScore > oppScore) return 'W';
+                if (teamScore < oppScore) return 'L';
+                return 'D';
+            });
+
+            if (!groups[row.group_name]) {
+                groups[row.group_name] = { groupName: row.group_name, standings: [] };
+                formattedData.push(groups[row.group_name]);
             }
 
-            group.standings.push({
-                rank: curr.rank,
-                teamName: curr.team_name,
-                played: curr.played,
-                won: curr.won,
-                drawn: curr.drawn,
-                lost: curr.lost,
-                goalsFor: curr.goals_for,
-                goalsAgainst: curr.goals_against,
-                goalDifference: (curr.goals_for - curr.goals_against).toString(),
-                points: curr.points,
-                form: curr.form ? curr.form.split(',') : []
+            groups[row.group_name].standings.push({
+                rank: groups[row.group_name].standings.length + 1,
+                teamName: row.team_name,
+                played: row.played,
+                won: row.won,
+                drawn: row.drawn,
+                lost: row.lost,
+                goalsFor: row.goals_for,
+                goalsAgainst: row.goals_against,
+                goalDifference: row.goal_difference.toString(),
+                points: row.points,
+                form: formArray // Dữ liệu phong độ đã chuẩn
             });
-            return acc;
-        }, []);
+        }
 
-        return res.status(200).json({
-            status: "success",
-            data: groupedData
-        });
-
+        return res.status(200).json({ status: "success", data: formattedData });
     } catch (error) {
-        console.error("Lỗi API standings:", error);
-        return res.status(500).json({ 
-            status: "error", 
-            message: 'Lỗi Database!' 
-        });
+        res.status(500).json({ status: "error", message: error.message });
     }
 });
 

@@ -39,6 +39,7 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     onForgotPasswordClick: () -> Unit
 ) {
+
     val context = LocalContext.current
     val lifecycleScope = LocalLifecycleOwner.current.lifecycleScope
 
@@ -226,7 +227,7 @@ fun LoginScreen(
                                     // 🌟 XỬ LÝ LƯU HOẶC XÓA TÀI KHOẢN THEO TRẠNG THÁI CHECKBOX 🌟
                                     sharedPref.edit().apply {
                                         putString("ACCESS_TOKEN", loginResult.token).apply() // Lưu token hệ thống
-
+                                        putString("USER_NAME", loginResult.user?.name ?: "Người dùng")
                                         if (isRememberMeChecked) {
                                             putString("REMEMBERED_EMAIL", inputEmail)
                                             putString("REMEMBERED_PASSWORD", inputPassword)

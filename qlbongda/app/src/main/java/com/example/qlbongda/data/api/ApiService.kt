@@ -24,6 +24,7 @@ interface ApiService {
     suspend fun checkAdminEmail(@Body request: CheckAdminRequest): Response<CheckAdminResponse>
 
     // ---- QUÊN MẬT KHẨU ----
+
     @POST("api/verify-email")
     suspend fun verifyEmail(@Body request: VerifyEmailRequest): Response<VerifyEmailResponse>
 
@@ -37,18 +38,18 @@ interface ApiService {
     @POST("api/profile/verify-otp")
     suspend fun verifyOtpProfile(@Body request: VerifyOtpRequest): Response<VerifyOtpResponse>
 
-    // ---- 🌟 PHẦN SỬA ĐỔI / THÊM MỚI CHO HOME GIẢI ĐẤU 🌟 ----
-    // Gọi API lấy danh sách các vòng đấu (Phases) theo id của mùa giải
-    @GET("api/teams/{teamId}/detail")
+   //chitietcauthu vs bxh
+    @GET("api/team/{teamId}/detail")
     suspend fun getTeamDetail(
         @Path("teamId") teamId: Int
     ): Response<TeamDetailResponse>
-    @GET("api/detailed")
+
+    @GET("api/standings")
     suspend fun getDetailedStandings(): Response<DetailedStandingResponse>
     @GET("api/season/get-phases")
     suspend fun getSeasonPhases(@Query("season_id") seasonId: Int): Response<SeasonResponse>
-    @GET("api/news")
-    suspend fun getNews(): Response<NewsResponse>
+    @GET("api/notifications")
+    suspend fun getNotifications(): retrofit2.Response<NotificationResponse>
     @GET("match/detail")
     suspend fun getMatchDetail(@Query("id") matchId: Int): Response<MatchDetailResponse>
     // ---- ADMIN SECTION ----

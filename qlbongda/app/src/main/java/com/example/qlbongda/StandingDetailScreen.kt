@@ -21,10 +21,11 @@ import com.example.qlbongda.ui.theme.NeonGreen
 @Composable
 fun StandingDetailScreen(
     standings: List<GroupStanding>,
+    initialTabIndex: Int, // <--- Nhận index từ bên ngoài
     onBack: () -> Unit,
     onTeamClick: (String) -> Unit
 ) {
-    var selectedTabIndex by remember { mutableStateOf(0) }
+    var selectedTabIndex by remember { mutableIntStateOf(initialTabIndex) }
     val sharedScrollState = rememberScrollState()
 
     Scaffold(
@@ -76,7 +77,7 @@ fun StandingDetailScreen(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212))
                     ) {
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("STT", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.width(30.dp), textAlign = TextAlign.Center)
+                            Text("#", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.width(30.dp), textAlign = TextAlign.Center)
                             Text("ĐỘI BÓNG", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.width(100.dp))
 
                             Row(modifier = Modifier.horizontalScroll(sharedScrollState)) {
@@ -119,11 +120,28 @@ fun StandingDetailScreen(
                                 DataCell(row.points.toString(), color = NeonGreen, fontWeight = FontWeight.Bold)
 
                                 // Render phong độ 5 trận
-                                Row(modifier = Modifier.width(130.dp).padding(start = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    row.form.forEach { outcome ->
-                                        val (bg, txt) = when (outcome) { "W" -> Color(0xFF00C853) to Color.Black; "D" -> Color.DarkGray to Color.White; else -> Color.Red to Color.White }
-                                        Box(modifier = Modifier.size(18.dp).background(bg, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
-                                            Text(outcome, color = txt, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                Row(
+                                    modifier = Modifier.width(130.dp).padding(start = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    (row.form ?: emptyList()).take(5).forEach { outcome ->
+                                        val (bg, txt) = when (outcome) {
+                                            "W" -> Color(0xFF00C853) to Color.Black
+                                            "D" -> Color.DarkGray to Color.White
+                                            "L" -> Color.Red to Color.White
+                                            else -> Color.Transparent to Color.Transparent // Tránh lỗi nếu dữ liệu khác lạ
+                                        }
+
+                                        Box(
+                                            modifier = Modifier.size(18.dp).background(bg, RoundedCornerShape(4.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = outcome,
+                                                color = txt,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
                                         }
                                     }
                                 }

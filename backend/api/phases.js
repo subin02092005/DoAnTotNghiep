@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
 
-// Cấu hình kết nối Database chung (Giữ nguyên từ login.js của bạn)
+
 const dbConfig = {
     host: 'localhost',
     user: 'root',
@@ -10,7 +10,7 @@ const dbConfig = {
     database: 'football_management'
 };
 
-// 🌟 ĐĂNG KÝ ĐƯỜNG DẪN TRỰC TIẾP: /seasons/:seasonId/phases
+// 🌟 ĐĂNG KÝ ĐƯỜNG DẪN TRỰC TIẾP:
 router.get('/seasons/:seasonId/phases', async (req, res) => {
     const seasonId = req.params.seasonId;
 

@@ -39,6 +39,8 @@ fun TeamTabContent(
     onLeagueRegisteredChange: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
+    // 1. Lấy tên người dùng đã đăng nhập (ví dụ từ SharedPreferences)
+    val sharedPref = remember { context.getSharedPreferences("AUTH_PREF", android.content.Context.MODE_PRIVATE) }
 
     var isEditingPlayer by remember { mutableStateOf(false) }
     var editingPlayerIndex by remember { mutableStateOf(-1) }
@@ -47,6 +49,17 @@ fun TeamTabContent(
     var inputPlayerPosition by remember { mutableStateOf("FW") }
     var inputCoachName by remember { mutableStateOf(coachName) }
 
+    LaunchedEffect(Unit) {
+        if (leaderName.isEmpty()) {
+            val savedName = sharedPref.getString("USER_NAME", "") ?: ""
+            onLeaderNameChange(savedName)
+            val allEntries = sharedPref.all
+            android.util.Log.d("DEBUG_TEAM", "Dữ liệu hiện có trong AUTH_PREF: $allEntries")
+        }
+    }
+    fun isNameValid(input: String): Boolean {
+        return input.matches(Regex("^[\\p{L}\\s]*$"))
+    }
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(text = "QUẢN LÝ ĐỘI BÓNG", color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         Text(text = "— MÙA GIẢI 2026 —", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp), textAlign = TextAlign.Center)
@@ -64,7 +77,15 @@ fun TeamTabContent(
 
                     OutlinedTextField(
                         value = teamName,
-                        onValueChange = onTeamNameChange,
+                      onValueChange = { newValue ->
+                            // Chỉ cập nhật nếu hợp lệ
+                            if (isNameValid(newValue)) {
+                                onTeamNameChange(newValue)
+                            } else {
+                                // Tùy chọn: Báo lỗi nếu nhập sai
+                                Toast.makeText(context, "Tên đội không được chứa số hoặc ký tự đặc biệt!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         label = { Text("Tên đội bóng", color = Color.White) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = NeonGreen, focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -73,11 +94,19 @@ fun TeamTabContent(
 
                     OutlinedTextField(
                         value = leaderName,
-                        onValueChange = onLeaderNameChange,
+                        onValueChange = { newValue ->
+                            // Chỉ cập nhật nếu hợp lệ
+                            if (isNameValid(newValue)) {
+                                onLeaderNameChange(newValue)
+                            } else {
+                                Toast.makeText(context, "Tên đội trưởng không được chứa số hoặc ký tự đặc biệt!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         label = { Text("Tên Captain / Đại diện", color = Color.White) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = NeonGreen, focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = NeonGreen, focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                     )
+
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Button(

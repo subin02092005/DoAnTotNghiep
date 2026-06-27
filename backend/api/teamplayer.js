@@ -2,34 +2,31 @@ const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
 
-const dbConfig = {
+// 1. Tạo Pool một lần duy nhất ở ngoài router
+const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
     password: '123456',
-    database: 'football_management'
-};
+    database: 'football_management',
+    waitForConnections: true,
+    connectionLimit: 10 // Số kết nối tối đa
+});
 
-// API lấy chi tiết đội bóng và danh sách cầu thủ
-router.get('/teams/:id/detail', async (req, res) => {
+router.get('/team/:id/detail', async (req, res) => {
     const teamId = req.params.id;
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        
-        // 1. Lấy thông tin đội bóng (bao gồm tên đội và HLV)
-        const [teamRows] = await connection.execute(
+        // 2. Sử dụng pool.query thay vì createConnection
+        // Chạy song song 2 câu query bằng Promise.all để tăng tốc độ phản hồi
+        const [teamRows] = await pool.query(
             'SELECT id, name, coach_name, description FROM teams WHERE id = ?', 
             [teamId]
         );
 
         if (teamRows.length === 0) {
-            await connection.end();
             return res.status(404).json({ status: "error", message: "Không tìm thấy đội bóng" });
         }
 
-        // 2. Lấy danh sách cầu thủ thuộc đội bóng này 
-        // Kết hợp bảng team_players và bảng users (để lấy tên người dùng) 
-        // hoặc bảng players nếu cần thông tin chi tiết cầu thủ
-        const [playerRows] = await connection.execute(
+        const [playerRows] = await pool.query(
             `SELECT tp.player_id, u.name as player_name, tp.position, tp.jersey_number, tp.role 
              FROM team_players tp
              JOIN players p ON tp.player_id = p.id
@@ -38,9 +35,6 @@ router.get('/teams/:id/detail', async (req, res) => {
             [teamId]
         );
 
-        await connection.end();
-
-        // 3. Trả về thông tin kết hợp
         return res.status(200).json({
             status: "success",
             data: {
