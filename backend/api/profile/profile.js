@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
-
+const bcrypt = require('bcrypt');
 const dbConfig = {
     host: 'localhost',
     user: 'root',
@@ -99,4 +99,90 @@ router.post('/profile/verify-otp', async (req, res) => {
     }
 });
 
+// 🌟 API 3: CẬP NHẬT THÔNG TIN CÁ NHÂN
+// Đường dẫn: POST http://localhost:3000/api/profile/update-info
+router.post('/profile/update-info', async (req, res) => {
+    const { email, name, phone } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ success: false, message: 'Email là bắt buộc để cập nhật!' });
+    }
+
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+
+        // Câu lệnh cập nhật: Chỉ cập nhật những trường được cung cấp
+        // Ở đây ta mặc định cho phép đổi tên và số điện thoại
+        const updateQuery = `
+            UPDATE users 
+            SET name = ?, phone = ? 
+            WHERE email = ?
+        `;
+        
+        const [result] = await connection.execute(updateQuery, [name, phone, email]);
+        await connection.end();
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng để cập nhật!' });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Cập nhật thông tin thành công!'
+        });
+    } catch (error) {
+        console.error("Lỗi cập nhật Profile:", error);
+        if (connection) await connection.end();
+        return res.status(500).json({ success: false, message: 'Lỗi hệ thống khi cập nhật!' });
+    }
+});
+// 🌟 API 4: ĐỔI MẬT KHẨU
+// Đường dẫn: POST http://localhost:3000/api/profile/change-password
+router.post('/profile/change-password', async (req, res) => {
+    const { email, oldPassword, newPassword } = req.body;
+
+    if (!email || !oldPassword || !newPassword) {
+        return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ thông tin!' });
+    }
+
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+
+        // 1. Lấy mật khẩu hiện tại trong DB
+        const [users] = await connection.execute('SELECT password FROM users WHERE email = ?', [email]);
+        
+        if (users.length === 0) {
+            await connection.end();
+            return res.status(404).json({ success: false, message: 'Người dùng không tồn tại!' });
+        }
+
+        const currentPasswordHash = users[0].password;
+
+        // 2. So sánh mật khẩu cũ
+        // Nếu bạn đang lưu mật khẩu thô (text), hãy thay dòng dưới bằng: if (oldPassword !== currentPasswordHash)
+        const isMatch = await bcrypt.compare(oldPassword, currentPasswordHash);
+        
+        if (!isMatch) {
+            await connection.end();
+            return res.status(400).json({ success: false, message: 'Mật khẩu cũ không chính xác!' });
+        }
+
+        // 3. Mã hóa mật khẩu mới
+        const saltRounds = 10;
+        const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+        // 4. Cập nhật mật khẩu mới vào database
+        await connection.execute('UPDATE users SET password = ? WHERE email = ?', [newPasswordHash, email]);
+        
+        await connection.end();
+        return res.status(200).json({ success: true, message: 'Đổi mật khẩu thành công!' });
+
+    } catch (error) {
+        console.error("Lỗi đổi mật khẩu:", error);
+        if (connection) await connection.end();
+        return res.status(500).json({ success: false, message: 'Lỗi hệ thống khi đổi mật khẩu!' });
+    }
+});
 module.exports = router;
