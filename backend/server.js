@@ -5,6 +5,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use('/api', (req, res, next) => {
+    console.log('API REQUEST:', req.method, req.originalUrl);
+    next();
+});
+
 // 🌟 NẠP CÁC FILE CODE CON VÀO ĐÂY 🌟
 const loginApi = require('./api/login');
 const registerApi = require('./api/register');
@@ -12,6 +17,7 @@ const profileApi = require('./api/profile/profile');
 const teamApi = require('./api/admin/teamController');
 const playerApi = require('./api/admin/playerController');
 const matchApi = require('./api/admin/matchController');
+const featuredMatchApi = require('./api/admin/featuredMatchController');
 const tournamentApi = require('./api/admin/tournamentController');
 const forgotpasswordRouter = require('./api/forgotPassword'); // Đảm bảo đường dẫn đúng đến file này
 
@@ -38,6 +44,7 @@ app.use('/api', profileApi);
 app.use('/api', teamApi);     
 app.use('/api', playerApi);   
 app.use('/api', matchApi);    
+app.use('/api', featuredMatchApi);
 app.use('/api', tournamentApi);
 app.use('/api', forgotpasswordRouter);
 

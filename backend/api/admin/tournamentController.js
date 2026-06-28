@@ -58,7 +58,7 @@ router.get('/tournaments/:id', async (req, res) => {
         const [seasons] = await pool.execute(
             `SELECT id, name, description, status, start_date, end_date, registration_deadline, is_registration_open, is_active
              FROM seasons
-             WHERE tournament_id = ? AND is_deleted = 0
+             WHERE tournament_id = ? AND deleted_at IS NULL
              ORDER BY start_date ASC`,
             [id]
         );
@@ -152,8 +152,8 @@ router.post('/tournaments/:id/seasons', async (req, res) => {
 
     try {
         const [result] = await pool.execute(
-            `INSERT INTO seasons (name, description, status, start_date, end_date, registration_deadline, is_registration_open, is_active, created_at, updated_at, is_deleted, tournament_id, user_id)
-             VALUES (?, ?, 'upcoming', ?, ?, ?, ?, 1, NOW(), NOW(), 0, ?, ?)`,
+            `INSERT INTO seasons (name, description, status, start_date, end_date, registration_deadline, is_registration_open, is_active, created_at, updated_at, deleted_at, tournament_id, user_id)
+             VALUES (?, ?, 'upcoming', ?, ?, ?, ?, 1, NOW(), NOW(), NULL, ?, ?)`,
             [name, description || null, start_date, end_date, registration_deadline, is_registration_open ? 1 : 0, id, user_id || null]
         );
 
@@ -182,7 +182,7 @@ router.put('/tournaments/:tournamentId/seasons/:seasonId/rules', async (req, res
 
     try {
         const [existingRules] = await pool.execute(
-            'SELECT id FROM season_rules WHERE season_id = ? AND is_deleted = 0',
+            'SELECT id FROM season_rules WHERE season_id = ? AND deleted_at IS NULL',
             [seasonId]
         );
 
@@ -222,8 +222,8 @@ router.put('/tournaments/:tournamentId/seasons/:seasonId/rules', async (req, res
                     season_id, points_per_win, points_per_draw, points_per_loss,
                     yellow_cards_suspension, max_players_per_team, min_players_per_team,
                     registration_fee, forfeit_score, teams_advance_per_group,
-                    tiebreaker_order, created_at, updated_at, is_deleted, user_id)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, ?)`,
+                    tiebreaker_order, created_at, updated_at, deleted_at, user_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL, ?)`,
                 [seasonId,
                     points_per_win || 3,
                     points_per_draw || 1,
@@ -250,7 +250,7 @@ router.patch('/tournaments/:tournamentId/seasons/:seasonId/open-registration', a
     const { seasonId } = req.params;
     try {
         const [result] = await pool.execute(
-            `UPDATE seasons SET is_registration_open = 1, status = 'registration_open', updated_at = NOW() WHERE id = ? AND is_deleted = 0`,
+            `UPDATE seasons SET is_registration_open = 1, status = 'registration_open', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
             [seasonId]
         );
 
@@ -269,7 +269,7 @@ router.patch('/tournaments/:tournamentId/seasons/:seasonId/close-registration', 
     const { seasonId } = req.params;
     try {
         const [result] = await pool.execute(
-            `UPDATE seasons SET is_registration_open = 0, status = 'upcoming', updated_at = NOW() WHERE id = ? AND is_deleted = 0`,
+            `UPDATE seasons SET is_registration_open = 0, status = 'upcoming', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
             [seasonId]
         );
 

@@ -16,11 +16,12 @@ const pool = mysql.createPool(dbConfig);
 router.get('/teams', async (req, res) => {
     try {
         const { name, coach_name, is_active } = req.query;
+        console.log('DEBUG: teamController /teams route hit');
         let query = `
             SELECT id, name, coach_name, logo, description, is_active,
                    created_at, updated_at
             FROM teams
-            WHERE is_deleted = 0
+            WHERE deleted_at IS NULL
         `;
         const params = [];
 
@@ -55,7 +56,7 @@ router.get('/teams/:id', async (req, res) => {
         const [teams] = await pool.execute(
             `SELECT id, name, coach_name, logo, description, is_active, created_at, updated_at, deleted_at, user_id
              FROM teams
-             WHERE id = ? AND is_deleted = 0`,
+             WHERE id = ? AND deleted_at IS NULL`,
             [id]
         );
 
@@ -69,7 +70,7 @@ router.get('/teams/:id', async (req, res) => {
             `SELECT tl.id, tl.user_id, u.name, u.email, u.phone, tl.created_at
              FROM team_leaders tl
              JOIN users u ON tl.user_id = u.id
-             WHERE tl.team_id = ? AND tl.is_deleted = 0`,
+             WHERE tl.team_id = ? AND tl.deleted_at IS NULL`,
             [id]
         );
 
@@ -80,7 +81,7 @@ router.get('/teams/:id', async (req, res) => {
              FROM team_players tp
              JOIN players pl ON tp.player_id = pl.id
              LEFT JOIN users u ON pl.user_id = u.id
-             WHERE tp.team_id = ? AND tp.is_deleted = 0`,
+             WHERE tp.team_id = ? AND tp.deleted_at IS NULL`,
             [id]
         );
 
@@ -97,7 +98,7 @@ router.patch('/teams/:id/approve', async (req, res) => {
         const [result] = await pool.execute(
             `UPDATE teams
              SET is_active = 1, updated_at = NOW()
-             WHERE id = ? AND is_deleted = 0`,
+             WHERE id = ? AND deleted_at IS NULL`,
             [id]
         );
 
@@ -117,8 +118,8 @@ router.patch('/teams/:id/reject', async (req, res) => {
     try {
         const [result] = await pool.execute(
             `UPDATE teams
-             SET is_deleted = 1, updated_at = NOW()
-             WHERE id = ? AND is_deleted = 0`,
+             SET deleted_at = NOW(), updated_at = NOW()
+             WHERE id = ? AND deleted_at IS NULL`,
             [id]
         );
 

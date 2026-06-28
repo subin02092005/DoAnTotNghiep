@@ -1,6 +1,6 @@
 package com.example.qlbongda.data.api
 
-import com.example.qlbongda.data.model.* // Import toàn bộ các model đã tạo ở trên
+import com.example.qlbongda.data.model.* 
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -13,51 +13,50 @@ import retrofit2.http.Query
 interface ApiService {
 
     // ---- AUTHENTICATION ----
-    @POST("api/login")
+    @POST("login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
-    
-    @POST("api/register")
+    @POST("register")
     suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
 
-    @POST("api/check-admin-email")
+    @POST("check-admin-email")
     suspend fun checkAdminEmail(@Body request: CheckAdminRequest): Response<CheckAdminResponse>
 
     // ---- QUÊN MẬT KHẨU ----
-
-    @POST("api/verify-email")
+    @POST("verify-email")
     suspend fun verifyEmail(@Body request: VerifyEmailRequest): Response<VerifyEmailResponse>
 
-    @POST("api/reset-password")
+    @POST("reset-password")
     suspend fun resetPassword(@Body request: ResetPasswordRequest): Response<GenericResponse>
 
     // ---- PROFILE ----
-    @GET("api/profile/get-info")
+    @GET("profile/get-info")
     suspend fun getProfileInfo(@Query("email") email: String): Response<ProfileResponse>
 
-    @POST("api/profile/verify-otp")
+    @POST("profile/verify-otp")
     suspend fun verifyOtpProfile(@Body request: VerifyOtpRequest): Response<VerifyOtpResponse>
 
-
-
-    //chitietcauthu vs bxh
-    @GET("api/team/{teamId}/detail")
+    // ---- CHI TIẾT ĐỘI BÓNG & BXH ----
+    @GET("teams/{teamId}") // Khớp với router.get('/teams/:id') trong teamController.js
     suspend fun getTeamDetail(
         @Path("teamId") teamId: Int
     ): Response<TeamDetailResponse>
-    @GET("api/standings")
+
+    @GET("standings")
     suspend fun getDetailedStandings(): Response<DetailedStandingResponse>
 
+    @GET("seasons/{seasonId}/phases") // Đã sửa theo server.js: /api/seasons/:seasonId/phases
+    suspend fun getSeasonPhases(@Path("seasonId") seasonId: Int): Response<SeasonResponse>
 
+    @GET("notifications")
+    suspend fun getNotifications(): Response<NotificationResponse>
 
-    @GET("api/season/get-phases")
-    suspend fun getSeasonPhases(@Query("season_id") seasonId: Int): Response<SeasonResponse>
-    @GET("api/notifications")
-    suspend fun getNotifications(): retrofit2.Response<NotificationResponse>
-    @GET("api/matches")
+    @GET("matches")
     suspend fun getMatches(): Response<MatchResponse>
-    @GET("api/match/detail")
+
+    @GET("match/detail")
     suspend fun getMatchDetail(@Query("id") matchId: Int): Response<MatchDetailResponse>
+
     // ---- ADMIN SECTION ----
     @GET("players")
     suspend fun getPlayersAdmin(@Query("name") name: String? = null): Response<AdminPlayerResponse>
@@ -91,10 +90,8 @@ interface ApiService {
     @PATCH("teams/{id}/reject")
     suspend fun rejectTeam(@Path("id") id: Int): Response<GenericAdminResponse>
 
-
-
     // ---- ADMIN MATCHES ----
-    @GET("matches")
+    @GET("matches") // Bạn nên cân nhắc đặt path khác nếu bị trùng với public matches
     suspend fun getMatchesAdmin(
         @Query("status") status: String? = null,
         @Query("season_id") seasonId: Int? = null
@@ -110,13 +107,13 @@ interface ApiService {
     suspend fun cancelMatch(@Path("id") id: Int): Response<GenericAdminResponse>
 
     // ---- ADMIN FEATURED MATCHES ----
-    @PATCH("api/admin/matches/{id}/featured")
+    @PATCH("matches/{id}/featured")
     suspend fun updateFeaturedMatch(
         @Path("id") id: Int,
         @Body request: FeaturedMatchRequest
     ): Response<FeaturedMatchResponse>
 
-    @GET("api/admin/matches/featured")
+    @GET("featured")
     suspend fun getFeaturedMatches(
         @Query("limit") limit: Int? = 10,
         @Query("offset") offset: Int? = 0

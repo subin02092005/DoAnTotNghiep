@@ -30,13 +30,15 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             _isLoading.value = true
             try {
                 val response = apiService.getPlayersAdmin(name)
-                if (response.isSuccessful && response.body()?.success == true) {
-                    _players.value = response.body()?.data ?: emptyList()
+                val body = response.body()
+                if (response.isSuccessful && body != null && (body.success == true || body.status == "success")) {
+                    _players.value = body.data ?: emptyList()
                 } else {
-                    _message.value = response.body()?.message ?: "Lỗi tải danh sách cầu thủ"
+                    _message.value = body?.message ?: "Lỗi tải: ${response.code()}"
                 }
             } catch (e: Exception) {
-                _message.value = "Lỗi kết nối: ${e.message}"
+                _message.value = "Lỗi hệ thống: ${e.localizedMessage}"
+                e.printStackTrace()
             } finally {
                 _isLoading.value = false
             }
@@ -114,13 +116,21 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             _isLoading.value = true
             try {
                 val response = apiService.getTeamsAdmin(name = name)
-                if (response.isSuccessful && response.body()?.success == true) {
-                    _teams.value = response.body()?.data ?: emptyList()
+                val body = response.body()
+                
+                // Kiểm tra linh hoạt cả success (boolean) hoặc status (string)
+                val isSuccessful = response.isSuccessful && body != null && 
+                    (body.success == true || body.status == "success" || body.status == "ok")
+
+                if (isSuccessful && body != null) {
+                    _teams.value = body.data ?: emptyList()
                 } else {
-                    _message.value = response.body()?.message ?: "Lỗi tải danh sách đội bóng"
+                    val errorMsg = body?.message ?: "Mã lỗi: ${response.code()}"
+                    _message.value = "Không thể tải danh sách: $errorMsg"
                 }
             } catch (e: Exception) {
-                _message.value = "Lỗi kết nối: ${e.message}"
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+                e.printStackTrace()
             } finally {
                 _isLoading.value = false
             }
@@ -165,10 +175,11 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             _isLoading.value = true
             try {
                 val response = apiService.getMatchesAdmin()
-                if (response.isSuccessful && response.body()?.success == true) {
-                    _matches.value = response.body()?.data ?: emptyList()
+                val body = response.body()
+                if (response.isSuccessful && body != null && (body.success == true || body.status == "success")) {
+                    _matches.value = body.data ?: emptyList()
                 } else {
-                    _message.value = response.body()?.message ?: "Lỗi tải lịch thi đấu"
+                    _message.value = body?.message ?: "Lỗi tải lịch thi đấu"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
@@ -203,10 +214,11 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             _isLoading.value = true
             try {
                 val response = apiService.getFeaturedMatches(limit, offset)
-                if (response.isSuccessful && response.body()?.success == true) {
-                    _featuredMatches.value = response.body()?.data ?: emptyList()
+                val body = response.body()
+                if (response.isSuccessful && body != null && (body.success == true || body.status == "success")) {
+                    _featuredMatches.value = body.data ?: emptyList()
                 } else {
-                    _message.value = response.body()?.message ?: "Lỗi tải danh sách nổi bật"
+                    _message.value = body?.message ?: "Lỗi tải danh sách nổi bật"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"

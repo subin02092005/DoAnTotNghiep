@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
             QlbongdaTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
-                    var currentScreen by remember { mutableStateOf("login") }
+                    var currentScreen by remember { mutableStateOf("admin") }
                     var previousScreen by remember { mutableStateOf("home") }
                     var selectedTab by remember { mutableIntStateOf(0) }
                     var currentStandingTabIndex by remember { mutableIntStateOf(0) }

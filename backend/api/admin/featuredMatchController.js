@@ -19,7 +19,7 @@ const pool = mysql.createPool(dbConfig);
  * @param   {number} id - ID của trận đấu
  * @body    {boolean} is_featured - Trạng thái nổi bật (true/false)
  */
-router.patch('/matches/:id/featured', async (req, res) => {
+router.patch('/admin/matches/:id/featured', async (req, res) => {
     const matchId = parseInt(req.params.id);
     const { is_featured } = req.body;
 
@@ -43,7 +43,7 @@ router.patch('/matches/:id/featured', async (req, res) => {
         const [matches] = await pool.execute(
             `SELECT id, home_team_id, away_team_id, status, scheduled_at, is_featured
              FROM matches 
-             WHERE id = ? AND is_deleted = 0`,
+             WHERE id = ? AND deleted_at IS NULL`,
             [matchId]
         );
 
@@ -58,7 +58,7 @@ router.patch('/matches/:id/featured', async (req, res) => {
         await pool.execute(
             `UPDATE matches 
              SET is_featured = ?, updated_at = NOW() 
-             WHERE id = ? AND is_deleted = 0`,
+             WHERE id = ? AND deleted_at IS NULL`,
             [is_featured ? 1 : 0, matchId]
         );
 
@@ -73,7 +73,7 @@ router.patch('/matches/:id/featured', async (req, res) => {
              FROM matches m
              LEFT JOIN teams ht ON m.home_team_id = ht.id
              LEFT JOIN teams at ON m.away_team_id = at.id
-             WHERE m.id = ? AND m.is_deleted = 0`,
+             WHERE m.id = ? AND m.deleted_at IS NULL`,
             [matchId]
         );
 
@@ -102,12 +102,12 @@ router.patch('/matches/:id/featured', async (req, res) => {
  * @query   {number} limit - Số lượng trận đấu (default: 10)
  * @query   {number} offset - Vị trí bắt đầu (default: 0)
  */
-router.get('/featured', async (req, res) => {
+router.get('/admin/matches/featured', async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 10;
-        const offset = parseInt(req.query.offset) || 0;
+        const limit = Math.max(1, parseInt(req.query.limit, 10) || 10);
+        const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
 
-        const [featuredMatches] = await pool.execute(
+        const [featuredMatches] = await pool.query(
             `SELECT m.id, m.phase_id, m.group_id, 
                     m.home_team_id, ht.name AS home_team_name, ht.logo AS home_team_logo,
                     m.away_team_id, at.name AS away_team_name, at.logo AS away_team_logo,
@@ -117,15 +117,14 @@ router.get('/featured', async (req, res) => {
              FROM matches m
              LEFT JOIN teams ht ON m.home_team_id = ht.id
              LEFT JOIN teams at ON m.away_team_id = at.id
-             WHERE m.is_featured = 1 AND m.is_deleted = 0
+             WHERE m.is_featured = 1 AND m.deleted_at IS NULL
              ORDER BY m.updated_at DESC
-             LIMIT ? OFFSET ?`,
-            [limit, offset]
+             LIMIT ${limit} OFFSET ${offset}`
         );
 
         // Lấy tổng số trận đấu nổi bật
         const [countResult] = await pool.execute(
-            `SELECT COUNT(*) as total FROM matches WHERE is_featured = 1 AND is_deleted = 0`
+            `SELECT COUNT(*) as total FROM matches WHERE is_featured = 1 AND deleted_at IS NULL`
         );
 
         res.json({

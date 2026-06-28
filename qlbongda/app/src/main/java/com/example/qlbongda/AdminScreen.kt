@@ -369,7 +369,7 @@ fun PlayerManagementAdminScreen(viewModel: AdminViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(players) { player ->
-                    PlayerAdminCard(player, onLockClick = { viewModel.lockAccount(player.userId) })
+                    PlayerAdminCard(player, onLockClick = { player.userId?.let { viewModel.lockAccount(it) } })
                 }
             }
         }
@@ -392,13 +392,13 @@ fun PlayerAdminCard(player: AdminPlayerItem, onLockClick: () -> Unit) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = player.name,
+                    text = player.name ?: "N/A",
                     color = Color.White,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Email: ${player.email}",
+                    text = "Email: ${player.email ?: "N/A"}",
                     color = Color.Gray,
                     fontSize = 13.sp
                 )
@@ -422,7 +422,9 @@ fun PlayerAdminCard(player: AdminPlayerItem, onLockClick: () -> Unit) {
                     Icon(Icons.Default.Lock, contentDescription = "Lock", tint = Color.Red)
                 }
             } else {
-                Icon(Icons.Default.LockPerson, contentDescription = "Locked", tint = Color.Gray)
+                IconButton(onClick = {}) {
+                    Icon(Icons.Default.LockPerson, contentDescription = "Locked", tint = Color.Gray)
+                }
             }
         }
     }
@@ -476,8 +478,8 @@ fun TeamManagementScreen(viewModel: AdminViewModel) {
                 items(teams) { team ->
                     TeamAdminCard(
                         team = team,
-                        onApprove = { viewModel.approveTeam(team.id) },
-                        onReject = { viewModel.rejectTeam(team.id) }
+                        onApprove = { team.id?.let { viewModel.approveTeam(it) } },
+                        onReject = { team.id?.let { viewModel.rejectTeam(it) } }
                     )
                 }
             }
@@ -501,7 +503,7 @@ fun TeamAdminCard(team: AdminTeamItem, onApprove: () -> Unit, onReject: () -> Un
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = team.name,
+                    text = team.name ?: "Đội bóng không tên",
                     color = Color.White,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold

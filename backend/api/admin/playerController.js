@@ -24,7 +24,7 @@ router.get('/players', async (req, res) => {
                    u.id as user_id, u.name, u.email, u.phone, u.is_active as user_active
             FROM players p
             JOIN users u ON p.user_id = u.id
-            WHERE p.is_deleted = 0
+            WHERE p.deleted_at IS NULL
         `;
         const params = [];
 
@@ -99,7 +99,7 @@ router.patch('/team-players/:id/approve', async (req, res) => {
     const { id } = req.params; // id của bảng team_players
     try {
         const [result] = await pool.execute(
-            `UPDATE team_players SET approval_status = 'approved', updated_at = NOW() WHERE id = ? AND is_deleted = 0`,
+            `UPDATE team_players SET approval_status = 'approved', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
             [id]
         );
 
@@ -120,7 +120,7 @@ router.patch('/team-players/:id/reject', async (req, res) => {
     const { id } = req.params;
     try {
         const [result] = await pool.execute(
-            `UPDATE team_players SET approval_status = 'rejected', updated_at = NOW() WHERE id = ? AND is_deleted = 0`,
+            `UPDATE team_players SET approval_status = 'rejected', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
             [id]
         );
 
@@ -141,7 +141,7 @@ router.patch('/team-players/:id/status/injured', async (req, res) => {
     const { id } = req.params;
     try {
         const [result] = await pool.execute(
-            `UPDATE team_players SET status = 'injured', updated_at = NOW() WHERE id = ? AND is_deleted = 0`,
+            `UPDATE team_players SET status = 'injured', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
             [id]
         );
 

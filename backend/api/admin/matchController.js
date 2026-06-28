@@ -24,7 +24,7 @@ router.get('/matchesadmin', async (req, res) => {
             FROM matches m
             LEFT JOIN teams ht ON m.home_team_id = ht.id
             LEFT JOIN teams at ON m.away_team_id = at.id
-            WHERE m.is_deleted = 0
+            WHERE m.deleted_at IS NULL
         `;
         const params = [];
 
@@ -79,7 +79,7 @@ router.get('/matches/:id', async (req, res) => {
              FROM matches m
              LEFT JOIN teams ht ON m.home_team_id = ht.id
              LEFT JOIN teams at ON m.away_team_id = at.id
-             WHERE m.id = ? AND m.is_deleted = 0`,
+             WHERE m.id = ? AND m.deleted_at IS NULL`,
             [id]
         );
 
@@ -227,7 +227,7 @@ router.put('/matches/:id', async (req, res) => {
         params.push(id);
 
         const [result] = await pool.execute(
-            `UPDATE matches SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ? AND is_deleted = 0`,
+            `UPDATE matches SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
             params
         );
 
@@ -246,7 +246,7 @@ router.patch('/matches/:id/cancel', async (req, res) => {
     const { id } = req.params;
     try {
         const [result] = await pool.execute(
-            `UPDATE matches SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND is_deleted = 0`,
+            `UPDATE matches SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
             [id]
         );
 
@@ -287,7 +287,7 @@ router.patch('/matches/:id/reschedule', async (req, res) => {
         params.push(id);
 
         const [result] = await pool.execute(
-            `UPDATE matches SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ? AND is_deleted = 0`,
+            `UPDATE matches SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
             params
         );
 

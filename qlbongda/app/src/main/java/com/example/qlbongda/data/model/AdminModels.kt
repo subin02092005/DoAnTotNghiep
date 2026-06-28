@@ -3,22 +3,23 @@ package com.example.qlbongda.data.model
 import com.google.gson.annotations.SerializedName
 
 data class AdminPlayerItem(
-    @SerializedName("player_id") val playerId: Int,
-    @SerializedName("date_of_birth") val dateOfBirth: String?,
-    val position: String?,
-    val height: Int?,
-    val weight: Int?,
-    val nationality: String?,
-    @SerializedName("player_active") val playerActive: Int,
-    @SerializedName("user_id") val userId: Int,
-    val name: String,
-    val email: String,
-    val phone: String?,
-    @SerializedName("user_active") val userActive: Int
+    @SerializedName("player_id") val playerId: Int? = null,
+    @SerializedName("date_of_birth") val dateOfBirth: String? = null,
+    val position: String? = null,
+    val height: String? = null,
+    val weight: String? = null,
+    val nationality: String? = null,
+    @SerializedName("player_active") val playerActive: Int? = null,
+    @SerializedName("user_id") val userId: Int? = null,
+    val name: String? = null,
+    val email: String? = null,
+    val phone: String? = null,
+    @SerializedName("user_active") val userActive: Int? = null
 )
 
 data class AdminPlayerResponse(
-    val success: Boolean,
+    val success: Boolean? = null,
+    val status: String? = null,
     val data: List<AdminPlayerItem>? = null,
     val message: String? = null
 )
@@ -33,17 +34,18 @@ data class GenericAdminResponse(
 )
 
 data class AdminTeamItem(
-    val id: Int,
-    val name: String,
-    @SerializedName("coach_name") val coachName: String?,
-    val logo: String?,
-    val description: String?,
-    @SerializedName("is_active") val isActive: Int,
-    @SerializedName("created_at") val createdAt: String?
+    val id: Int? = null,
+    val name: String? = null,
+    @SerializedName("coach_name") val coachName: String? = null,
+    val logo: String? = null,
+    val description: String? = null,
+    @SerializedName("is_active") val isActive: Int? = null,
+    @SerializedName("created_at") val createdAt: String? = null
 )
 
 data class AdminTeamResponse(
-    val success: Boolean,
+    val success: Boolean? = null,
+    val status: String? = null,
     val data: List<AdminTeamItem>? = null,
     val message: String? = null
 )
@@ -85,7 +87,8 @@ data class FeaturedMatchResponse(
 )
 
 data class FeaturedMatchesListResponse(
-    val success: Boolean,
+    val success: Boolean? = null,
+    val status: String? = null,
     val message: String? = null,
     val data: List<AdminMatchItem>? = null,
     val pagination: PaginationInfo? = null
@@ -99,7 +102,8 @@ data class PaginationInfo(
 )
 
 data class AdminMatchResponse(
-    val success: Boolean,
+    val success: Boolean? = null,
+    val status: String? = null,
     val data: List<AdminMatchItem>? = null,
     val message: String? = null
 )
