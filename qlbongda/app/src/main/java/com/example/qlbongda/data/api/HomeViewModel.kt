@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.data.model.GroupStanding
+import com.example.qlbongda.data.model.MyTeamData
+import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.TournamentPhase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -116,6 +118,86 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
+///////////////////////
+
+    val teamPlayers = MutableStateFlow<List<PlayerInfo>>(emptyList()) // Danh sách cầu thủ của đội
+
+
+
+    // Sửa lại hàm fetchMyTeam
+    // Khai báo state để UI biết có đội hay chưa
+
+
+    private val _myTeam = MutableStateFlow<MyTeamData?>(null)
+    val myTeam: StateFlow<MyTeamData?> = _myTeam
+    private val _hasTeam = MutableStateFlow<Boolean?>(null)
+    val hasTeam: StateFlow<Boolean?> = _hasTeam
+
+
+    fun fetchMyTeam(userId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getMyTeam(userId) // Gọi API bạn đã gửi
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body?.hasTeam == true) {
+                        _myTeam.value = body.data
+                        _hasTeam.value = true // Đã có đội -> UI sẽ tự chuyển sang màn hình quản lý
+                        body.data?.teamId?.let { loadTeamDetails(it) }
+                    } else {
+                        _hasTeam.value = false // Chưa có đội
+                    }
+                }
+            } catch (e: Exception) {
+                _hasTeam.value = false
+            }
+        }
+    }
+
+
+    // Gọi API lấy chi tiết đội (đã có từ trước)
+    fun loadTeamDetails(teamId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getTeamDetail(teamId)
+                if (response.isSuccessful) {
+                    teamPlayers.value = response.body()?.data?.players ?: emptyList()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    fun addPlayer(teamId: Int, player: PlayerInfo) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.addPlayerToTeam(teamId, player)
+                if (response.isSuccessful) {
+                    loadTeamDetails(teamId) // Cập nhật lại list sau khi thêm
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    // Hàm xóa cầu thủ
+    fun removePlayer(teamId: Int, playerId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.removePlayerFromTeam(teamId, playerId)
+                if (response.isSuccessful) {
+                    loadTeamDetails(teamId) // Cập nhật lại list sau khi xóa
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+
+
+
 
     private fun setMockData() {
         _phases.value = listOf(

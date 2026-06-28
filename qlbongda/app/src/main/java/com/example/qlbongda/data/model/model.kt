@@ -157,15 +157,42 @@ data class StandingItem(
     val players: List<PlayerInfo> = emptyList() // Thêm danh sách cầu thủ
 )
 data class PlayerInfo(
-    val number: String,
-    val name: String,
-    val position: String
+    @SerializedName("jersey_number") val number: String, // Đổi kiểu thành String để khớp UI
+    @SerializedName("full_name") val name: String,
+    @SerializedName("position") val position: String,
+    val isCaptain: Boolean = false, // Thêm trường này
+    val userId: Int = 0             // Thêm ID người dùng để so sánh
 )
+
 data class TeamDetailResponse(
     val status: String,
     val message: String,
     val data: StandingItem // Trả về object StandingItem chứa list cầu thủ, tên HLV, Đội trưởng
 )
+
+data class MyTeamResponse(
+    val status: String,
+    val hasTeam: Boolean,
+    val data: MyTeamData?,
+    val message: String?
+)
+
+data class MyTeamData(
+    val teamId: Int,
+    val teamName: String,
+    val coachName: String?,
+    val captainName: String?,
+    val currentUserRole: String, // Dùng để ẩn/hiện nút Sửa
+    val players: List<Player>
+)
+
+data class Player(
+    val full_name: String,
+    val jersey_number: Int,
+    val position: String,
+    val role: String
+)
+
 
 
 // Model chi tiết bảng xếp hạng đầy đủ

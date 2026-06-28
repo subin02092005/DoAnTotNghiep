@@ -28,6 +28,9 @@ const standingsRoutes = require('./api/standings');
 const teamRoutes = require('./api/teamplayer');// import file bạn vừa tạo
 const matchRoutes = require('./api/matches');
 const matchDetailRoutes = require('./api/matchesdetail');
+//doi bong cua minh
+const myTeamRoutes = require('./api/my_team'); // import file my_team.js
+
 
 // 1. Thêm dòng require ở đầu file
 
@@ -54,6 +57,9 @@ app.use('/api', standingsRoutes);
 app.use('/api', teamRoutes);
 app.use('/api', matchRoutes);
 app.use('/api', matchDetailRoutes);
+
+app.use('/api', myTeamRoutes); // Đăng ký route cho my_team.js
+
 // Khởi chạy server duy nhất trên Port 3000
 const PORT = 3000;
 app.listen(PORT, () => {

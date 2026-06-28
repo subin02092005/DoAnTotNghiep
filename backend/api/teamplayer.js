@@ -8,8 +8,7 @@ const pool = mysql.createPool({
     user: 'root',
     password: '123456',
     database: 'football_management',
-    waitForConnections: true,
-    connectionLimit: 10 // Số kết nối tối đa
+   
 });
 
 router.get('/team/:id/detail', async (req, res) => {

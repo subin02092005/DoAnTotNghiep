@@ -35,6 +35,24 @@ interface ApiService {
 
     @POST("profile/verify-otp")
     suspend fun verifyOtpProfile(@Body request: VerifyOtpRequest): Response<VerifyOtpResponse>
+    // ---- ĐỘI BÓNG CỦA TÔI (Cá nhân) ----
+
+    @GET("my_team")
+    suspend fun getMyTeam(@Query("userId") userId: Int): Response<MyTeamResponse>
+    // ---- QUẢN LÝ THÀNH VIÊN TRONG ĐỘI ----
+    // Dùng để thêm cầu thủ vào đội
+    @POST("teams/{teamId}/players")
+    suspend fun addPlayerToTeam(
+        @Path("teamId") teamId: Int,
+        @Body player: PlayerInfo
+    ): Response<GenericResponse>
+
+    // Dùng để xóa cầu thủ khỏi đội
+    @PATCH("teams/{teamId}/players/{playerId}/remove")
+    suspend fun removePlayerFromTeam(
+        @Path("teamId") teamId: Int,
+        @Path("playerId") playerId: Int
+    ): Response<GenericResponse>
 
     // ---- CHI TIẾT ĐỘI BÓNG & BXH ----
     @GET("teams/{teamId}") // Khớp với router.get('/teams/:id') trong teamController.js

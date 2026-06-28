@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
             QlbongdaTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
-                    var currentScreen by remember { mutableStateOf("admin") }
+                    var currentScreen by remember { mutableStateOf("login") }
                     var previousScreen by remember { mutableStateOf("home") }
                     var selectedTab by remember { mutableIntStateOf(0) }
                     var currentStandingTabIndex by remember { mutableIntStateOf(0) }
@@ -65,7 +65,8 @@ class MainActivity : ComponentActivity() {
 
                         "login" -> {
                             LoginScreen(
-                                onLoginSuccess = { currentScreen = "home" },
+                                onLoginSuccess = { selectedTab = 0
+                                    currentScreen = "home" },
                                 onLoginAdminSuccess = { currentScreen = "admin" },
                                 onNavigateToRegister = { currentScreen = "register" },
                                 onForgotPasswordClick = { currentScreen = "forgot_password" }
