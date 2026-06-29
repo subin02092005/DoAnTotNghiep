@@ -28,6 +28,8 @@
     import androidx.lifecycle.compose.LocalLifecycleOwner
     import androidx.lifecycle.lifecycleScope
     import com.example.qlbongda.data.api.RetrofitClient
+    import com.example.qlbongda.data.model.ChangePasswordRequest
+    import com.example.qlbongda.data.model.UpdateProfileRequest
     import com.example.qlbongda.data.model.VerifyOtpRequest
     import com.example.qlbongda.ui.theme.NeonGreen
     import kotlinx.coroutines.launch
@@ -44,7 +46,7 @@
         var userName by remember { mutableStateOf(sharedPref.getString("USER_NAME", "Người dùng") ?: "Người dùng") }
         val userEmail = remember { sharedPref.getString("REMEMBERED_EMAIL", "") ?: "" }
         var userPhone by remember { mutableStateOf(sharedPref.getString("USER_PHONE", "") ?: "") }
-        var userPassword by remember { mutableStateOf(sharedPref.getString("REMEMBERED_PASSWORD", "123456") ?: "123456") }
+       // var userPassword by remember { mutableStateOf(sharedPref.getString("REMEMBERED_PASSWORD", "123456") ?: "123456") }
         var userRole by remember { mutableStateOf("user") }
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         // Các state quản lý OTP và Dialog
@@ -64,10 +66,11 @@
                     if (response.isSuccessful && response.body()?.success == true) {
                         val profileData = response.body()?.data
                         if (profileData != null) {
-                            userName = profileData.name
-                            userPhone = profileData.phone
-                            isEmailVerified = profileData.email_verified == 1 // 1 là true, 0 là false
-                            userRole = profileData.role
+                            // Thêm các toán tử safe call hoặc elvis operator
+                            userName = profileData.name ?: "Người dùng"
+                            userPhone = profileData.phone ?: ""
+                            isEmailVerified = (profileData.email_verified == 1)
+                            userRole = profileData.role ?: "user" // Đề phòng role bị null
                         }
                     }
                 } catch (e: Exception) {
@@ -252,7 +255,28 @@
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(value = editEmail, onValueChange = { editEmail = it }, label = { Text("Địa chỉ Email", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true, readOnly = true, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.White))
                     Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(value = editPhone, onValueChange = { editPhone = it }, label = { Text("Số điện thoại", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                    OutlinedTextField(
+                        value = editPhone,
+                        onValueChange = { newValue ->
+                            // Chỉ cho phép nhập số
+                            if (newValue.all { it.isDigit() }) {
+                                // Giới hạn tối đa 11 ký tự
+                                if (newValue.length <= 11) {
+                                    // Kiểm tra xem ký tự đầu tiên có phải là '0' không
+                                    // Nếu người dùng xóa hết thì cho phép rỗng
+                                    if (newValue.isEmpty() || newValue.startsWith("0")) {
+                                        editPhone = newValue
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text("Số điện thoại", color = Color.Gray) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        // Đảm bảo bàn phím chỉ hiện số
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.White))
 
                     Spacer(modifier = Modifier.height(20.dp))
                     TextButton(onClick = { showChangePasswordDialog = true }, modifier = Modifier.align(Alignment.End)) {
@@ -267,18 +291,39 @@
                         Spacer(modifier = Modifier.width(16.dp))
                         Button(
                             onClick = {
-                                if (editName.trim().isEmpty() || editPhone.trim().isEmpty()) {
-                                    Toast.makeText(context, "Vui lòng không để trống thông tin!", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    userName = editName
-                                    userPhone = editPhone
-                                    sharedPref.edit().apply {
-                                        putString("USER_NAME", editName)
-                                        putString("USER_PHONE", editPhone)
-                                        apply()
+                                val phoneRegex = Regex("^0[0-9]{9,10}$")
+
+                                when {
+                                    editName.trim().isEmpty() -> {
+                                    Toast.makeText(context, "Họ và tên không được để trống!", Toast.LENGTH_SHORT).show()
+                                }
+                                    !editPhone.matches(phoneRegex) -> {
+                                    Toast.makeText(context, "Số điện thoại phải bắt đầu bằng 0 và có 10-11 số!", Toast.LENGTH_SHORT).show()
+                                }
+                                    else -> {
+                                    // Gọi API cập nhật lên server nếu mọi thông tin đều hợp lệ
+                                    lifecycleOwner.lifecycleScope.launch {
+                                        try {
+                                            val response = RetrofitClient.getClient(context).updateProfile(
+                                                UpdateProfileRequest(userEmail, editName, editPhone)
+                                            )
+                                            if (response.isSuccessful && response.body()?.success == true) {
+                                                userName = editName
+                                                userPhone = editPhone
+                                                sharedPref.edit()
+                                                    .putString("USER_NAME", editName)
+                                                    .putString("USER_PHONE", editPhone)
+                                                    .apply()
+                                                Toast.makeText(context, "Đã cập nhật thành công!", Toast.LENGTH_SHORT).show()
+                                                showEditSheet = false
+                                            } else {
+                                                Toast.makeText(context, "Lỗi: " + (response.body()?.message ?: "Không thể cập nhật"), Toast.LENGTH_SHORT).show()
+                                            }
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Lỗi kết nối Server!", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
-                                    Toast.makeText(context, "Đã lưu thay đổi thông tin!", Toast.LENGTH_SHORT).show()
-                                    showEditSheet = false
+                                }
                                 }
                             },
                             modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black)
@@ -305,6 +350,14 @@
                             OutlinedTextField(value = oldPasswordInput, onValueChange = { oldPasswordInput = it }, label = { Text("Mật khẩu hiện tại", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = if (isOldVisible) VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), trailingIcon = { IconButton(onClick = { isOldVisible = !isOldVisible }) { Icon(imageVector = if (isOldVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null, tint = NeonGreen) } }, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.White))
                             Spacer(modifier = Modifier.height(12.dp))
                             OutlinedTextField(value = newPasswordInput, onValueChange = { newPasswordInput = it }, label = { Text("Mật khẩu mới", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = if (isNewVisible) VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), trailingIcon = { IconButton(onClick = { isNewVisible = !isNewVisible }) { Icon(imageVector = if (isNewVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null, tint = NeonGreen) } }, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                            if (newPasswordInput.isNotEmpty() && newPasswordInput.length < 6) {
+                                Text(
+                                    text = "Mật khẩu quá ngắn (tối thiểu 6 ký tự)",
+                                    color = Color.Red,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.height(12.dp))
                             OutlinedTextField(value = confirmPasswordInput, onValueChange = { confirmPasswordInput = it }, label = { Text("Xác nhận mật khẩu mới", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = if (isConfirmVisible) VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), trailingIcon = { IconButton(onClick = { isConfirmVisible = !isConfirmVisible }) { Icon(imageVector = if (isConfirmVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null, tint = NeonGreen) } }, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.White))
                         }
@@ -313,15 +366,39 @@
                         Button(
                             onClick = {
                                 when {
-                                    oldPasswordInput.isEmpty() || newPasswordInput.isEmpty() || confirmPasswordInput.isEmpty() -> Toast.makeText(context, "Vui lòng nhập đầy đủ 3 ô!", Toast.LENGTH_SHORT).show()
-                                    oldPasswordInput != userPassword -> Toast.makeText(context, "Mật khẩu hiện tại không chính xác!", Toast.LENGTH_SHORT).show()
-                                    newPasswordInput == oldPasswordInput -> Toast.makeText(context, "Mật khẩu mới không được trùng mật khẩu cũ!", Toast.LENGTH_SHORT).show()
-                                    newPasswordInput != confirmPasswordInput -> Toast.makeText(context, "Mật khẩu xác nhận không trùng khớp!", Toast.LENGTH_SHORT).show()
+                                    // Kiểm tra các trường không để trống
+                                    oldPasswordInput.isEmpty() || newPasswordInput.isEmpty() || confirmPasswordInput.isEmpty() ->
+                                        Toast.makeText(context, "Vui lòng nhập đầy đủ!", Toast.LENGTH_SHORT).show()
+
+                                    // KIỂM TRA ĐỘ DÀI MẬT KHẨU MỚI (Ít nhất 6 ký tự)
+                                    newPasswordInput.length < 6 ->
+                                        Toast.makeText(context, "Mật khẩu mới phải có ít nhất 6 ký tự!", Toast.LENGTH_SHORT).show()
+
+                                    // Kiểm tra xác nhận mật khẩu trùng khớp
+                                    newPasswordInput != confirmPasswordInput ->
+                                        Toast.makeText(context, "Xác nhận mật khẩu không trùng khớp!", Toast.LENGTH_SHORT).show()
+
                                     else -> {
-                                        userPassword = newPasswordInput
-                                        sharedPref.edit().putString("REMEMBERED_PASSWORD", newPasswordInput).apply()
-                                        Toast.makeText(context, "Đổi mật khẩu thành công!", Toast.LENGTH_SHORT).show()
-                                        showChangePasswordDialog = false
+                                        // Gọi API đổi mật khẩu...
+                                        lifecycleOwner.lifecycleScope.launch {
+                                            try {
+                                                val response = RetrofitClient.getClient(context).changePassword(
+                                                    ChangePasswordRequest(
+                                                        userEmail,
+                                                        oldPasswordInput,
+                                                        newPasswordInput
+                                                    )
+                                                )
+                                                if (response.isSuccessful && response.body()?.success == true) {
+                                                    Toast.makeText(context, "Đổi mật khẩu thành công!", Toast.LENGTH_SHORT).show()
+                                                    showChangePasswordDialog = false
+                                                } else {
+                                                    Toast.makeText(context, response.body()?.message ?: "Sai mật khẩu cũ!", Toast.LENGTH_SHORT).show()
+                                                }
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Lỗi kết nối Server!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     }
                                 }
                             },

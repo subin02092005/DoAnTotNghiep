@@ -49,7 +49,20 @@ fun NewsTabContent() {
         NewsDetailScreen(news = activeDetailNews!!) { activeDetailNews = null }
     } else {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp),horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "THÔNG BÁO", color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
+            Text(
+                "LỊCH THI ĐẤU",
+                color = NeonGreen,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .padding(horizontal = 60.dp)
+                    .background(Color.White))
 
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

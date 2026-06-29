@@ -19,6 +19,7 @@ data class User(
     val name: String,
     val email: String,
     val phone: String?,
+    val role:String?,
     val email_verified: Int,
     @SerializedName("is_admin") val isAdmin: Boolean? = false
 )
@@ -116,7 +117,9 @@ data class GenericResponse(
     val message: String
 )
 
-
+data class UpdateProfileRequest(val email: String, val name: String, val phone: String)
+data class ChangePasswordRequest(val email: String, val oldPassword: String, val newPassword: String)
+data class GeneralResponse(val success: Boolean, val message: String)
 // =================================================================
 // 4. 🌟 TOURNAMENT & PHASES MODELS (ĐỒNG BỘ VÒNG ĐẤU ĐỘNG TỪ ADMIN)
 // =================================================================
@@ -157,11 +160,11 @@ data class StandingItem(
     val players: List<PlayerInfo> = emptyList() // Thêm danh sách cầu thủ
 )
 data class PlayerInfo(
-    @SerializedName("jersey_number") val number: String, // Đổi kiểu thành String để khớp UI
-    @SerializedName("full_name") val name: String,
+    @SerializedName("jersey_number") val number: String, // Ánh xạ từ 'jersey_number' của SQL
+    @SerializedName("name") val name: String,             // Ánh xạ từ 'name' của SQL
     @SerializedName("position") val position: String,
-    val isCaptain: Boolean = false, // Thêm trường này
-    val userId: Int = 0             // Thêm ID người dùng để so sánh
+   val isCaptain: Boolean = false, // Thêm trường này
+   val userId: Int = 0             // Thêm ID người dùng để so sánh
 )
 
 data class TeamDetailResponse(
@@ -183,15 +186,15 @@ data class MyTeamData(
     val coachName: String?,
     val captainName: String?,
     val currentUserRole: String, // Dùng để ẩn/hiện nút Sửa
-    val players: List<Player>
+    val players: List<PlayerInfo>
+)
+data class AddPlayerResponse(
+    val status: String,
+    val message: String,
+    val data: PlayerInfo // PlayerInfo của bạn đã có các trường name, jersey_number, position
 )
 
-data class Player(
-    val full_name: String,
-    val jersey_number: Int,
-    val position: String,
-    val role: String
-)
+
 
 
 

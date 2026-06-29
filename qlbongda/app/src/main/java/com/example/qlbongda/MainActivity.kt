@@ -45,10 +45,12 @@ class MainActivity : ComponentActivity() {
 
                     var selectedTeamObjectForDetail by remember { mutableStateOf<StandingItem?>(null) }
                     var isTeamRegistered by remember { mutableStateOf(false) }
+                    var currentUserRole by remember { mutableStateOf("") }
                     var teamName by remember { mutableStateOf("") }
                     var leaderName by remember { mutableStateOf("") }
                     var coachName by remember { mutableStateOf("") }
                     var isLeagueRegistered by remember { mutableStateOf(false) }
+
                     val playerList = remember { mutableStateListOf<PlayerInfo>() }
 
                     when (currentScreen) {
@@ -65,7 +67,9 @@ class MainActivity : ComponentActivity() {
 
                         "login" -> {
                             LoginScreen(
-                                onLoginSuccess = { selectedTab = 0
+                                onLoginSuccess = {role -> // 🌟 Nhận role từ LoginScreen
+                                    currentUserRole = role // 🌟 Cập nhật vào state để Compose re-render
+                                    selectedTab = 0
                                     currentScreen = "home" },
                                 onLoginAdminSuccess = { currentScreen = "admin" },
                                 onNavigateToRegister = { currentScreen = "register" },
@@ -89,7 +93,9 @@ class MainActivity : ComponentActivity() {
 
                         "home" -> {
                             if (isLoading) {
-                                Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                                Box(modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black), contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator(color = Color(0xFF00FF66))
                                 }
                             } else {
@@ -121,6 +127,7 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             StandingItem(0, teamNameClicked, 0, "0", 0, "Đang cập nhật", "Đang cập nhật", emptyList())
                                         }
+
                                         previousScreen = "home"
                                         currentScreen = "team_detail"
                                     },
@@ -134,6 +141,7 @@ class MainActivity : ComponentActivity() {
                                     onCoachNameChange = { coachName = it },
                                     isLeagueRegistered = isLeagueRegistered,
                                     onLeagueRegisteredChange = { isLeagueRegistered = it },
+                                    currentUserRole = currentUserRole, // 🌟 Truyền xuống
                                     playerList = playerList
                                 )
                             }
@@ -145,7 +153,9 @@ class MainActivity : ComponentActivity() {
                                     match = match,
                                     onBack = { currentScreen = "home" }
                                 )
-                            } ?: Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                            } ?: Box(modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(color = Color(0xFF00FF66))
                             }
                         }

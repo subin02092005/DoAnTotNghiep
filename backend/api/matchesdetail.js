@@ -49,7 +49,7 @@ router.get('/match/detail', async (req, res) => {
         // 3. Lấy đội hình từ bảng team_players (Thay cho bảng lineups không tồn tại)
         // Lấy tất cả cầu thủ thuộc về đội chủ nhà hoặc đội khách trong trận đấu này
         const [allPlayers] = await pool.execute(`
-            SELECT tp.jersey_number AS number, u.name, tp.position, tp.team_id
+            SELECT tp.jersey_number, u.name, tp.position, tp.team_id
             FROM team_players tp
             JOIN players p ON tp.player_id = p.id
             JOIN users u ON p.user_id = u.id
@@ -75,8 +75,6 @@ router.get('/match/detail', async (req, res) => {
             events: events,
             lineupA: lineupA,
             lineupB: lineupB,
-            subsA: [], 
-            subsB: [],
             PossessionA: "50%",
             PossessionB: "50%",
             ShotsA: "0",

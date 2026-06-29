@@ -36,7 +36,18 @@ router.post('/login', async (req, res) => {
             [user.id]
         );
         const isAdmin = roleRows.some(r => r.name === 'admin');
+const queryRole = `
+    SELECT tp.role 
+    FROM team_players tp
+    JOIN players p ON tp.player_id = p.id
+    WHERE p.user_id = ? AND tp.is_active = 1 
+    LIMIT 1
+`;
 
+const [role] = await connection.execute(queryRole, [user.id]);
+
+// Nếu không tìm thấy role trong team_players, mặc định là 'player'
+const userRole = role.length > 0 ? role[0].role : 'player';
         await connection.end();
 
         if (rows.length === 0) {
@@ -68,6 +79,7 @@ router.post('/login', async (req, res) => {
                 name: user.name,
                 email: user.email,
                 phone: user.phone,
+                role: userRole,
                 email_verified: user.email_verified,
                 is_admin: isAdmin
             }

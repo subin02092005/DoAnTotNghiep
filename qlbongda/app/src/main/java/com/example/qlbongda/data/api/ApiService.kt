@@ -35,10 +35,23 @@ interface ApiService {
 
     @POST("profile/verify-otp")
     suspend fun verifyOtpProfile(@Body request: VerifyOtpRequest): Response<VerifyOtpResponse>
+    @POST("profile/update-info")
+    suspend fun updateProfile(@Body request: UpdateProfileRequest): Response<GeneralResponse>
+
+    // API Đổi mật khẩu
+    @POST("profile/change-password")
+    suspend fun changePassword(@Body request: ChangePasswordRequest): Response<GeneralResponse>
+
     // ---- ĐỘI BÓNG CỦA TÔI (Cá nhân) ----
 
     @GET("my_team")
     suspend fun getMyTeam(@Query("userId") userId: Int): Response<MyTeamResponse>
+    @POST("add_player_by_email")
+    suspend fun addPlayerByEmail(
+        @Body request: Map<String, Any>
+    ): Response<AddPlayerResponse>
+
+
     // ---- QUẢN LÝ THÀNH VIÊN TRONG ĐỘI ----
     // Dùng để thêm cầu thủ vào đội
     @POST("teams/{teamId}/players")
