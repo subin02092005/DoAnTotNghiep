@@ -1,6 +1,7 @@
 package com.example.qlbongda
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,6 +20,7 @@ import com.example.qlbongda.data.api.HomeViewModel
 import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.*
 import com.example.qlbongda.ui.theme.QlbongdaTheme
+import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,7 +29,9 @@ class MainActivity : ComponentActivity() {
         val apiService = RetrofitClient.getClient(this@MainActivity)
         val homeViewModel = HomeViewModel(apiService)
         val adminViewModel = AdminViewModel(apiService)
-
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            Log.d("FCM_TOKEN", "Token của tôi là: ${task.result}")
+        }
         setContent {
             QlbongdaTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

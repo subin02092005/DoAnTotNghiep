@@ -53,7 +53,7 @@ LIMIT 1
 
         // 3. Lấy danh sách toàn bộ cầu thủ trong đội đó
        const [players] = await pool.query(
-    `SELECT p.id,u.name, tp.jersey_number, tp.position, tp.role
+    `SELECT p.id,p.user_id,u.name, tp.jersey_number, tp.position, tp.role
      FROM team_players tp
      JOIN players p ON tp.player_id = p.id
      JOIN users u ON p.user_id = u.id
@@ -76,6 +76,13 @@ return res.status(200).json({
         players: players
     }
 });
+if (!user.date_of_birth) {
+    return res.status(422).json({ 
+        status: "error", 
+        message: "Cảnh báo: Cầu thủ này chưa có ngày sinh trong hồ sơ!",
+        code: "MISSING_DOB" 
+    });
+}
 
     } catch (error) {
         console.error("Lỗi API my_team:", error);
@@ -114,9 +121,24 @@ router.post('/update_player', async (req, res) => {
 
 ///////////////////////////////////
 router.post('/remove_player', async (req, res) => {
-    const { team_id, player_id } = req.body;
+    // 🌟 Sửa ở đây: Lấy currentUserId từ req.body
+    const { team_id, player_id, currentUserId } = req.body;
+
+    // Kiểm tra nếu thiếu dữ liệu
+    if (!team_id || !player_id || !currentUserId) {
+        return res.status(400).json({ status: "error", message: "Thiếu dữ liệu bắt buộc" });
+    }
 
     try {
+        // 🌟 Sửa ở đây: Sử dụng biến currentUserId đã lấy từ req.body
+        // Chuyển đổi sang số để so sánh chính xác
+        if (parseInt(player_id) === parseInt(currentUserId)) {
+            return res.status(403).json({ 
+                status: "error", 
+                message: "Bạn không thể tự xóa chính mình khỏi đội!" 
+            });
+        }
+
         const query = `
             UPDATE team_players 
             SET is_active = 0 
@@ -222,6 +244,103 @@ await pool.query(
     } catch (error) {
         console.error("Lỗi API add_player_by_email:", error);
         res.status(500).json({ status: "error", message: "Lỗi hệ thống" });
+    }
+});
+/////////////////////////////
+router.post('/add_coach_by_email', async (req, res) => {
+    const { team_id, email } = req.body;
+
+    // 1. Kiểm tra team_id hợp lệ trước khi thực hiện
+    if (!team_id || team_id <= 0) {
+        return res.status(400).json({ status: "error", message: "ID đội bóng không hợp lệ" });
+    }
+
+    try {
+        // 1. Tìm user theo email và lấy tên của họ
+        const [users] = await pool.query("SELECT id, name FROM users WHERE email = ?", [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ status: "error", message: "Email không tồn tại trong hệ thống" });
+        }
+        const coach_user_id = users[0].id;
+        const coach_name = users[0].name; // 🌟 Lấy tên để cập nhật vào bảng teams
+
+        // 2. Kiểm tra xem đội đã có HLV chưa (tùy bạn, ở đây kiểm tra theo logic cũ)
+        const [existingCoach] = await pool.query("SELECT id FROM team_leaders WHERE team_id = ?", [team_id]);
+        if (existingCoach.length > 0) {
+            return res.status(400).json({ status: "error", message: "Đội đã có HLV rồi!" });
+        }
+
+        // 3. Sử dụng Transaction để đảm bảo tính toàn vẹn dữ liệu
+        // (Nếu update bảng teams lỗi thì không insert bảng team_leaders)
+        await pool.query("START TRANSACTION");
+
+        // Cập nhật tên HLV vào bảng teams (để API my_team hiển thị được)
+        await pool.query("UPDATE teams SET coach_name = ? WHERE id = ?", [coach_name, team_id]);
+
+        // Thêm vào bảng team_leaders
+        await pool.query("INSERT INTO team_leaders (team_id, user_id) VALUES (?, ?)", [team_id, coach_user_id]);
+
+        await pool.query("COMMIT");
+
+        res.status(200).json({ status: "success", message: "Đã chỉ định HLV thành công!" });
+
+    } catch (error) {
+        await pool.query("ROLLBACK"); // Quay lại trạng thái cũ nếu lỗi
+        console.error("Lỗi add_coach_by_email:", error);
+        res.status(500).json({ status: "error", message: "Lỗi hệ thống: " + error.message });
+    }
+});
+// router.post('/register_team')
+router.post('/register_team', async (req, res) => {
+    const { team_name, captain_name, user_id } = req.body;
+
+    try {
+        // 1. Kiểm tra ngày sinh của user trước (Phải có ngày sinh mới được tạo đội)
+        const [users] = await pool.query(
+            "SELECT p.date_of_birth, p.id as player_id FROM players p WHERE p.user_id = ?",
+            [user_id]
+        );
+
+        if (users.length === 0 || !users[0].date_of_birth) {
+            return res.status(400).json({ 
+                status: "error", 
+                message: "Bạn chưa cập nhật ngày sinh trong hồ sơ, không thể đăng ký đội!" 
+            });
+        }
+
+        // 2. Kiểm tra xem user này đã có đội nào khác chưa
+        const [checkMembership] = await pool.query(
+            "SELECT team_id FROM team_players WHERE user_id = ? AND is_active = 1 LIMIT 1",
+            [user_id]
+        );
+
+        if (checkMembership.length > 0) {
+            return res.status(400).json({ status: "error", message: "Bạn đã là thành viên của một đội khác!" });
+        }
+
+        // 3. Insert đội bóng mới
+        const [result] = await pool.query(
+            "INSERT INTO teams (name, coach_name, user_id, created_at) VALUES (?, ?, ?, NOW())",
+            [team_name, "Chưa cập nhật", user_id]
+        );
+
+        const newTeamId = result.insertId;
+
+        // 4. Thêm người tạo đội vào bảng team_players (để xác định họ là đội trưởng)
+       await pool.query(
+    "INSERT INTO team_players (team_id, player_id, user_id, role, is_active, jersey_number) VALUES (?, ?, ?, 'captain', 1, ?)",
+    [newTeamId, users[0].player_id, user_id, 1] // Thêm số 0 làm giá trị mặc định cho jersey_number
+);
+
+        res.status(200).json({ status: "success", teamId: newTeamId });
+
+    } catch (error) {
+        // Xử lý lỗi trùng tên đội
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ status: "error", message: "Tên đội bóng này đã có người sử dụng!" });
+        }
+        console.error("Lỗi đăng ký đội:", error);
+        res.status(500).json({ status: "error", message: "Lỗi hệ thống, vui lòng thử lại sau." });
     }
 });
 module.exports = router;

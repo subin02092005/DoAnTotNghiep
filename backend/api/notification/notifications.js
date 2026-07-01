@@ -10,40 +10,30 @@ const dbConfig = {
 };
 
 // API lấy danh sách bài viết (Thông báo)
-router.get('/notifications', async (req, res) => {
+router.get('/my_notifications', async (req, res) => {
+    const { userId, teamId } = req.query; // Nhận thêm teamId từ client
+
+    if (!userId) {
+        return res.status(400).json({ status: "error", message: "Thiếu userId" });
+    }
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        
-        // Lấy các thông tin cần thiết từ bảng articles
-        // status = 'published' (giả sử bài viết phải được xuất bản mới hiện)
-        const [rows] = await connection.execute(
-            'SELECT id, title, content, cover_image FROM articles ORDER BY id DESC'
-        );
-        
-        await connection.end();
+        // Lấy thông báo cho CÁ NHÂN HOẶC cho ĐỘI của họ
+        const query = `
+            SELECT * FROM notifications 
+            WHERE is_active = 1 
+            AND (recipient_user_id = ? OR target_team_id = ?)
+            ORDER BY created_at DESC
+        `;
+        const [notifications] = await pool.query(query, [userId, teamId || 0]);
 
-        // Map dữ liệu khớp với Model Notification bên Android
-        const formattedData = rows.map(item => ({
-            id: item.id,
-            title: item.title,          // Tiêu đề
-            content: item.content,      // Nội dung
-            imageUrl: item.cover_image || "", // Ảnh bìa (nếu có)
-            time: "Mới cập nhật"        // Bạn có thể sửa thành cột created_at nếu DB có
-        }));
-
-        return res.status(200).json({
+        res.status(200).json({
             status: "success",
-            message: "Tải danh sách bài viết thành công!",
-            data: formattedData
+            data: notifications
         });
-
     } catch (error) {
-        console.error("Lỗi API bài viết:", error);
-        return res.status(500).json({ 
-            status: "error", 
-            message: 'Lỗi kết nối Server!' 
-        });
+        console.error("Lỗi lấy thông báo:", error);
+        res.status(500).json({ status: "error", message: "Lỗi Server" });
     }
 });
-
 module.exports = router;

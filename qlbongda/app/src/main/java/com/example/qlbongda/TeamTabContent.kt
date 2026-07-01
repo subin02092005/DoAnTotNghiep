@@ -1,5 +1,8 @@
 package com.example.qlbongda
 
+import android.content.Context
+import android.content.SharedPreferences
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -13,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -23,9 +27,12 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.core.view.DragAndDropPermissionsCompat.request
 import com.example.qlbongda.data.api.RetrofitClient
+import com.example.qlbongda.data.model.AddCoachRequest
 import com.example.qlbongda.data.model.AddPlayerRequest
 import com.example.qlbongda.data.model.PlayerInfo
+import com.example.qlbongda.data.model.RegisterTeamRequest
 import com.example.qlbongda.data.model.RemovePlayerRequest
+
 import com.example.qlbongda.data.model.UpdatePlayerRequest
 import com.example.qlbongda.ui.theme.NeonGreen
 import kotlinx.coroutines.launch
@@ -50,35 +57,55 @@ fun TeamTabContent(
     val sharedPref = remember { context.getSharedPreferences("AUTH_PREF", android.content.Context.MODE_PRIVATE) }
     val userId = sharedPref.getInt("USER_ID", -1)
     var myTeamId by remember { mutableStateOf(-1) }
+    var hasTeam by remember { mutableStateOf(sharedPref.getInt("TEAM_ID", -1) != -1) }
+    var currentRole by remember { mutableStateOf(currentUserRole) }
     // Load dữ liệu ban đầu
     LaunchedEffect(userId) {
         if (userId != -1) {
             try {
                 val response = RetrofitClient.getClient(context).getMyTeam(userId)
-                if (response.isSuccessful && response.body()?.hasTeam == true) {
-                    val teamData = response.body()?.data
+
+                // 🌟 SỬA CHỖ NÀY: Dùng response.body() thay vì 'body' không tồn tại
+                val responseBody = response.body()
+
+                if (response.isSuccessful && responseBody?.hasTeam == true) {
+                    val teamData = responseBody.data
+
+                    // Log để debug
+                    android.util.Log.d("DEBUG_API", "Kết quả: ${responseBody.hasTeam}, Dữ liệu: $teamData")
+
                     myTeamId = teamData?.teamId ?: -1
                     onTeamRegisteredChange(true)
                     onTeamNameChange(teamData?.teamName ?: "")
                     onLeaderNameChange(teamData?.captainName ?: "")
                     onCoachNameChange(teamData?.coachName ?: "")
+
                     playerList.clear()
                     teamData?.players?.let {
                         playerList.addAll(it)
-                        it.forEach { p ->
-                            android.util.Log.d("DEBUG_PLAYER", "Name: ${p.name}, ID từ Server: ${p.id}")
-                        }
                     }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("API_ERROR", "Lỗi: ${e.message}")
             }
         }
+
     }
     android.util.Log.d("ROLE_DEBUG", "Role hiện tại là: '$currentUserRole'")
     // PHÂN TÁCH GIAO DIỆN TẠI ĐÂY
     val role = currentUserRole.lowercase().trim() // CHUYỂN VỀ THƯỜNG VÀ XÓA KHOẢNG TRẮNG DƯ
-
+    if (!hasTeam) {
+        // Màn hình 3: Người chưa vào đội
+        TeamRegistrationScreen(
+            onTeamRegisteredChange = { success ->
+                if (success) {
+                    hasTeam = true
+                    currentRole = "captain" // 🌟 Ép kiểu sang captain ngay lập tức
+                }
+            },
+            sharedPref = sharedPref
+        )
+    }  else {
     if (role == "coach" || role == "captain") {
         CoachCaptainScreen(
             teamId = myTeamId, // 🌟 Truyền biến myTeamId vào
@@ -97,6 +124,7 @@ fun TeamTabContent(
     } else {
         PlayerReadOnlyScreen(teamName, leaderName, coachName, playerList)
     }
+}
 }
 
 // Màn hình QUẢN LÝ (Coach/Captain)
@@ -123,8 +151,18 @@ fun CoachCaptainScreen(
     var email by remember { mutableStateOf("") }
     var pos by remember { mutableStateOf("FW") } // Biến lưu vị trí
     var newCoachName by remember { mutableStateOf(coachName) }
-
+    var coachEmail by remember { mutableStateOf("") }
     var isUpdating by remember { mutableStateOf(false) }
+
+
+    // 🌟 Lấy ID từ SharedPreferences (giả sử bạn lưu key là "user_id")
+    val sharedPreferences = remember {
+        context.getSharedPreferences("AUTH_PREF", Context.MODE_PRIVATE) // Phải là "AUTH_PREF"
+    }
+    val currentUserId = remember {
+        sharedPreferences.getInt("USER_ID", -1)
+    }
+    Log.d("DEBUG_CHECK", "My ID from Prefs: $currentUserId") // 🌟 THÊM DÒNG NÀY
     LaunchedEffect(coachName) {
         newCoachName = coachName
     }
@@ -167,37 +205,67 @@ fun CoachCaptainScreen(
                 border = BorderStroke(1.dp, NeonGreen)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("ĐỘI: ${teamName.uppercase()}", color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text("CAPTAIN: $leaderName", color = Color.White, fontSize = 14.sp)
-                    Text("HLV: ${coachName.ifEmpty { "Chưa cập nhật" }}", color = Color.Yellow, fontSize = 14.sp)
-                }
-            }
-        }
-
-        // KHUNG ĐỔI HLV (Màu vàng)
-        item {
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), border = BorderStroke(1.dp, Color.Yellow)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    OutlinedTextField(
-                        value = newCoachName,
-                        onValueChange = {
-                            // 🌟 Chỉ cho phép nếu thỏa mãn validator
-                            if (isCoachNameValid(it) || it.isEmpty()) {
-                                newCoachName = it
-                            }
-                        },
-                        label = { Text("Cập nhật HLV", color = Color.Yellow) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Yellow, focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    Text(
+                        "ĐỘI: ${teamName.uppercase()}",
+                        color = NeonGreen,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { onCoachNameChange(newCoachName) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow), modifier = Modifier.fillMaxWidth()) {
-                        Text("LƯU HLV", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
+                    Text("CAPTAIN: $leaderName", color = Color.White, fontSize = 14.sp)
+                    Text(
+                        "HLV: ${coachName.ifEmpty { "Chưa cập nhật" }}",
+                        color = Color.Yellow,
+                        fontSize = 14.sp
+                    )
                 }
             }
-        }
 
+
+            // KHUNG ĐỔI HLV (Màu vàng)
+            OutlinedTextField(
+                value = coachEmail,
+                onValueChange = { coachEmail = it },
+                label = { Text("Email HLV", color = Color.Yellow) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Yellow,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    scope.launch {
+                        try {
+                            // Gọi API mới theo Email
+                            val request = AddCoachRequest(team_id = teamId, email = coachEmail)
+                            val response =
+                                RetrofitClient.getClient(context).addCoachByEmail(request)
+
+                            if (response.isSuccessful) {
+                                Toast.makeText(
+                                    context,
+                                    "Đã gán HLV thành công!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                // Hiển thị thông báo từ server trả về nếu có
+                                val errorMsg = response.errorBody()?.string() ?: "Lỗi!"
+                                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Lỗi kết nối!", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("GÁN HLV QUA EMAIL", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+
+        }
         // FORM CẦU THỦ
         item {
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)), border = BorderStroke(1.dp, NeonGreen)) {
@@ -369,6 +437,7 @@ fun CoachCaptainScreen(
         // DANH SÁCH CẦU THỦ VỚI MÀU VỊ TRÍ
         items(playerList.size) { i ->
             val p = playerList[i]
+            Log.d("DEBUG_PLAYER", "Player: ${p.name}, UserId: ${p.userId}, Number: ${p.number}")
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
@@ -388,29 +457,31 @@ fun CoachCaptainScreen(
                     IconButton(onClick = { isEditing = true; editIdx = i; nbr = p.number; email = p.name; pos = mapFullToShort(p.position)}) {
                         Icon(Icons.Default.Edit, "Edit", tint = if (editIdx == i) NeonGreen else Color.LightGray)
                     }
-                    IconButton(onClick = {
-                        scope.launch {
-                            try {
-                                val player = playerList[i]
+                    if (p.userId != currentUserId) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                try {
+                                    val player = playerList[i]
 
+                                    val requestBody = RemovePlayerRequest(team_id = teamId, player_id = player.id, currentUserId =currentUserId)
+                                    val response = RetrofitClient.getClient(context).removePlayer(requestBody)
 
-                                val requestBody = RemovePlayerRequest(teamId, player.id)
-                                val response = RetrofitClient.getClient(context).removePlayer(requestBody)
-
-                                if (response.isSuccessful) {
-                                    playerList.removeAt(i) // Xóa khỏi danh sách UI
-                                    Toast.makeText(context, "Đã xóa cầu thủ", Toast.LENGTH_SHORT).show()
-                                    // Nếu đang edit cầu thủ vừa xóa thì reset form
-                                    if (editIdx == i) { isEditing = false; editIdx = -1; email = ""; nbr = ""; pos = "FW" }
-                                } else {
-                                    Toast.makeText(context, "Lỗi xóa cầu thủ", Toast.LENGTH_SHORT).show()
+                                    if (response.isSuccessful) {
+                                        playerList.removeAt(i)
+                                        Toast.makeText(context, "Đã xóa cầu thủ", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Lỗi xóa cầu thủ", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Lỗi kết nối", Toast.LENGTH_SHORT).show()
                                 }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Lỗi kết nối: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
+                        }) {
+                            Icon(Icons.Default.Delete, "Delete", tint = Color(0xFFFF5252))
                         }
-                    }) {
-                        Icon(Icons.Default.Delete, "Delete", tint = Color(0xFFFF5252))
+                    } else {
+                        // Có thể để một icon rỗng hoặc không hiện gì để giữ khoảng cách
+                        Spacer(modifier = Modifier.size(48.dp))
                     }
                 }
             }
@@ -591,6 +662,93 @@ fun PlayerReadOnlyScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun TeamRegistrationScreen(
+    onTeamRegisteredChange: (Boolean) -> Unit, // Callback để chuyển màn hình
+    sharedPref: SharedPreferences
+) {
+    var teamName by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope() // Cần scope này để gọi API
+
+    // Lấy tên user từ SharedPref hoặc biến lưu trữ global
+    val currentUserName = sharedPref.getString("USER_NAME", "Người dùng") ?: "Người dùng"
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("ĐĂNG KÝ ĐỘI BÓNG", color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(20.dp))
+
+        OutlinedTextField(
+            value = teamName,
+            onValueChange = { teamName = it },
+            label = { Text("Nhập tên đội bóng") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Captain lấy mặc định là mình
+        OutlinedTextField(
+            value = currentUserName,
+            onValueChange = {},
+            label = { Text("Đội trưởng") },
+            enabled = false, // Không cho sửa
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(onClick = {
+            if (teamName.isBlank()) {
+                Toast.makeText(context, "Vui lòng nhập tên đội bóng!", Toast.LENGTH_SHORT).show()
+                return@Button
+            }
+
+            scope.launch {
+                try {
+                    val userId = sharedPref.getInt("USER_ID", -1)
+                    val request = RegisterTeamRequest(teamName, "Chưa cập nhật", userId)
+                    val response = RetrofitClient.getClient(context).registerTeam(request)
+
+                    if (response.isSuccessful) {
+                        // ĐĂNG KÝ THÀNH CÔNG
+                        val teamId = response.body()?.teamId ?: -1
+
+                        // Lưu vào SharedPreferences để app biết user này đã có đội
+                        sharedPref.edit().putInt("TEAM_ID", teamId).apply()
+
+                        Toast.makeText(
+                            context,
+                            "Đăng ký thành công! Chào mừng đội trưởng.",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        // Chuyển màn hình sang giao diện quản lý đội (Màn hình Đội trưởng)
+                        onTeamRegisteredChange(true)
+                    } else {
+                        // ĐĂNG KÝ THẤT BẠI
+                        val errorBody = response.errorBody()?.string()
+                        val message = try {
+                            org.json.JSONObject(errorBody ?: "").getString("message")
+                        } catch (e: Exception) {
+                            "Lỗi: ${response.code()}"
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Lỗi kết nối server!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }) {
+            Text("HOÀN TẤT ĐĂNG KÝ")
         }
     }
 }

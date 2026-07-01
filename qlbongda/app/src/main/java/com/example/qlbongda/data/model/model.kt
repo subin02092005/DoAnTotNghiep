@@ -167,7 +167,7 @@ data class PlayerInfo(
     @SerializedName("position") val position: String,
     @SerializedName("date_of_birth") val dateOfBirth: String? = null,
    val isCaptain: Boolean = false, // Thêm trường này
-   val userId: Int = 0             // Thêm ID người dùng để so sánh
+    @SerializedName("user_id") val userId: Int=0,        // Thêm ID người dùng để so sánh
 
 )
 
@@ -211,7 +211,19 @@ data class UpdatePlayerRequest(
 )
 data class RemovePlayerRequest(
     val team_id: Int,
-    val player_id: Int
+    val player_id: Int,
+    val currentUserId: Int
+)
+data class AddCoachRequest(val team_id: Int, val email: String)
+data class RegisterTeamRequest(
+    @SerializedName("team_name") val teamName: String, // Khớp với req.body của Node.js
+    val captain_name: String,
+    val user_id: Int
+)
+
+data class RegisterTeamResponse(
+    val status: String,
+    val teamId: Int? // Trả về ID của đội vừa tạo
 )
 // =================================================================
 // 7. COMMON RESPONSE (Dùng chung cho các API chỉ trả về status)
