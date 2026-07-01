@@ -48,9 +48,15 @@ interface ApiService {
     suspend fun getMyTeam(@Query("userId") userId: Int): Response<MyTeamResponse>
     @POST("add_player_by_email")
     suspend fun addPlayerByEmail(
-        @Body request: Map<String, Any>
+        @Body request: AddPlayerRequest // Thay Map bằng Data Class này
     ): Response<AddPlayerResponse>
+    @POST("update_player")
+    suspend fun updatePlayer(@Body request: UpdatePlayerRequest): Response<ApiResponse>
 
+    @POST("remove_player") // Tùy thuộc vào baseURL của bạn
+    suspend fun removePlayer(@Body request: RemovePlayerRequest): Response<Void>
+
+    // Giả sử ApiResponse của bạn là:
 
     // ---- QUẢN LÝ THÀNH VIÊN TRONG ĐỘI ----
     // Dùng để thêm cầu thủ vào đội

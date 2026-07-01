@@ -67,7 +67,8 @@ data class ProfileData(
     val email: String,
     val phone: String,
     val email_verified: Int, // Nhận về 0 (chưa kích hoạt) hoặc 1 (đã kích hoạt)
-    val role: String
+    val role: String,
+    @SerializedName("date_of_birth") val dateOfBirth: String?
 )
 
 // Khối phản hồi tổng khi lấy dữ liệu Profile
@@ -117,7 +118,7 @@ data class GenericResponse(
     val message: String
 )
 
-data class UpdateProfileRequest(val email: String, val name: String, val phone: String)
+data class UpdateProfileRequest(val email: String, val name: String, val phone: String,val date_of_birth: String? )
 data class ChangePasswordRequest(val email: String, val oldPassword: String, val newPassword: String)
 data class GeneralResponse(val success: Boolean, val message: String)
 // =================================================================
@@ -160,11 +161,14 @@ data class StandingItem(
     val players: List<PlayerInfo> = emptyList() // Thêm danh sách cầu thủ
 )
 data class PlayerInfo(
+    val id: Int=0, // 🌟 BẮT BUỘC THÊM ĐỂ CẬP NHẬT/XÓA
     @SerializedName("jersey_number") val number: String, // Ánh xạ từ 'jersey_number' của SQL
     @SerializedName("name") val name: String,             // Ánh xạ từ 'name' của SQL
     @SerializedName("position") val position: String,
+    @SerializedName("date_of_birth") val dateOfBirth: String? = null,
    val isCaptain: Boolean = false, // Thêm trường này
    val userId: Int = 0             // Thêm ID người dùng để so sánh
+
 )
 
 data class TeamDetailResponse(
@@ -188,10 +192,34 @@ data class MyTeamData(
     val currentUserRole: String, // Dùng để ẩn/hiện nút Sửa
     val players: List<PlayerInfo>
 )
+data class AddPlayerRequest(
+    val team_id: Int,
+    val email: String,
+    val jersey_number: String,
+    val position: String
+)
 data class AddPlayerResponse(
     val status: String,
     val message: String,
     val data: PlayerInfo // PlayerInfo của bạn đã có các trường name, jersey_number, position
+)
+data class UpdatePlayerRequest(
+    val team_id: Int,
+    val id: Int,
+    val jersey_number: String,
+    val position: String
+)
+data class RemovePlayerRequest(
+    val team_id: Int,
+    val player_id: Int
+)
+// =================================================================
+// 7. COMMON RESPONSE (Dùng chung cho các API chỉ trả về status)
+// =================================================================
+
+data class ApiResponse(
+    val status: String,
+    val message: String
 )
 
 

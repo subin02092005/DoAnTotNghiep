@@ -1,9 +1,11 @@
     package com.example.qlbongda
 
+    import android.util.Log
     import android.widget.Toast
     import androidx.compose.foundation.BorderStroke
     import androidx.compose.foundation.background
     import androidx.compose.foundation.border
+    import androidx.compose.foundation.clickable
     import androidx.compose.foundation.layout.*
     import androidx.compose.foundation.rememberScrollState
     import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +34,10 @@
     import com.example.qlbongda.data.model.UpdateProfileRequest
     import com.example.qlbongda.data.model.VerifyOtpRequest
     import com.example.qlbongda.ui.theme.NeonGreen
+    import com.example.qlbongda.utils.DateUtils
     import kotlinx.coroutines.launch
+    import java.time.Instant
+    import java.time.ZoneId
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -46,16 +51,19 @@
         var userName by remember { mutableStateOf(sharedPref.getString("USER_NAME", "Người dùng") ?: "Người dùng") }
         val userEmail = remember { sharedPref.getString("REMEMBERED_EMAIL", "") ?: "" }
         var userPhone by remember { mutableStateOf(sharedPref.getString("USER_PHONE", "") ?: "") }
-       // var userPassword by remember { mutableStateOf(sharedPref.getString("REMEMBERED_PASSWORD", "123456") ?: "123456") }
+        // var userPassword by remember { mutableStateOf(sharedPref.getString("REMEMBERED_PASSWORD", "123456") ?: "123456") }
         var userRole by remember { mutableStateOf("user") }
+        var userDob by remember { mutableStateOf(sharedPref.getString("USER_DOB", "") ?: "") }
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         // Các state quản lý OTP và Dialog
         var isEmailVerified by remember { mutableStateOf(false) }
         var showOtpDialog by remember { mutableStateOf(false) }
         var otpInput by remember { mutableStateOf("") }
         var isLoadingProfile by remember { mutableStateOf(true) }
-
+        var editDob by remember { mutableStateOf(userDob) }
         var showEditSheet by remember { mutableStateOf(false) }
+        var showDatePicker by remember { mutableStateOf(false) }
+        var dateOfBirthInput by remember { mutableStateOf(userDob) }
 
         // 🌟 1. TỰ ĐỘNG GỌI API LẤY THÔNG TIN REALTIME TỪ DB KHI MỞ TAB PROFILE
         LaunchedEffect(userEmail) {
@@ -70,7 +78,12 @@
                             userName = profileData.name ?: "Người dùng"
                             userPhone = profileData.phone ?: ""
                             isEmailVerified = (profileData.email_verified == 1)
-                            userRole = profileData.role ?: "user" // Đề phòng role bị null
+                            userRole = profileData.role ?: "user"
+                            if (profileData != null) {
+                                Log.d("DEBUG_DOB", "Dữ liệu ngày sinh từ API: ${profileData.dateOfBirth}")
+                                userDob = profileData.dateOfBirth ?: ""
+                                dateOfBirthInput = userDob
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -261,7 +274,7 @@
                             // Chỉ cho phép nhập số
                             if (newValue.all { it.isDigit() }) {
                                 // Giới hạn tối đa 11 ký tự
-                                if (newValue.length <= 11) {
+                                if (newValue.length < 11) {
                                     // Kiểm tra xem ký tự đầu tiên có phải là '0' không
                                     // Nếu người dùng xóa hết thì cho phép rỗng
                                     if (newValue.isEmpty() || newValue.startsWith("0")) {
@@ -276,8 +289,40 @@
                         singleLine = true,
                         // Đảm bảo bàn phím chỉ hiện số
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.White))
-
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = DateUtils.formatDate(dateOfBirthInput),
+                        onValueChange = { editDob = it },
+                        readOnly = true, // Khóa không cho nhập tay
+                        label = { Text("Ngày sinh", color = Color.Gray) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showDatePicker = true },
+                        enabled = false, // Vô hiệu hóa để click vẫn nhận sự kiện
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(disabledTextColor = Color.White)
+                    )
+                    // Bảng chọn ngày (hiện ra khi showDatePicker = true)
+                    if (showDatePicker) {
+                        val datePickerState = rememberDatePickerState()
+                        DatePickerDialog(
+                            onDismissRequest = { showDatePicker = false },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    datePickerState.selectedDateMillis?.let { millis ->
+                                        // 🌟 Cập nhật ngày đã chọn sang định dạng ISO cho server
+                                        dateOfBirthInput = Instant.ofEpochMilli(millis)
+                                            .atZone(ZoneId.of("UTC"))
+                                            .toString()
+                                    }
+                                    showDatePicker = false
+                                }) { Text("CHỌN") }
+                            }
+                        ) { DatePicker(state = datePickerState) }
+                    }
                     Spacer(modifier = Modifier.height(20.dp))
                     TextButton(onClick = { showChangePasswordDialog = true }, modifier = Modifier.align(Alignment.End)) {
                         Text(text = "Đổi mật khẩu tài khoản?", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -302,12 +347,21 @@
                                 }
                                     else -> {
                                     // Gọi API cập nhật lên server nếu mọi thông tin đều hợp lệ
-                                    lifecycleOwner.lifecycleScope.launch {
-                                        try {
-                                            val response = RetrofitClient.getClient(context).updateProfile(
-                                                UpdateProfileRequest(userEmail, editName, editPhone)
-                                            )
+                                        lifecycleOwner.lifecycleScope.launch {
+                                            try {
+                                                // 🌟 Gửi dateOfBirthInput (định dạng ISO) lên server
+                                                val response = RetrofitClient.getClient(context).updateProfile(
+                                                    UpdateProfileRequest(
+                                                        email = userEmail,
+                                                        name = editName,
+                                                        phone = editPhone,
+                                                        date_of_birth = dateOfBirthInput // Gửi qua API này
+                                                    )
+                                                )
+
                                             if (response.isSuccessful && response.body()?.success == true) {
+                                                userDob = dateOfBirthInput
+                                                sharedPref.edit().putString("USER_DOB", dateOfBirthInput).apply()
                                                 userName = editName
                                                 userPhone = editPhone
                                                 sharedPref.edit()

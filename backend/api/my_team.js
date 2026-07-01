@@ -53,7 +53,7 @@ LIMIT 1
 
         // 3. Lấy danh sách toàn bộ cầu thủ trong đội đó
        const [players] = await pool.query(
-    `SELECT u.name, tp.jersey_number, tp.position, tp.role
+    `SELECT p.id,u.name, tp.jersey_number, tp.position, tp.role
      FROM team_players tp
      JOIN players p ON tp.player_id = p.id
      JOIN users u ON p.user_id = u.id
@@ -86,30 +86,29 @@ return res.status(200).json({
 
 ///////////////////////////////////
 router.post('/update_player', async (req, res) => {
-    const { team_id, player_id, new_name, jersey_number, position } = req.body;
+    // Chỉ lấy các thông tin cần thiết
+    const { team_id, id, jersey_number, position } = req.body;
 
     try {
-        // 1. Cập nhật tên trong bảng users (liên kết qua player_id -> p.user_id -> u.id)
-        const updateNameQuery = `
-            UPDATE users u
-            JOIN players p ON u.id = p.user_id
-            SET u.name = ?
-            WHERE p.id = ?
-        `;
-        await pool.query(updateNameQuery, [new_name, player_id]);
-
-        // 2. Cập nhật số áo và vị trí trong bảng team_players
-        const updateInfoQuery = `
+        // Chỉ cập nhật bảng team_players
+        const [result] = await pool.query(`
             UPDATE team_players 
             SET jersey_number = ?, position = ? 
             WHERE team_id = ? AND player_id = ?
-        `;
-        await pool.query(updateInfoQuery, [jersey_number, position, team_id, player_id]);
+        `, [jersey_number, position, team_id, id]);
 
-        res.status(200).json({ status: "success", message: "Đã cập nhật thông tin cầu thủ!" });
+        // Kiểm tra xem có dòng nào được cập nhật không
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ 
+                status: "error", 
+                message: "Không tìm thấy cầu thủ trong đội này!" 
+            });
+        }
+
+        res.status(200).json({ status: "success", message: "Đã cập nhật vị trí và số áo!" });
     } catch (error) {
         console.error("Lỗi cập nhật:", error);
-        res.status(500).json({ status: "error", message: "Không thể cập nhật cầu thủ" });
+        res.status(500).json({ status: "error", message: error.message });
     }
 });
 
@@ -131,52 +130,89 @@ router.post('/remove_player', async (req, res) => {
         res.status(500).json({ status: "error", message: "Lỗi hệ thống" });
     }
 });
-
-/////////////////////////////////
+//////////////////////////////////
 router.post('/add_player_by_email', async (req, res) => {
     const { team_id, email, jersey_number, position } = req.body;
 
     try {
-        // 1. Tìm user_id và lấy TÊN dựa trên email
-        const [users] = await pool.query("SELECT id, name FROM users WHERE email = ?", [email]);
+        // 1. Tìm thông tin user và ngày sinh từ bảng players
+        const [users] = await pool.query(
+            `SELECT u.id, u.name, p.id as player_id, p.date_of_birth 
+             FROM users u 
+             LEFT JOIN players p ON u.id = p.user_id 
+             WHERE u.email = ?`, 
+            [email]
+        );
+
         if (users.length === 0) {
             return res.status(404).json({ status: "error", message: "Email không tồn tại" });
         }
-        const user_id = users[0].id;
-        const user_name = users[0].name; // 🌟 Lấy tên để trả về
 
-        // 2. Tìm hoặc tạo player_id
-        let [players] = await pool.query("SELECT id FROM players WHERE user_id = ?", [user_id]);
-        let player_id;
-        if (players.length === 0) {
-            const [result] = await pool.query("INSERT INTO players (user_id) VALUES (?)", [user_id]);
+        const user = users[0];
+
+        // 🌟 KIỂM TRA NGÀY SINH: Phải có mới cho thêm vào đội
+        if (!user.date_of_birth) {
+            return res.status(400).json({ 
+                status: "error", 
+                message: "Cầu thủ này chưa cập nhật ngày sinh trong hồ sơ, không thể thêm vào đội!" 
+            });
+        }
+
+        // 2. Xác định player_id
+        // Nếu user đã tồn tại trong bảng players (có player_id) thì dùng nó, chưa có thì tạo mới
+        let player_id = user.player_id;
+        if (!player_id) {
+            const [result] = await pool.query("INSERT INTO players (user_id) VALUES (?)", [user.id]);
             player_id = result.insertId;
-        } else {
-            player_id = players[0].id;
         }
 
-        // 3. Kiểm tra đã có trong team chưa
-        const [existing] = await pool.query(
-            "SELECT * FROM team_players WHERE team_id = ? AND player_id = ?", 
-            [team_id, player_id]
-        );
+        // 3. Kiểm tra đã có trong team này chưa
+       // 3. Kiểm tra đã có trong team này chưa (bao gồm cả những người đã bị xóa - is_active = 0)
+const [existing] = await pool.query(
+    "SELECT id, is_active FROM team_players WHERE team_id = ? AND player_id = ?", 
+    [team_id, player_id]
+);
 
-        if (existing.length > 0) {
-            return res.status(400).json({ status: "error", message: "Cầu thủ đã có trong đội rồi!" });
-        }
-
-        // 4. Thêm vào đội
+if (existing.length > 0) {
+    if (existing[0].is_active === 1) {
+        // TH 1: Cầu thủ đang thực sự ở trong đội
+        return res.status(400).json({ status: "error", message: "Cầu thủ đã có trong đội rồi!" });
+    } else {
+        // TH 2: Cầu thủ từng ở trong đội nhưng đã xóa, giờ thêm lại -> UPDATE is_active = 1
         await pool.query(
-            "INSERT INTO team_players (team_id, player_id, jersey_number, position, role, is_active) VALUES (?, ?, ?, ?, 'player', 1)",
-            [team_id, player_id, jersey_number, position]
+            "UPDATE team_players SET is_active = 1, jersey_number = ?, position = ? WHERE id = ?",
+            [jersey_number, position, existing[0].id]
         );
+        return res.status(200).json({ 
+            status: "success", 
+            message: "Thêm thành công!",
+            data: { id: player_id, name: user.name, jersey_number, position, role: 'player' }
+        });
+    }
+}
 
-        // 5. TRẢ VỀ THÔNG TIN CẦU THỦ VỪA THÊM
+// 3.5. Kiểm tra trùng số áo (Chỉ kiểm tra người đang active)
+const [checkJersey] = await pool.query(
+    "SELECT jersey_number FROM team_players WHERE team_id = ? AND jersey_number = ? AND is_active = 1",
+    [team_id, jersey_number]
+);
+
+if (checkJersey.length > 0) {
+    return res.status(400).json({ status: "error", message: "Số áo này đã được đăng ký trong đội!" });
+}
+
+// 4. Thêm mới (Chỉ chạy khi cầu thủ chưa từng tồn tại trong team_players)
+await pool.query(
+    "INSERT INTO team_players (team_id, player_id, jersey_number, position, role, is_active) VALUES (?, ?, ?, ?, 'player', 1)",
+    [team_id, player_id, jersey_number, position]
+);
+
         res.status(200).json({ 
             status: "success", 
             message: "Thêm thành công!",
             data: {
-                name: user_name,
+                id: player_id, // Nên trả thêm ID để Android quản lý danh sách tốt hơn
+                name: user.name,
                 jersey_number: jersey_number,
                 position: position,
                 role: 'player'

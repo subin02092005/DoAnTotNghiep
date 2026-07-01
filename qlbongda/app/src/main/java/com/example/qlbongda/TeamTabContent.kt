@@ -21,9 +21,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
+import androidx.core.view.DragAndDropPermissionsCompat.request
 import com.example.qlbongda.data.api.RetrofitClient
+import com.example.qlbongda.data.model.AddPlayerRequest
 import com.example.qlbongda.data.model.PlayerInfo
+import com.example.qlbongda.data.model.RemovePlayerRequest
+import com.example.qlbongda.data.model.UpdatePlayerRequest
 import com.example.qlbongda.ui.theme.NeonGreen
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +49,7 @@ fun TeamTabContent(
     val context = LocalContext.current
     val sharedPref = remember { context.getSharedPreferences("AUTH_PREF", android.content.Context.MODE_PRIVATE) }
     val userId = sharedPref.getInt("USER_ID", -1)
-
+    var myTeamId by remember { mutableStateOf(-1) }
     // Load dữ liệu ban đầu
     LaunchedEffect(userId) {
         if (userId != -1) {
@@ -52,12 +57,18 @@ fun TeamTabContent(
                 val response = RetrofitClient.getClient(context).getMyTeam(userId)
                 if (response.isSuccessful && response.body()?.hasTeam == true) {
                     val teamData = response.body()?.data
+                    myTeamId = teamData?.teamId ?: -1
                     onTeamRegisteredChange(true)
                     onTeamNameChange(teamData?.teamName ?: "")
                     onLeaderNameChange(teamData?.captainName ?: "")
                     onCoachNameChange(teamData?.coachName ?: "")
                     playerList.clear()
-                    teamData?.players?.let { playerList.addAll(it) }
+                    teamData?.players?.let {
+                        playerList.addAll(it)
+                        it.forEach { p ->
+                            android.util.Log.d("DEBUG_PLAYER", "Name: ${p.name}, ID từ Server: ${p.id}")
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("API_ERROR", "Lỗi: ${e.message}")
@@ -70,6 +81,7 @@ fun TeamTabContent(
 
     if (role == "coach" || role == "captain") {
         CoachCaptainScreen(
+            teamId = myTeamId, // 🌟 Truyền biến myTeamId vào
             playerList,
             isTeamRegistered,
             onTeamRegisteredChange,
@@ -90,6 +102,7 @@ fun TeamTabContent(
 // Màn hình QUẢN LÝ (Coach/Captain)
 @Composable
 fun CoachCaptainScreen(
+    teamId: Int,
     playerList: SnapshotStateList<PlayerInfo>,
     isTeamRegistered: Boolean,
     onTeamRegisteredChange: (Boolean) -> Unit,
@@ -102,12 +115,16 @@ fun CoachCaptainScreen(
     isLeagueRegistered: Boolean,
     onLeagueRegisteredChange: (Boolean) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var isEditing by remember { mutableStateOf(false) }
     var editIdx by remember { mutableStateOf(-1) }
     var nbr by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var pos by remember { mutableStateOf("FW") } // Biến lưu vị trí
     var newCoachName by remember { mutableStateOf(coachName) }
+
+    var isUpdating by remember { mutableStateOf(false) }
     LaunchedEffect(coachName) {
         newCoachName = coachName
     }
@@ -185,10 +202,14 @@ fun CoachCaptainScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)), border = BorderStroke(1.dp, NeonGreen)) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(if (isEditing) "CẬP NHẬT CẦU THỦ" else "THÊM CẦU THỦ", color = NeonGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isEditing) "CẬP NHẬT CẦU THỦ" else "THÊM CẦU THỦ",
+                        color = NeonGreen,
+                        fontWeight = FontWeight.Bold
+                    )
 
                     OutlinedTextField(
-                        value =email,
+                        value = email,
                         onValueChange = { if (isEmailValid(it)) email = it },
                         label = { Text("Email thành viên") },
                         modifier = Modifier.fillMaxWidth(),
@@ -217,13 +238,15 @@ fun CoachCaptainScreen(
                         Row(
                             modifier = Modifier.weight(1f),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ){
+                        ) {
                             listOf("GK", "DF", "MF", "FW").forEach { p ->
                                 FilterChip(
                                     selected = pos == p,
                                     onClick = { pos = p },
                                     label = { Text(p, fontSize = 10.sp) },
-                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = NeonGreen)
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = NeonGreen
+                                    )
                                 )
                             }
                         }
@@ -231,27 +254,113 @@ fun CoachCaptainScreen(
 
                     Button(
                         onClick = {
-                            if (isEditing && editIdx != -1) {
-                                // CHỈ CẬP NHẬT SỐ ÁO & VỊ TRÍ
-                                val oldPlayer = playerList[editIdx]
-                                playerList[editIdx] = PlayerInfo(nbr, oldPlayer.name, mapPositionToFull(pos))
+                            if (isEditing) {
+                                // 1. Kiểm tra trùng số áo
+                                val isDuplicateNumber = playerList.any {
+                                    it.number == nbr && it.id != playerList[editIdx].id
+                                }
+
+                                if (isDuplicateNumber) {
+                                    Toast.makeText(context, "Số áo $nbr đã có cầu thủ khác sử dụng!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    // 2. Nếu không trùng, tiến hành gọi API
+                                    isUpdating = true
+                                    scope.launch {
+                                        try {
+                                            val player = playerList[editIdx]
+                                            val request = UpdatePlayerRequest(
+                                                team_id = teamId,
+                                                id = player.id,
+                                                jersey_number = nbr,
+                                                position = mapPositionToFull(pos)
+                                            )
+
+                                            val response = RetrofitClient.getClient(context).updatePlayer(request)
+
+                                            if (response.isSuccessful) {
+
+                                                // Cập nhật UI
+                                                playerList[editIdx] = player.copy(
+                                                    number = nbr,
+                                                    position = mapPositionToFull(pos)
+                                                )
+                                                Toast.makeText(context, "Cập nhật thành công!", Toast.LENGTH_SHORT).show()
+                                                isEditing = false; editIdx = -1; email = ""; nbr = ""; pos = "FW"
+                                            } else {
+                                                // 3. Thông báo lỗi cụ thể từ Server (ví dụ: DB lỗi, trùng số áo từ phía Server)
+                                                val errorMsg = response.errorBody()?.string() ?: "Không thể cập nhật!"
+                                                Toast.makeText(context, "Lỗi: $errorMsg", Toast.LENGTH_LONG).show()
+                                            }
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Lỗi kết nối mạng!", Toast.LENGTH_SHORT).show()
+                                        } finally {
+                                            isUpdating = false
+                                        }
+                                    }
+                                }
                             } else {
-                                // THÊM MỚI BẰNG EMAIL
-                                playerList.add(PlayerInfo(nbr, email, mapPositionToFull(pos)))
+                                if (!isEmailFormatValid(email)) {
+                                    Toast.makeText(context, "Email không đúng định dạng!", Toast.LENGTH_SHORT).show()
+                                } else
+                                // 🌟 Xử lý trực tiếp tại đây mà không cần gọi hàm handleAddPlayer()
+                                if (email.isEmpty() || nbr.isEmpty()) {
+                                    Toast.makeText(
+                                        context,
+                                        "Vui lòng nhập Email và Số áo",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    scope.launch {
+                                        try {
+                                            val requestBody = AddPlayerRequest(
+                                                team_id = teamId,
+                                                email = email,
+                                                jersey_number = nbr,
+                                                position = mapPositionToFull(pos)
+                                            )
+                                            val response = RetrofitClient.getClient(context).addPlayerByEmail(requestBody)
+
+                                            if (response.isSuccessful) {
+                                                val newPlayer = response.body()?.data
+                                                if (newPlayer != null) {
+                                                    // 1. Thêm cầu thủ vào danh sách trước (để UI cập nhật ngay)
+                                                    playerList.add(newPlayer)
+                                                    email = ""; nbr = ""; pos = "FW"
+                                                    Toast.makeText(context, "Đã thêm ${newPlayer.name} vào đội!", Toast.LENGTH_SHORT).show()
+
+                                                }
+                                            } else {val errorString = response.errorBody()?.string()
+                                                try {
+                                                    // 2. Chỉ trích xuất phần "message" từ JSON
+                                                    val jsonObject = org.json.JSONObject(errorString ?: "{}")
+                                                    val errorMessage = jsonObject.optString("message", "Có lỗi xảy ra!")
+
+                                                    // 3. Hiển thị thông báo (chỉ hiện nội dung message)
+                                                    Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+
+                                                } catch (e: Exception) {
+                                                    // Dự phòng: nếu server không trả về JSON chuẩn
+                                                    Toast.makeText(context, "Lỗi: Không thể thêm cầu thủ", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            Toast.makeText(
+                                                context,
+                                                "Lỗi kết nối: ${e.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                }
                             }
-                            // Reset form
-                            email = ""; nbr = ""; pos = "FW"; isEditing = false; editIdx = -1
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(if (isEditing) "CẬP NHẬT THÔNG TIN" else "THÊM VÀO ĐỘI", color = Color.Black)
-                    }
-
-                    if(isEditing) {
-                        TextButton(onClick = { isEditing = false; editIdx = -1; email = ""; nbr = "" }) {
-                            Text("Hủy chỉnh sửa", color = Color.Red)
-                        }
+                        Text(
+                            if (isEditing) "CẬP NHẬT THÔNG TIN" else "THÊM VÀO ĐỘI",
+                            color = Color.Black
+                        )
                     }
                 }
             }
@@ -279,7 +388,28 @@ fun CoachCaptainScreen(
                     IconButton(onClick = { isEditing = true; editIdx = i; nbr = p.number; email = p.name; pos = mapFullToShort(p.position)}) {
                         Icon(Icons.Default.Edit, "Edit", tint = if (editIdx == i) NeonGreen else Color.LightGray)
                     }
-                    IconButton(onClick = { playerList.removeAt(i) }) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            try {
+                                val player = playerList[i]
+
+
+                                val requestBody = RemovePlayerRequest(teamId, player.id)
+                                val response = RetrofitClient.getClient(context).removePlayer(requestBody)
+
+                                if (response.isSuccessful) {
+                                    playerList.removeAt(i) // Xóa khỏi danh sách UI
+                                    Toast.makeText(context, "Đã xóa cầu thủ", Toast.LENGTH_SHORT).show()
+                                    // Nếu đang edit cầu thủ vừa xóa thì reset form
+                                    if (editIdx == i) { isEditing = false; editIdx = -1; email = ""; nbr = ""; pos = "FW" }
+                                } else {
+                                    Toast.makeText(context, "Lỗi xóa cầu thủ", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Lỗi kết nối: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }) {
                         Icon(Icons.Default.Delete, "Delete", tint = Color(0xFFFF5252))
                     }
                 }
@@ -298,7 +428,10 @@ fun getPositionColor(pos: String): Color {
     }
 }
 fun isCoachNameValid(input: String) = input.matches(Regex("^[\\p{L}\\s]*$"))
-fun isEmailValid(input: String) = input.matches(Regex("^[A-Za-z0-9+_.-]*$"))
+fun isEmailValid(input: String) = input.matches(Regex("^[A-Za-z0-9+_.-@]*$"))
+fun isEmailFormatValid(email: String): Boolean {
+    return email.matches(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"))
+}
 // Validator cho số: Chỉ cho số
 fun isNumberValid(input: String) = input.matches(Regex("^[0-9]*$"))
 fun mapPositionToFull(shortPos: String): String {

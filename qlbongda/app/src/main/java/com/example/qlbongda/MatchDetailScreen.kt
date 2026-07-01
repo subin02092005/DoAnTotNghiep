@@ -270,25 +270,25 @@ fun MatchDetailScreenStartedPreview() {
             MatchEvent("89", "Arsenal", "Ghi bàn", "Martin Odegaard")
         ),
         lineupA = listOf(
-            PlayerInfo("22", "Raya", "GK"),
-            PlayerInfo("2", "Saliba", "DF"),
-            PlayerInfo("6", "Gabriel", "DF"),
-            PlayerInfo("4", "White", "DF"),
-            PlayerInfo("41", "Rice", "MF"),
-            PlayerInfo("8", "Odegaard", "MF"),
-            PlayerInfo("7", "Saka", "FW")
+            PlayerInfo(1,"22", "Raya", "GK"),
+            PlayerInfo(1,"2", "Saliba", "DF"),
+            PlayerInfo(1,"6", "Gabriel", "DF"),
+            PlayerInfo(1,"4", "White", "DF"),
+            PlayerInfo(1,"41", "Rice", "MF"),
+            PlayerInfo(1,"8", "Odegaard", "MF"),
+            PlayerInfo(1,"7", "Saka", "FW")
         ),
         lineupB = listOf(
-            PlayerInfo("31", "Ederson", "GK"),
-            PlayerInfo("3", "Dias", "DF"),
-            PlayerInfo("25", "Akanji", "DF"),
-            PlayerInfo("16", "Rodri", "MF"),
-            PlayerInfo("17", "De Bruyne", "MF"),
-            PlayerInfo("47", "Foden", "FW"),
-            PlayerInfo("9", "Haaland", "FW")
+            PlayerInfo(1,"31", "Ederson", "GK"),
+            PlayerInfo(1,"3", "Dias", "DF"),
+            PlayerInfo(1,"25", "Akanji", "DF"),
+            PlayerInfo(1,"16", "Rodri", "MF"),
+            PlayerInfo(1,"17", "De Bruyne", "MF"),
+            PlayerInfo(1,"47", "Foden", "FW"),
+            PlayerInfo(1,"9", "Haaland", "FW")
         ),
-        subsA = listOf(PlayerInfo("29", "Havertz", "FW"), PlayerInfo("11", "Martinelli", "FW")),
-        subsB = listOf(PlayerInfo("10", "Grealish", "FW"), PlayerInfo("19", "Alvarez", "FW")),
+        subsA = listOf(PlayerInfo(1,"29", "Havertz", "FW"), PlayerInfo(1,"11", "Martinelli", "FW")),
+        subsB = listOf(PlayerInfo(1,"10", "Grealish", "FW"), PlayerInfo(1,"19", "Alvarez", "FW")),
         PossessionA = "45%", PossessionB = "55%",
         ShotsA = "12", ShotsB = "14",
         mvp = "Martin Odegaard (Arsenal)",

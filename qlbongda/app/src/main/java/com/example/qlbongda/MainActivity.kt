@@ -183,9 +183,9 @@ class MainActivity : ComponentActivity() {
                                 if (coachName.isNotEmpty()) coachName else "Pep Guardiola",
                                 if (leaderName.isNotEmpty()) leaderName else "Kyle Walker",
                                 if (playerList.isNotEmpty()) playerList else listOf(
-                                    PlayerInfo("9", "Erling Haaland", "Tiền đạo"),
-                                    PlayerInfo("17", "Kevin De Bruyne", "Tiền vệ"),
-                                    PlayerInfo("31", "Ederson", "Thủ môn")
+                                    PlayerInfo( 1, number = "9", name = "Erling Haaland", position = "forward"),
+                                    PlayerInfo( 2, number = "17", name = "Kevin De Bruyne", position = "midfielder"),
+                                    PlayerInfo(3, number = "31", name = "Ederson", position = "goalkeeper")
                                 )
                             )
                             TeamDetailScreen(

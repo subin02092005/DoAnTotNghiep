@@ -22,15 +22,18 @@ router.get('/profile/get-info', async (req, res) => {
     try {
         connection = await mysql.createConnection(dbConfig);
 
-        // Lấy thông tin user kết hợp với tên quyền (role) từ database của bạn
+        // 🌟 Sửa query: Join thêm bảng players
         const query = `
-            SELECT u.name, u.email, u.phone, u.email_verified, r.name as role_name 
+            SELECT u.name, u.email, u.phone, u.email_verified, r.name as role_name, 
+                   p.date_of_birth
             FROM users u
             LEFT JOIN user_role ur ON u.id = ur.user_id
             LEFT JOIN roles r ON ur.role_id = r.id
+            LEFT JOIN players p ON u.id = p.user_id
             WHERE u.email = ? 
             LIMIT 1
         `;
+        
         const [rows] = await connection.execute(query, [email]);
         await connection.end();
 
@@ -39,14 +42,18 @@ router.get('/profile/get-info', async (req, res) => {
         }
 
         const user = rows[0];
+        
+        // Trả về dữ liệu kèm ngày sinh
         return res.status(200).json({
             success: true,
             data: {
                 name: user.name,
                 email: user.email,
                 phone: user.phone,
-                email_verified: user.email_verified, // Sẽ trả về số 0 hoặc 1
-                role: user.role_name || 'user'
+                email_verified: user.email_verified,
+                role: user.role_name || 'user',
+                // 🌟 Định dạng ngày sinh (nếu có dữ liệu)
+               date_of_birth: user.date_of_birth ? new Date(user.date_of_birth.getTime() - (user.date_of_birth.getTimezoneOffset() * 60000)).toISOString().split('T')[0] : null
             }
         });
     } catch (error) {
@@ -102,7 +109,8 @@ router.post('/profile/verify-otp', async (req, res) => {
 // 🌟 API 3: CẬP NHẬT THÔNG TIN CÁ NHÂN
 // Đường dẫn: POST http://localhost:3000/api/profile/update-info
 router.post('/profile/update-info', async (req, res) => {
-    const { email, name, phone } = req.body;
+    // 1. Nhận thêm date_of_birth từ request body
+    const { email, name, phone, date_of_birth } = req.body;
 
     if (!email) {
         return res.status(400).json({ success: false, message: 'Email là bắt buộc để cập nhật!' });
@@ -112,27 +120,46 @@ router.post('/profile/update-info', async (req, res) => {
     try {
         connection = await mysql.createConnection(dbConfig);
 
-        // Câu lệnh cập nhật: Chỉ cập nhật những trường được cung cấp
-        // Ở đây ta mặc định cho phép đổi tên và số điện thoại
-        const updateQuery = `
-            UPDATE users 
-            SET name = ?, phone = ? 
-            WHERE email = ?
-        `;
-        
-        const [result] = await connection.execute(updateQuery, [name, phone, email]);
-        await connection.end();
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng để cập nhật!' });
+        // 2. Tìm user_id dựa trên email (để dùng cho bảng players)
+        const [users] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            await connection.end();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
         }
+        const userId = users[0].id;
+
+        // 3. Cập nhật bảng users
+        await connection.execute(
+            'UPDATE users SET name = ?, phone = ? WHERE email = ?', 
+            [name, phone, email]
+        );
+
+        // 4. Cập nhật ngày sinh vào bảng players
+        // Lưu ý: Nếu user chưa tồn tại trong bảng players, bạn có thể cần lệnh INSERT hoặc UPDATE
+        // Ở đây dùng UPDATE giả định dòng cầu thủ đã tồn tại
+       let formattedDob = null;
+if (date_of_birth) {
+    // Nếu dữ liệu có chứa chữ 'T' (dạng ISO), lấy phần đầu: YYYY-MM-DD
+    // Ví dụ: '1997-07-24T00:00Z[UTC]' -> '1997-07-24'
+    formattedDob = date_of_birth.toString().split('T')[0];
+}
+
+const sql = `
+    INSERT INTO players (user_id, date_of_birth) 
+    VALUES (?, ?) 
+    ON DUPLICATE KEY UPDATE date_of_birth = ?
+`;
+// TRUYỀN formattedDob VÀO THAY VÌ date_of_birth
+await connection.execute(sql, [userId, formattedDob, formattedDob]);
+
+        await connection.end();
 
         return res.status(200).json({
             success: true,
             message: 'Cập nhật thông tin thành công!'
         });
     } catch (error) {
-        console.error("Lỗi cập nhật Profile:", error);
+        console.error("Lỗi cập nhật Profile:",  error);
         if (connection) await connection.end();
         return res.status(500).json({ success: false, message: 'Lỗi hệ thống khi cập nhật!' });
     }
