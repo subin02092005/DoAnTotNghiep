@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "715520443776",
-    "project_id": "qlbongda-279af",
-    "storage_bucket": "qlbongda-279af.firebasestorage.app"
+    "project_number": "556798944192",
+    "project_id": "qlbongda",
+    "storage_bucket": "qlbongda.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:715520443776:android:64dcae310b250e11f4ed65",
+        "mobilesdk_app_id": "1:556798944192:android:28742002c7a6f20da5de25",
         "android_client_info": {
           "package_name": "com.example.qlbongda"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBvMP2NKiGpLJQl6YHr5NNi_5bPojzNk_M"
+          "current_key": "AIzaSyAYpYEDVUViSu_i0ny995zrzXwSi6yBZjg"
         }
       ],
       "services": {

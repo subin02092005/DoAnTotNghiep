@@ -21,17 +21,31 @@ import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.*
 import com.example.qlbongda.ui.theme.QlbongdaTheme
 import com.google.firebase.messaging.FirebaseMessaging
-
+import android.Manifest
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 class MainActivity : ComponentActivity() {
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (!isGranted) {
+            // Bạn có thể hiện một Toast thông báo nếu người dùng từ chối quyền
+            Log.d("FCM_PERMISSION", "Người dùng từ chối cấp quyền thông báo")
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        askNotificationPermission()
         val apiService = RetrofitClient.getClient(this@MainActivity)
         val homeViewModel = HomeViewModel(apiService)
         val adminViewModel = AdminViewModel(apiService)
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener { task ->
             Log.d("FCM_TOKEN", "Token của tôi là: ${task.result}")
         }
+
         setContent {
             QlbongdaTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -199,6 +213,15 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
+        }
+    }
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
     }

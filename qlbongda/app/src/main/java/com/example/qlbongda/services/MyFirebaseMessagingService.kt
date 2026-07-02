@@ -27,7 +27,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setSmallIcon(R.mipmap.ic_launcher) // Thay icon app của bạn ở đây
             .setContentTitle(title)
             .setContentText(body)
-            .setPriority(NotificationCompat.PRIORITY_HIGH) // Quan trọng để không bị Silent
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)// Quan trọng để không bị Silent
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 

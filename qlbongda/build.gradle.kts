@@ -3,10 +3,11 @@ plugins {
 
 
         // Remove the 'version "4.4.2"' part here
-    id("com.google.gms.google-services") version "4.4.2" apply false
+    //id("com.google.gms.google-services") version "4.4.2" apply false
         alias(libs.plugins.android.application) apply false
         alias(libs.plugins.kotlin.android) apply false
         alias(libs.plugins.kotlin.compose) apply false
+    id("com.google.gms.google-services") version "4.5.0" apply false
 
 
 }

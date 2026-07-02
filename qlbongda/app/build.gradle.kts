@@ -1,7 +1,8 @@
 plugins {
-    alias(libs.plugins.android.application)
+   // alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.android.application")
     id("com.google.gms.google-services")
 
 }
@@ -46,6 +47,8 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-analytics")
+    implementation(libs.firebase.database)
+
 
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
