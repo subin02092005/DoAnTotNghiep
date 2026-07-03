@@ -42,10 +42,16 @@ class MainActivity : ComponentActivity() {
         val homeViewModel = HomeViewModel(apiService)
         val adminViewModel = AdminViewModel(apiService)
 
+        // Tìm đoạn này trong MainActivity.onCreate
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener { task ->
-            Log.d("FCM_TOKEN", "Token của tôi là: ${task.result}")
+            if (!task.isSuccessful) {
+                Log.w("FCM_TOKEN", "Lấy token thất bại", task.exception)
+                return@addOnCompleteListener
+            }
+            // Chỉ lấy result khi thành công
+            val token = task.result
+            Log.d("FCM_TOKEN", "Token của tôi là: $token")
         }
-
         setContent {
             QlbongdaTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

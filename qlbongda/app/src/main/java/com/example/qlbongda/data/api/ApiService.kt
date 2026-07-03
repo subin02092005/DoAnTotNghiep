@@ -59,12 +59,18 @@
         suspend fun registerTeam(@Body request: RegisterTeamRequest): Response< RegisterTeamResponse>
         @POST("add_coach_by_email")
         suspend fun addCoachByEmail(@Body request: AddCoachRequest): Response<Void>
-        @GET("/open_seasons") // URL tùy bạn đặt
-        suspend fun getOpenSeasons(): Response<List<SeasonInfo>>
-
+         // Đảm bảo khớp với route trong server
+         @GET("open_seasons")
+         suspend fun getOpenSeasons(@Query("teamId") teamId: Int): Response<List<SeasonInfo>>
+        @POST("unregister_season") // Đảm bảo URL này khớp với route bên Node.js
+        suspend fun unregisterFromSeason(
+            @Body request: Map<String, Int>
+        ): Response<ApiResponse>
         @POST("register_to_season")
         suspend fun registerToSeason(@Body request: Map<String, Int>): Response<Void>
         // Giả sử ApiResponse của bạn là:
+        @POST("/confirm_payment")
+        suspend fun confirmPayment(@Body body: Map<String, Any>): Response<Void>
 
         // ---- QUẢN LÝ THÀNH VIÊN TRONG ĐỘI ----
         // Dùng để thêm cầu thủ vào đội

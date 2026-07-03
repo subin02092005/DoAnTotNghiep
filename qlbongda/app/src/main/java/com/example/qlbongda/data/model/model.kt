@@ -229,17 +229,28 @@ data class RegisterTeamResponse(
 data class SeasonInfo(
     val id: Int,
     val name: String,
-    val registrationFee: Double, // Dùng Double hoặc String tùy theo cách bạn parse JSON
-    val status: String
+    val description: String?,
+    val status: String,
+    val max_teams: Int,        // Thêm trường số đội tối đa
+    val start_date: String?,   // Dùng String hoặc Date
+    val end_date: String?,     // Dùng String hoặc Date
+    @SerializedName("registration_fee")
+    val registrationFee: Long,
+    val is_registered: Int,
+    val payment_status: String?,val season_team_id: Int? = null// 1 nếu đã đăng ký, 0 nếu chưa
 )
 // =================================================================
 // 7. COMMON RESPONSE (Dùng chung cho các API chỉ trả về status)
 // =================================================================
-
+data class SeasonListResponse(
+    val status: String,
+    val data: List<SeasonInfo>
+)
 data class ApiResponse(
     val status: String,
     val message: String
 )
+
 
 
 

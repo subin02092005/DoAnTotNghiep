@@ -20,7 +20,26 @@ router.get('/my_team', async (req, res) => {
     try {
         // 1. Lấy thông tin đội bóng và quyền của người dùng (coach/captain/player)
         // Lưu ý: Dùng LEFT JOIN để kiểm tra xem user có nằm trong team_leaders (coach) hay không
-        const query = `
+     const query = `
+    SELECT 
+        COALESCE(tl.team_id, tp.team_id) AS team_id, 
+        t.name AS team_name,
+        t.coach_name,
+        CASE 
+            WHEN tl.user_id IS NOT NULL THEN 'coach'
+            WHEN tp.role = 'captain' THEN 'captain'
+            ELSE 'player'
+        END AS currentUserRole
+    FROM teams t
+    -- Kiểm tra trực tiếp bảng team_leaders mà không qua bảng players
+    LEFT JOIN team_leaders tl ON t.id = tl.team_id AND tl.user_id = ? AND tl.is_active = 1
+    -- Kiểm tra bảng players và team_players để tìm cầu thủ
+    LEFT JOIN players p ON p.user_id = ?
+    LEFT JOIN team_players tp ON t.id = tp.team_id AND tp.player_id = p.id AND tp.is_active = 1
+    WHERE tl.user_id IS NOT NULL OR tp.user_id IS NOT NULL
+    LIMIT 1
+`;
+    /*    const query = `
            SELECT 
     tp.team_id, 
     t.name AS team_name,
@@ -36,7 +55,7 @@ JOIN teams t ON tp.team_id = t.id
 LEFT JOIN team_leaders tl ON tp.team_id = tl.team_id AND tl.user_id = p.user_id
 WHERE p.user_id = ? AND tp.is_active = 1
 LIMIT 1
-        `;
+        `;*/
         
         const [rows] = await pool.query(query, [userId, userId]);
 
@@ -357,7 +376,23 @@ router.post('/register_to_season', async (req, res) => {
             return res.status(400).json({ status: "error", message: "Giải đấu không mở đăng ký!" });
         }
 
-        // 2. Kiểm tra xem đội đã đăng ký vào mùa này chưa (tránh trùng lặp)
+        // --- MỚI: RÀNG BUỘC MỖI ĐỘI CHỈ ĐƯỢC ĐĂNG KÝ 1 GIẢI ĐANG MỞ ---
+        const [checkOther] = await pool.query(
+            `SELECT st.id 
+             FROM season_teams st
+             JOIN seasons s ON st.season_id = s.id
+             WHERE st.team_id = ? 
+             AND st.is_active = 1 
+             AND s.status = 'registration_open'`,
+            [team_id]
+        );
+
+        if (checkOther.length > 0) {
+            return res.status(400).json({ status: "error", message: "Bạn đã đăng ký một giải đấu khác rồi, vui lòng hủy giải cũ trước!" });
+        }
+        // -----------------------------------------------------------
+
+        // 2. Kiểm tra xem đội đã đăng ký VÀO CHÍNH GIẢI NÀY chưa
         const [existing] = await pool.query(
             "SELECT id FROM season_teams WHERE team_id = ? AND season_id = ? AND is_active = 1",
             [team_id, season_id]
@@ -366,7 +401,7 @@ router.post('/register_to_season', async (req, res) => {
             return res.status(400).json({ status: "error", message: "Đội bóng đã đăng ký giải này rồi!" });
         }
 
-        // 3. Kiểm tra số lượng đội (count các dòng có status khác 'withdrawn')
+        // 3. Kiểm tra số lượng đội
         const [count] = await pool.query(
             "SELECT COUNT(*) as total FROM season_teams WHERE season_id = ? AND is_active = 1",
             [season_id]
@@ -375,7 +410,7 @@ router.post('/register_to_season', async (req, res) => {
             return res.status(400).json({ status: "error", message: "Giải đấu đã đủ số lượng đội!" });
         }
 
-        // 4. Insert vào bảng season_teams của bạn
+        // 4. Insert vào bảng season_teams
         await pool.query(
             "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at) VALUES (?, ?, 'pending', 1, NOW())",
             [season_id, team_id]
@@ -389,18 +424,91 @@ router.post('/register_to_season', async (req, res) => {
     }
 });
 router.get('/open_seasons', async (req, res) => {
+    const { teamId } = req.query;
+
+    if (!teamId) {
+        return res.status(400).json([]);
+    }
+
     try {
-        const query = `
-            SELECT id, name, description, registration_fee 
-            FROM seasons 
-            WHERE status = 'registration_open' 
-            AND is_active = 1 
-            AND deleted_at IS NULL
-        `;
-        const [seasons] = await pool.query(query);
-        res.status(200).json(seasons);
+       const query = `
+   SELECT 
+        s.id, 
+        s.name, 
+        s.description, 
+        s.status, 
+        s.max_teams, 
+        s.start_date, 
+        s.end_date, 
+        s.registration_fee,
+        IF(st.team_id IS NOT NULL, 1, 0) as is_registered,
+        st.id as season_team_id,     -- THÊM DÒNG NÀY
+        p.status as payment_status
+    FROM seasons s
+    LEFT JOIN season_teams st ON s.id = st.season_id AND st.team_id = ? AND st.deleted_at IS NULL
+    LEFT JOIN (
+        SELECT p1.season_team_id, p1.status
+        FROM payments p1
+        INNER JOIN (
+            SELECT season_team_id, MAX(created_at) as max_created
+            FROM payments
+            WHERE is_active = 1
+            GROUP BY season_team_id
+        ) p2 ON p1.season_team_id = p2.season_team_id AND p1.created_at = p2.max_created
+    ) p ON st.id = p.season_team_id
+    WHERE s.deleted_at IS NULL
+    AND (
+        s.status = 'registration_open'
+        OR st.team_id IS NOT NULL
+    )
+`;
+        const [seasons] = await pool.query(query, [teamId]);
+        res.status(200).json(Array.isArray(seasons) ? seasons : []);
+        
+    } catch (error) {
+        console.error("Lỗi lấy danh sách giải:", error);
+        res.status(500).json([]); 
+    }
+});
+
+router.post('/unregister_season', async (req, res) => {
+    const { team_id, season_id } = req.body;
+    try {
+        // Xóa bản ghi trong bảng season_teams
+        await pool.query('DELETE FROM season_teams WHERE team_id = ? AND season_id = ?', [team_id, season_id]);
+        res.status(200).json({ status: "success", message: "Đã hủy giải thành công" });
     } catch (error) {
         res.status(500).json({ status: "error", message: "Lỗi server" });
     }
 });
+router.post('/confirm_payment', async (req, res) => {
+    const { transaction_ref, season_team_id } = req.body;
+    
+    // Bắt đầu Transaction để đảm bảo tính toàn vẹn
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Cập nhật bảng payments
+        await connection.query(
+            "UPDATE payments SET status = 'confirmed', paid_at = NOW(), transaction_ref = ? WHERE season_team_id = ?",
+            [transaction_ref, season_team_id]
+        );
+
+        // 2. Cập nhật bảng season_teams (nếu cần đổi trạng thái đội)
+        await connection.query(
+            "UPDATE season_teams SET status = 'accepted' WHERE id = ?",
+            [season_team_id]
+        );
+
+        await connection.commit();
+        res.status(200).json({ message: "Thanh toán thành công" });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ message: "Lỗi xử lý thanh toán" });
+    } finally {
+        connection.release();
+    }
+});
+
 module.exports = router;
