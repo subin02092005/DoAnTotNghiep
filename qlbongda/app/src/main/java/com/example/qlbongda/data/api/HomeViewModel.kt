@@ -8,6 +8,7 @@ import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.data.model.GroupStanding
 import com.example.qlbongda.data.model.MyTeamData
 import com.example.qlbongda.data.model.PlayerInfo
+import com.example.qlbongda.data.model.StandingItem
 import com.example.qlbongda.data.model.TournamentPhase
 import com.example.qlbongda.data.model.UpdateProfileRequest
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,7 +78,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
                             events = emptyList(), lineupA = emptyList(), lineupB = emptyList(),
                             subsA = emptyList(), subsB = emptyList(), PossessionA = "0%",
                             PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = "",
-                            isHot = true
+                            isHot = false
                         )
                     }
                 }
@@ -102,8 +103,27 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
+    private val _teamState = MutableStateFlow<StandingItem?>(null)
+    val teamState: StateFlow<StandingItem?> = _teamState
+    fun fetchTeamDetail(teamId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.getTeamDetail(teamId)
+                // Kiểm tra response thành công và có dữ liệu
+                if (response.isSuccessful && response.body() != null) {
+                    val teamData = response.body()!!.data // Lấy trực tiếp từ class TeamDetailResponse
 
-
+                    // Cập nhật State
+                    _teamState.value = teamData
+                }
+            } catch (e: Exception) {
+                Log.e("TeamViewModel", "Error: ${e.message}")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
     fun loadStandings() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -167,10 +187,10 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
 
     private fun setMockData() {
         _phases.value = listOf(
-            TournamentPhase(1, "Vòng Bảng", "round_robin"),
-            TournamentPhase(2, "Tứ Kết", "knockout"),
-            TournamentPhase(3, "Bán Kết", "knockout"),
-            TournamentPhase(4, "Chung Kết", "knockout")
+            TournamentPhase(1, "Vòng Bảng", "round_robin",""),
+            TournamentPhase(2, "Tứ Kết", "knockout",""),
+            TournamentPhase(3, "Bán Kết", "knockout",""),
+            TournamentPhase(4, "Chung Kết", "knockout","")
         )
     }
 

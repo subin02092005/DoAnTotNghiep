@@ -28,7 +28,9 @@ fun HomeTabContent(
 
     // State chọn bảng đấu (index của standings)
 
-
+    LaunchedEffect(selectedPhase) {
+        onTabSelected(0)
+    }
 
 
     Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -87,7 +89,7 @@ fun HomeTabContent(
                         Row(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
                             Text("#", color = Color.Gray, modifier = Modifier.width(30.dp), textAlign = TextAlign.Center)
                             Text("Đội bóng", color = Color.Gray, modifier = Modifier.weight(1f))
-                            Text("T", color = Color.Gray, modifier = Modifier.width(35.dp), textAlign = TextAlign.Center)
+                            Text("Trận", color = Color.Gray, modifier = Modifier.width(35.dp), textAlign = TextAlign.Center)
                             Text("HS", color = Color.Gray, modifier = Modifier.width(35.dp), textAlign = TextAlign.Center)
                             Text("Đ", color = Color.Gray, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
                         }

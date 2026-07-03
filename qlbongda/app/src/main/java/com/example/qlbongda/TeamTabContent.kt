@@ -26,12 +26,14 @@ import androidx.compose.ui.unit.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.core.view.DragAndDropPermissionsCompat.request
+import androidx.navigation.NavController
 import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.AddCoachRequest
 import com.example.qlbongda.data.model.AddPlayerRequest
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.RegisterTeamRequest
 import com.example.qlbongda.data.model.RemovePlayerRequest
+import com.example.qlbongda.data.model.SeasonInfo
 
 import com.example.qlbongda.data.model.UpdatePlayerRequest
 import com.example.qlbongda.ui.theme.NeonGreen
@@ -59,6 +61,7 @@ fun TeamTabContent(
     var myTeamId by remember { mutableStateOf(-1) }
     var hasTeam by remember { mutableStateOf(sharedPref.getInt("TEAM_ID", -1) != -1) }
     var currentRole by remember { mutableStateOf(currentUserRole) }
+    var showRegistrationScreen by remember { mutableStateOf(false) }
     // Load dữ liệu ban đầu
     LaunchedEffect(userId) {
         if (userId != -1) {
@@ -94,6 +97,13 @@ fun TeamTabContent(
     android.util.Log.d("ROLE_DEBUG", "Role hiện tại là: '$currentUserRole'")
     // PHÂN TÁCH GIAO DIỆN TẠI ĐÂY
     val role = currentUserRole.lowercase().trim() // CHUYỂN VỀ THƯỜNG VÀ XÓA KHOẢNG TRẮNG DƯ
+    if (showRegistrationScreen) {
+        // Màn hình Đăng ký giải đấu
+        SeasonRegistrationScreen(
+            teamId = myTeamId,
+            onBack = { showRegistrationScreen = false } // Khi quay lại thì tắt
+        )
+    } else {
     if (!hasTeam) {
         // Màn hình 3: Người chưa vào đội
         TeamRegistrationScreen(
@@ -106,25 +116,25 @@ fun TeamTabContent(
             sharedPref = sharedPref
         )
     }  else {
-    if (role == "coach" || role == "captain") {
-        CoachCaptainScreen(
-            teamId = myTeamId, // 🌟 Truyền biến myTeamId vào
-            playerList,
-            isTeamRegistered,
-            onTeamRegisteredChange,
-            teamName,
-            onTeamNameChange,
-            leaderName,
-            onLeaderNameChange,
-            coachName,
-            onCoachNameChange,
-            isLeagueRegistered,
-            onLeagueRegisteredChange
-        )
-    } else {
-        PlayerReadOnlyScreen(teamName, leaderName, coachName, playerList)
+        if (role == "coach" || role == "captain") {
+            CoachCaptainScreen(
+                teamId = myTeamId, // 🌟 Truyền biến myTeamId vào
+                playerList,
+                isTeamRegistered,
+                onTeamRegisteredChange,
+                teamName,
+                onTeamNameChange,
+                leaderName,
+                onLeaderNameChange,
+                coachName,
+                onCoachNameChange,
+                onNavigateToRegister = { showRegistrationScreen = true }
+            )
+        } else {
+            PlayerReadOnlyScreen(teamName, leaderName, coachName, playerList)
+        }
     }
-}
+    }
 }
 
 // Màn hình QUẢN LÝ (Coach/Captain)
@@ -140,8 +150,7 @@ fun CoachCaptainScreen(
     onLeaderNameChange: (String) -> Unit,
     coachName: String,
     onCoachNameChange: (String) -> Unit,
-    isLeagueRegistered: Boolean,
-    onLeagueRegisteredChange: (Boolean) -> Unit
+    onNavigateToRegister: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -195,7 +204,15 @@ fun CoachCaptainScreen(
                 }
             }
         }
-
+        item {
+            Button(
+                onClick = { onNavigateToRegister() }, // 🌟 Gọi hàm khi bấm
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+            ) {
+                Text("ĐĂNG KÝ GIẢI ĐẤU", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        }
         // KHUNG THÔNG TIN ĐỘI BÓNG
         item {
             Card(
@@ -749,6 +766,88 @@ fun TeamRegistrationScreen(
             }
         }) {
             Text("HOÀN TẤT ĐĂNG KÝ")
+        }
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SeasonRegistrationScreen(
+    teamId: Int,
+    onBack: () -> Unit // Dùng callback thay cho NavController
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var seasons by remember { mutableStateOf(listOf<SeasonInfo>()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        try {
+            val response = RetrofitClient.getClient(context).getOpenSeasons()
+            if (response.isSuccessful) {
+                seasons = response.body() ?: emptyList()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Lỗi tải giải đấu", Toast.LENGTH_SHORT).show()
+        } finally {
+            isLoading = false
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("ĐĂNG KÝ GIẢI ĐẤU", color = NeonGreen) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = NeonGreen)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+            )
+        },
+        containerColor = Color.Black
+    ) { padding ->
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = NeonGreen)
+            }
+        } else {
+            LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
+                items(seasons) { season ->
+                    Card(
+                        modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
+                        border = BorderStroke(1.dp, NeonGreen)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(season.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("Phí: ${season.registrationFee} VNĐ", color = Color.Yellow, fontSize = 14.sp)
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        // Gọi API đăng ký
+                                        val response = RetrofitClient.getClient(context).registerToSeason(
+                                            mapOf("team_id" to teamId, "season_id" to season.id)
+                                        )
+                                        if (response.isSuccessful) {
+                                            Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Đăng ký thất bại!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("ĐĂNG KÝ NGAY", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

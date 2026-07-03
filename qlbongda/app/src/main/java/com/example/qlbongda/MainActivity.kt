@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
                     val standingList by homeViewModel.standingList.collectAsState()
                     val isLoading by homeViewModel.isLoading.collectAsState()
                     val selectedMatch by homeViewModel.selectedMatchDetail.collectAsState()
-
+                    var currentTeamId by remember { mutableIntStateOf(0) }
                     var selectedTeamObjectForDetail by remember { mutableStateOf<StandingItem?>(null) }
                     var isTeamRegistered by remember { mutableStateOf(false) }
                     var currentUserRole by remember { mutableStateOf("") }
@@ -138,16 +138,15 @@ class MainActivity : ComponentActivity() {
                                         Toast.makeText(this@MainActivity, "Đã đăng xuất thành công!", Toast.LENGTH_SHORT).show()
                                     },
                                     onTeamClick = { teamNameClicked ->
+                                        // Tìm ID từ danh sách (đảm bảo Model của bạn có trường id của team)
                                         val clickedTeam = standingList.flatMap { it.standings }
                                             .find { it.teamName.equals(teamNameClicked, ignoreCase = true) }
-                                        selectedTeamObjectForDetail = if (clickedTeam != null) {
-                                            StandingItem(clickedTeam.rank, clickedTeam.teamName, clickedTeam.played, clickedTeam.goalDifference, clickedTeam.points, "Đang cập nhật", "Đang cập nhật", emptyList())
-                                        } else {
-                                            StandingItem(0, teamNameClicked, 0, "0", 0, "Đang cập nhật", "Đang cập nhật", emptyList())
-                                        }
 
-                                        previousScreen = "home"
-                                        currentScreen = "team_detail"
+                                        if (clickedTeam != null) {
+                                            currentTeamId = clickedTeam.id // Cập nhật ID để Container lấy dữ liệu
+                                            previousScreen = "home"
+                                            currentScreen = "team_detail"
+                                        }
                                     },
                                     isTeamRegistered = isTeamRegistered,
                                     onTeamRegisteredChange = { isTeamRegistered = it },
@@ -206,8 +205,9 @@ class MainActivity : ComponentActivity() {
                                     PlayerInfo(3, number = "31", name = "Ederson", position = "goalkeeper")
                                 )
                             )
-                            TeamDetailScreen(
-                                team = safeTeamData,
+                            TeamDetailContainer(
+                                teamId = currentTeamId, // ID của đội bóng người dùng vừa click vào
+                                viewModel = homeViewModel,
                                 onBackClick = { currentScreen = previousScreen }
                             )
                         }

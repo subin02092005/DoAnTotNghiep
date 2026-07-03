@@ -59,6 +59,11 @@
         suspend fun registerTeam(@Body request: RegisterTeamRequest): Response< RegisterTeamResponse>
         @POST("add_coach_by_email")
         suspend fun addCoachByEmail(@Body request: AddCoachRequest): Response<Void>
+        @GET("/open_seasons") // URL tùy bạn đặt
+        suspend fun getOpenSeasons(): Response<List<SeasonInfo>>
+
+        @POST("register_to_season")
+        suspend fun registerToSeason(@Body request: Map<String, Int>): Response<Void>
         // Giả sử ApiResponse của bạn là:
 
         // ---- QUẢN LÝ THÀNH VIÊN TRONG ĐỘI ----

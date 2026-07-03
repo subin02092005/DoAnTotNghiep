@@ -14,6 +14,9 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.qlbongda.data.api.HomeViewModel
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingItem // 🌟 ĐÃ THÊM: Import Model chuẩn nhận từ API MySQL của bạn
 import com.example.qlbongda.ui.theme.NeonGreen
@@ -285,6 +289,30 @@ fun PreviewTeamDetailScreen() {
                 team = mockTeam,
                 onBackClick = {}
             )
+        }
+    }
+}
+@Composable
+fun TeamDetailContainer(
+    teamId: Int,
+    viewModel: HomeViewModel, // ViewModel đã có sẵn API Service
+    onBackClick: () -> Unit
+) {
+    // Quan sát State từ ViewModel
+    val teamDetail by viewModel.teamState.collectAsState()
+
+    // Gọi hàm load dữ liệu nếu chưa có
+    LaunchedEffect(teamId) {
+        viewModel.fetchTeamDetail(teamId)
+    }
+
+    // Hiển thị màn hình khi có dữ liệu
+    if (teamDetail != null) {
+        TeamDetailScreen(team = teamDetail!!, onBackClick = onBackClick)
+    } else {
+        // Hiện loading trong khi đợi API trả về
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = NeonGreen)
         }
     }
 }

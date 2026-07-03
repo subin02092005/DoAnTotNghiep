@@ -343,4 +343,64 @@ router.post('/register_team', async (req, res) => {
         res.status(500).json({ status: "error", message: "Lỗi hệ thống, vui lòng thử lại sau." });
     }
 });
+router.post('/register_to_season', async (req, res) => {
+    const { team_id, season_id } = req.body;
+
+    try {
+        // 1. Kiểm tra giải đấu có mở đăng ký không
+        const [season] = await pool.query(
+            "SELECT status, max_teams FROM seasons WHERE id = ? AND is_active = 1", 
+            [season_id]
+        );
+
+        if (season.length === 0 || season[0].status !== 'registration_open') {
+            return res.status(400).json({ status: "error", message: "Giải đấu không mở đăng ký!" });
+        }
+
+        // 2. Kiểm tra xem đội đã đăng ký vào mùa này chưa (tránh trùng lặp)
+        const [existing] = await pool.query(
+            "SELECT id FROM season_teams WHERE team_id = ? AND season_id = ? AND is_active = 1",
+            [team_id, season_id]
+        );
+        if (existing.length > 0) {
+            return res.status(400).json({ status: "error", message: "Đội bóng đã đăng ký giải này rồi!" });
+        }
+
+        // 3. Kiểm tra số lượng đội (count các dòng có status khác 'withdrawn')
+        const [count] = await pool.query(
+            "SELECT COUNT(*) as total FROM season_teams WHERE season_id = ? AND is_active = 1",
+            [season_id]
+        );
+        if (count[0].total >= season[0].max_teams) {
+            return res.status(400).json({ status: "error", message: "Giải đấu đã đủ số lượng đội!" });
+        }
+
+        // 4. Insert vào bảng season_teams của bạn
+        await pool.query(
+            "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at) VALUES (?, ?, 'pending', 1, NOW())",
+            [season_id, team_id]
+        );
+
+        res.status(200).json({ status: "success", message: "Đăng ký thành công, chờ ban tổ chức duyệt!" });
+
+    } catch (error) {
+        console.error("Lỗi đăng ký:", error);
+        res.status(500).json({ status: "error", message: "Lỗi hệ thống" });
+    }
+});
+router.get('/open_seasons', async (req, res) => {
+    try {
+        const query = `
+            SELECT id, name, description, registration_fee 
+            FROM seasons 
+            WHERE status = 'registration_open' 
+            AND is_active = 1 
+            AND deleted_at IS NULL
+        `;
+        const [seasons] = await pool.query(query);
+        res.status(200).json(seasons);
+    } catch (error) {
+        res.status(500).json({ status: "error", message: "Lỗi server" });
+    }
+});
 module.exports = router;

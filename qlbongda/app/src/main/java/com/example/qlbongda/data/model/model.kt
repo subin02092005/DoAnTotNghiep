@@ -140,8 +140,9 @@ data class SeasonDataResponse(
 // Model chi tiết của từng vòng đấu (Vòng Bảng, Tứ Kết, Bán Kết, Chung Kết...)
 data class TournamentPhase(
     @SerializedName("id") val id: Int,
-    @SerializedName("name") val name: String,         // Tên hiển thị (Ví dụ: "Vòng Bảng")
-    @SerializedName("format") val format: String        // Thể thức: "round_robin" hoặc "knockout"
+    @SerializedName("name") val name: String,
+    @SerializedName("type") val type: String, // Thêm trường này để phân loại
+    @SerializedName("format") val format: String
 )
 
 
@@ -225,6 +226,12 @@ data class RegisterTeamResponse(
     val status: String,
     val teamId: Int? // Trả về ID của đội vừa tạo
 )
+data class SeasonInfo(
+    val id: Int,
+    val name: String,
+    val registrationFee: Double, // Dùng Double hoặc String tùy theo cách bạn parse JSON
+    val status: String
+)
 // =================================================================
 // 7. COMMON RESPONSE (Dùng chung cho các API chỉ trả về status)
 // =================================================================
@@ -240,6 +247,7 @@ data class ApiResponse(
 
 // Model chi tiết bảng xếp hạng đầy đủ
 data class DetailedStanding(
+    @SerializedName("team_id") val id: Int, // <--- THÊM DÒNG NÀY VÀO
     val rank: Int,
     val teamName: String,
     val logoUrl: String,

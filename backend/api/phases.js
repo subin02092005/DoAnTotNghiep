@@ -23,28 +23,14 @@ router.get('/seasons/:seasonId/phases', async (req, res) => {
 
     try {
         const connection = await mysql.createConnection(dbConfig);
+        
+        // 1. Sửa tên bảng từ 'tournament_phases' thành 'phases'
+        // 2. Chọn thêm cột 'type' và các trường cần thiết
         const [rows] = await connection.execute(
-            'SELECT id, name, type FROM tournament_phases WHERE season_id = ? ORDER BY id ASC', 
+            'SELECT id, name, type, format FROM phases WHERE season_id = ? ORDER BY `order` ASC', 
             [seasonId]
         );
         await connection.end();
-
-        // Nếu database chưa có dữ liệu, trả về mock data để tránh lỗi app Android của bạn
-        if (rows.length === 0) {
-            return res.status(200).json({
-                status: "success",
-                message: "Tải danh sách vòng đấu mẫu thành công!",
-                data: {
-                    seasonId: parseInt(seasonId),
-                    phases: [
-                        { id: 1, name: "Vòng Bảng", type: "round_robin" },
-                        { id: 2, name: "Tứ Kết", type: "knockout" },
-                        { id: 3, name: "Bán Kết", type: "knockout" },
-                        { id: 4, name: "Chung Kết", type: "knockout" }
-                    ]
-                }
-            });
-        }
 
         // Trả về dữ liệu thật từ DB
         return res.status(200).json({
@@ -55,7 +41,8 @@ router.get('/seasons/:seasonId/phases', async (req, res) => {
                 phases: rows.map(item => ({
                     id: item.id,
                     name: item.name, 
-                    type: item.type  
+                    type: item.type,
+                    format: item.format  // Giá trị này sẽ khớp với ENUM trong DB
                 }))
             }
         });
