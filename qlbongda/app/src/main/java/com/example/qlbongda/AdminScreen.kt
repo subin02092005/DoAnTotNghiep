@@ -43,6 +43,7 @@ fun AdminScreen(
     adminViewModel: AdminViewModel // 🌟 THÊM VIEWMODEL VÀO ĐÂY
 ) {
     var currentSection by remember { mutableStateOf(AdminSection.DASHBOARD) }
+    var selectedMatchId by remember { mutableIntStateOf(-1) }
     val context = LocalContext.current
 
     val message by adminViewModel.message.collectAsStateWithLifecycle()
@@ -96,16 +97,28 @@ fun AdminScreen(
                 AdminSection.LEAGUES -> LeagueManagementScreen()
                 AdminSection.PLAYERS -> PlayerManagementAdminScreen(adminViewModel)
                 // 🌟 TRUYỀN DANH SÁCH VÀO MÀN HÌNH QUẢN LÝ LỊCH ĐẤU ĐỂ SWITCH
-                AdminSection.SCHEDULE -> MatchScheduleManagementScreen(adminViewModel)
+                AdminSection.SCHEDULE -> MatchScheduleManagementScreen(adminViewModel, onManageMatch = { matchId ->
+                    selectedMatchId = matchId
+                    currentSection = AdminSection.MATCH_DETAIL_MANAGE
+                })
                 AdminSection.STATS -> StatisticsScreen()
                 AdminSection.PAYMENTS -> PaymentConfirmationScreen()
+                AdminSection.MATCH_DETAIL_MANAGE -> {
+                    if (selectedMatchId != -1) {
+                        MatchEventManagementScreen(
+                            matchId = selectedMatchId,
+                            viewModel = adminViewModel,
+                            onBack = { currentSection = AdminSection.SCHEDULE }
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 enum class AdminSection {
-    DASHBOARD, TEAMS, LEAGUES, PLAYERS, SCHEDULE, STATS, PAYMENTS
+    DASHBOARD, TEAMS, LEAGUES, PLAYERS, SCHEDULE, STATS, PAYMENTS, MATCH_DETAIL_MANAGE
 }
 
 data class AdminMenuItem(
@@ -185,7 +198,7 @@ fun AdminMenuCard(item: AdminMenuItem, onClick: () -> Unit) {
 // THIẾT LẬP MÀN HÌNH QUẢN LÝ LỊCH ĐẤU (BẬT/TẮT HOT THẬT)
 // ==========================================
 @Composable
-fun MatchScheduleManagementScreen(viewModel: AdminViewModel) {
+fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int) -> Unit) {
     val matches by viewModel.matches.collectAsStateWithLifecycle()
     val featuredMatches by viewModel.featuredMatches.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -243,7 +256,8 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel) {
                         MatchAdminCard(
                             match = match,
                             onStatusChange = { newStatus -> viewModel.updateMatchStatus(match.id, newStatus) },
-                            onToggleFeatured = { viewModel.toggleFeatured(match.id, match.isFeatured == 0) }
+                            onToggleFeatured = { viewModel.toggleFeatured(match.id, match.isFeatured == 0) },
+                            onManage = { onManageMatch(match.id) }
                         )
                     }
                 }
@@ -256,7 +270,8 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel) {
 fun MatchAdminCard(
     match: com.example.qlbongda.data.model.AdminMatchItem, 
     onStatusChange: (String) -> Unit,
-    onToggleFeatured: () -> Unit
+    onToggleFeatured: () -> Unit,
+    onManage: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -289,6 +304,10 @@ fun MatchAdminCard(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onManage) {
+                    Icon(Icons.Default.Edit, contentDescription = "Manage Events", tint = Color.White)
+                }
+                
                 IconButton(onClick = onToggleFeatured) {
                     Icon(
                         imageVector = if (match.isFeatured == 1) Icons.Default.Star else Icons.Default.StarBorder,
@@ -297,7 +316,7 @@ fun MatchAdminCard(
                     )
                 }
                 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
 
                 if (match.status == "scheduled") {
                     Button(
@@ -598,6 +617,323 @@ fun PaymentConfirmationScreen() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: () -> Unit) {
+    val matchDetail by viewModel.matchDetail.collectAsStateWithLifecycle()
+    val events by viewModel.matchEvents.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
+    var showScoreDialog by remember { mutableStateOf(false) }
+    var showSubDialog by remember { mutableStateOf(false) }
+    var showCardDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(matchId) {
+        viewModel.fetchMatchDetail(matchId)
+        viewModel.fetchMatchEvents(matchId)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Quản lý sự kiện trận đấu", color = NeonGreen) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = NeonGreen)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+            )
+        },
+        containerColor = Color.Black
+    ) { padding ->
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = NeonGreen)
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp)
+            ) {
+                matchDetail?.let { match ->
+                    // Score Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceAround,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(match.teamA, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("${match.scoreA}", color = NeonGreen, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+                                }
+                                Text("VS", color = Color.Gray)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(match.teamB, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("${match.scoreB}", color = NeonGreen, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+                                }
+                            }
+                            Button(
+                                onClick = { showScoreDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+                            ) {
+                                Text("Cập nhật tỉ số", color = Color.Black)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Action Buttons
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { showSubDialog = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                        ) {
+                            Text("Thay người", color = Color.White, fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = { showCardDialog = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                        ) {
+                            Text("Thẻ phạt", color = Color.White, fontSize = 12.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text("Danh sách sự kiện", color = NeonGreen, fontWeight = FontWeight.Bold)
+                    
+                    LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
+                        items(events) { event ->
+                            EventAdminItem(event, onDelete = { viewModel.deleteEvent(matchId, event.id) })
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Dialogs
+    if (showScoreDialog && matchDetail != null) {
+        UpdateScoreDialog(
+            currentScoreA = matchDetail!!.scoreA,
+            currentScoreB = matchDetail!!.scoreB,
+            onDismiss = { showScoreDialog = false },
+            onConfirm = { home, away ->
+                viewModel.updateScore(matchId, home, away)
+                showScoreDialog = false
+            }
+        )
+    }
+
+    if (showSubDialog && matchDetail != null) {
+        SubstitutionDialog(
+            matchDetail = matchDetail!!,
+            onDismiss = { showSubDialog = false },
+            onConfirm = { teamId, pIn, pOut, min, period ->
+                viewModel.addSubstitution(matchId, teamId, pIn, pOut, min, period)
+                showSubDialog = false
+            }
+        )
+    }
+
+    if (showCardDialog && matchDetail != null) {
+        CardDialog(
+            matchDetail = matchDetail!!,
+            onDismiss = { showCardDialog = false },
+            onConfirm = { teamId, playerId, min, period, isRed ->
+                viewModel.addCard(matchId, teamId, playerId, min, period, isRed)
+                showCardDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun EventAdminItem(event: com.example.qlbongda.data.model.MatchEventDetailed, onDelete: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF121212))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(NeonGreen.copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("${event.minute}'", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                val typeText = when(event.type) {
+                    "yellow_card" -> "Thẻ vàng"
+                    "red_card" -> "Thẻ đỏ"
+                    "substitution_in" -> "Vào sân: ${event.playerName}"
+                    "substitution_out" -> "Rời sân: ${event.playerName}"
+                    else -> event.type
+                }
+                Text(typeText, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                if (event.type == "substitution_in" && event.subOutPlayerName != null) {
+                    Text("Thay cho: ${event.subOutPlayerName}", color = Color.Gray, fontSize = 12.sp)
+                } else if (event.playerName != null && !event.type.startsWith("sub")) {
+                    Text(event.playerName, color = Color.Gray, fontSize = 12.sp)
+                }
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f))
+            }
+        }
+    }
+}
+
+@Composable
+fun UpdateScoreDialog(currentScoreA: Int, currentScoreB: Int, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
+    var scoreA by remember { mutableStateOf(currentScoreA.toString()) }
+    var scoreB by remember { mutableStateOf(currentScoreB.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cập nhật tỉ số") },
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                OutlinedTextField(
+                    value = scoreA,
+                    onValueChange = { scoreA = it },
+                    modifier = Modifier.width(60.dp),
+                    label = { Text("Home") }
+                )
+                Text(" - ", modifier = Modifier.padding(horizontal = 8.dp))
+                OutlinedTextField(
+                    value = scoreB,
+                    onValueChange = { scoreB = it },
+                    modifier = Modifier.width(60.dp),
+                    label = { Text("Away") }
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(scoreA.toIntOrNull() ?: 0, scoreB.toIntOrNull() ?: 0) }) {
+                Text("Cập nhật")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
+        }
+    )
+}
+
+@Composable
+fun SubstitutionDialog(
+    matchDetail: FullMatchDetail,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int, Int, Int, String) -> Unit
+) {
+    var selectedTeamId by remember { mutableIntStateOf(0) }
+    var playerInId by remember { mutableIntStateOf(0) }
+    var playerOutId by remember { mutableIntStateOf(0) }
+    var minute by remember { mutableStateOf("45") }
+    var period by remember { mutableStateOf("1") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Thay người") },
+        text = {
+            Column {
+                Text("Đội bóng:")
+                Row {
+                    RadioButton(selected = selectedTeamId == 0, onClick = { selectedTeamId = 0 })
+                    Text("Đội nhà")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    RadioButton(selected = selectedTeamId == 1, onClick = { selectedTeamId = 1 })
+                    Text("Đội khách")
+                }
+                
+                // Demo purposes: normally we'd have a dropdown here
+                Text("Minute:")
+                OutlinedTextField(value = minute, onValueChange = { minute = it })
+                
+                Text("Cầu thủ vào (ID):")
+                OutlinedTextField(value = playerInId.toString(), onValueChange = { playerInId = it.toIntOrNull() ?: 0 })
+                
+                Text("Cầu thủ ra (ID):")
+                OutlinedTextField(value = playerOutId.toString(), onValueChange = { playerOutId = it.toIntOrNull() ?: 0 })
+            }
+        },
+        confirmButton = {
+            val teamId = if (selectedTeamId == 0) matchDetail.teamAId else matchDetail.teamBId
+            Button(onClick = { onConfirm(teamId, playerInId, playerOutId, minute.toIntOrNull() ?: 0, period) }) {
+                Text("Thêm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
+        }
+    )
+}
+
+@Composable
+fun CardDialog(
+    matchDetail: FullMatchDetail,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int, Int, String, Boolean) -> Unit
+) {
+    var selectedTeamId by remember { mutableIntStateOf(0) }
+    var playerId by remember { mutableIntStateOf(0) }
+    var minute by remember { mutableStateOf("45") }
+    var isRed by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Thẻ phạt") },
+        text = {
+            Column {
+                Text("Đội bóng:")
+                Row {
+                    RadioButton(selected = selectedTeamId == 0, onClick = { selectedTeamId = 0 })
+                    Text("Đội nhà")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    RadioButton(selected = selectedTeamId == 1, onClick = { selectedTeamId = 1 })
+                    Text("Đội khách")
+                }
+
+                Text("ID Cầu thủ:")
+                OutlinedTextField(value = playerId.toString(), onValueChange = { playerId = it.toIntOrNull() ?: 0 })
+                
+                Text("Phút:")
+                OutlinedTextField(value = minute, onValueChange = { minute = it })
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = isRed, onCheckedChange = { isRed = it })
+                    Text("Thẻ đỏ")
+                }
+            }
+        },
+        confirmButton = {
+            val teamId = if (selectedTeamId == 0) matchDetail.teamAId else matchDetail.teamBId
+            Button(onClick = { onConfirm(teamId, playerId, minute.toIntOrNull() ?: 0, "1", isRed) }) {
+                Text("Thêm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
+        }
+    )
+}
+
 @Composable
 fun ManagementHeader(title: String, subtitle: String) {
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -607,4 +943,3 @@ fun ManagementHeader(title: String, subtitle: String) {
         HorizontalDivider(color = Color(0xFF222222))
     }
 }
-

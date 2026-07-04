@@ -294,6 +294,8 @@ data class FullMatchDetail(
     val id: Int,
     val teamA: String,
     val teamB: String,
+    @SerializedName("home_team_id") val teamAId: Int = 0,
+    @SerializedName("away_team_id") val teamBId: Int = 0,
     val status: String, // <--- THÊM DÒNG NÀY VÀO
     val isStarted: Boolean,
     val scoreA: Int = 0,

@@ -114,3 +114,56 @@ data class UpdateMatchRequest(
     @SerializedName("away_score") val awayScore: Int? = null,
     @SerializedName("scheduled_at") val scheduledAt: String? = null
 )
+
+// --- MATCH EVENTS MODELS ---
+
+data class UpdateScoreRequest(
+    @SerializedName("home_score") val homeScore: Int,
+    @SerializedName("away_score") val awayScore: Int,
+    val status: String? = "ongoing"
+)
+
+data class SubstitutionRequest(
+    @SerializedName("team_id") val teamId: Int,
+    @SerializedName("player_in_id") val playerInId: Int,
+    @SerializedName("player_out_id") val playerOutId: Int,
+    val minute: Int,
+    val period: String
+)
+
+data class CardRequest(
+    @SerializedName("team_id") val teamId: Int,
+    @SerializedName("player_id") val playerId: Int,
+    val minute: Int,
+    val period: String,
+    val note: String? = null
+)
+
+data class MatchEventDetailed(
+    val id: Int,
+    @SerializedName("match_id") val matchId: Int,
+    @SerializedName("player_id") val playerId: Int?,
+    @SerializedName("team_id") val teamId: Int?,
+    val type: String,
+    val minute: Int,
+    val period: String,
+    val note: String?,
+    @SerializedName("card_color") val cardColor: String?,
+    @SerializedName("sub_out_player_id") val subOutPlayerId: Int?,
+    @SerializedName("player_name") val playerName: String?,
+    @SerializedName("team_name") val teamName: String?,
+    @SerializedName("sub_out_player_name") val subOutPlayerName: String?,
+    @SerializedName("created_at") val createdAt: String?
+)
+
+data class MatchEventResponse(
+    val success: Boolean,
+    val data: List<MatchEventDetailed>? = null,
+    val message: String? = null
+)
+
+data class GenericEventResponse(
+    val success: Boolean,
+    val message: String,
+    val data: Any? = null
+)

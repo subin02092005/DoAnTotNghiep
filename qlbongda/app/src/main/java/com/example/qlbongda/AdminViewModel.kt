@@ -228,6 +228,25 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
+    private val _matchDetail = MutableStateFlow<FullMatchDetail?>(null)
+    val matchDetail: StateFlow<FullMatchDetail?> = _matchDetail
+
+    fun fetchMatchDetail(matchId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.getMatchDetail(matchId)
+                if (response.isSuccessful && response.body()?.status == "success") {
+                    _matchDetail.value = response.body()?.data
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi tải chi tiết: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun toggleFeatured(id: Int, isFeatured: Boolean) {
         viewModelScope.launch {
             try {
@@ -239,6 +258,94 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     fetchFeaturedMatches()
                 } else {
                     _message.value = response.body()?.message ?: "Lỗi khi cập nhật"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    // ---- MATCH EVENTS ACTIONS ----
+
+    private val _matchEvents = MutableStateFlow<List<MatchEventDetailed>>(emptyList())
+    val matchEvents: StateFlow<List<MatchEventDetailed>> = _matchEvents
+
+    fun fetchMatchEvents(matchId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getMatchEvents(matchId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _matchEvents.value = response.body()?.data ?: emptyList()
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi tải sự kiện: ${e.message}"
+            }
+        }
+    }
+
+    fun updateScore(matchId: Int, homeScore: Int, awayScore: Int, status: String = "ongoing") {
+        viewModelScope.launch {
+            try {
+                val response = apiService.updateMatchScore(matchId, UpdateScoreRequest(homeScore, awayScore, status))
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Cập nhật tỉ số thành công"
+                    fetchMatches() // Refresh list để thấy tỉ số mới
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi cập nhật tỉ số"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun addSubstitution(matchId: Int, teamId: Int, playerInId: Int, playerOutId: Int, minute: Int, period: String) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.addSubstitution(matchId, SubstitutionRequest(teamId, playerInId, playerOutId, minute, period))
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Thay người thành công"
+                    fetchMatchEvents(matchId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi thay người"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun addCard(matchId: Int, teamId: Int, playerId: Int, minute: Int, period: String, isRed: Boolean, note: String? = null) {
+        viewModelScope.launch {
+            try {
+                val request = CardRequest(teamId, playerId, minute, period, note)
+                val response = if (isRed) {
+                    apiService.addRedCard(matchId, request)
+                } else {
+                    apiService.addYellowCard(matchId, request)
+                }
+                
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Đã thêm thẻ ${if (isRed) "đỏ" else "vàng"}"
+                    fetchMatchEvents(matchId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi thêm thẻ"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun deleteEvent(matchId: Int, eventId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.deleteMatchEvent(eventId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Xóa sự kiện thành công"
+                    fetchMatchEvents(matchId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi xóa sự kiện"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"

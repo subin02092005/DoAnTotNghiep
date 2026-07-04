@@ -9,6 +9,7 @@
     import retrofit2.http.PUT
     import retrofit2.http.Path
     import retrofit2.http.Query
+    import retrofit2.http.DELETE
 
     interface ApiService {
 
@@ -169,4 +170,39 @@
             @Query("limit") limit: Int? = 10,
             @Query("offset") offset: Int? = 0
         ): Response<FeaturedMatchesListResponse>
+
+        // ---- MATCH EVENTS ----
+        @PUT("match-events/{matchId}/score")
+        suspend fun updateMatchScore(
+            @Path("matchId") matchId: Int,
+            @Body request: UpdateScoreRequest
+        ): Response<GenericEventResponse>
+
+        @POST("match-events/{matchId}/substitution")
+        suspend fun addSubstitution(
+            @Path("matchId") matchId: Int,
+            @Body request: SubstitutionRequest
+        ): Response<GenericEventResponse>
+
+        @POST("match-events/{matchId}/yellow-card")
+        suspend fun addYellowCard(
+            @Path("matchId") matchId: Int,
+            @Body request: CardRequest
+        ): Response<GenericEventResponse>
+
+        @POST("match-events/{matchId}/red-card")
+        suspend fun addRedCard(
+            @Path("matchId") matchId: Int,
+            @Body request: CardRequest
+        ): Response<GenericEventResponse>
+
+        @GET("match-events/{matchId}")
+        suspend fun getMatchEvents(
+            @Path("matchId") matchId: Int
+        ): Response<MatchEventResponse>
+
+        @DELETE("match-events/{eventId}")
+        suspend fun deleteMatchEvent(
+            @Path("eventId") eventId: Int
+        ): Response<GenericEventResponse>
     }
