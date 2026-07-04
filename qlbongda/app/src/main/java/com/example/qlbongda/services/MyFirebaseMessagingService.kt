@@ -20,6 +20,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             showNotification(it.title, it.body)
         }
     }
+    override fun onNewToken(token: String) {
+        // Gửi token này lên Backend của bạn để lưu vào database
+        Log.d("FCM", "New Token: $token")
+    }
 
     private fun showNotification(title: String?, body: String?) {
         val channelId = "football_notifications_channel"

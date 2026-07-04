@@ -15,22 +15,25 @@ router.get('/match/detail', async (req, res) => {
 
     try {
         // 1. Lấy thông tin trận đấu
-        const [matchRows] = await pool.execute(`
-            SELECT m.*, mr.home_final_score, mr.away_final_score,
-                   t1.name AS teamA, t2.name AS teamB,
-                   ph.type AS phase_type,
-                   CASE 
-                       WHEN mr.home_final_score IS NOT NULL OR mr.away_final_score IS NOT NULL THEN 'finished'
-                       WHEN m.scheduled_at <= NOW() THEN 'ongoing'
-                       ELSE 'pending'
-                   END AS status
-            FROM matches m
-            LEFT JOIN match_results mr ON m.id = mr.match_id
-            JOIN teams t1 ON m.home_team_id = t1.id
-            JOIN teams t2 ON m.away_team_id = t2.id
-            LEFT JOIN phases ph ON m.phase_id = ph.id
-            WHERE m.id = ?
-        `, [matchId]);
+       // 1. Lấy thông tin trận đấu (đã thêm JOIN venues)
+const [matchRows] = await pool.execute(`
+    SELECT m.*, mr.home_final_score, mr.away_final_score,
+           t1.name AS teamA, t2.name AS teamB,
+           ph.type AS phase_type,
+           v.name AS venue_name, -- Lấy tên sân
+           CASE 
+               WHEN mr.home_final_score IS NOT NULL OR mr.away_final_score IS NOT NULL THEN 'finished'
+               WHEN m.scheduled_at <= NOW() THEN 'ongoing'
+               ELSE 'pending'
+           END AS status
+    FROM matches m
+    LEFT JOIN match_results mr ON m.id = mr.match_id
+    JOIN teams t1 ON m.home_team_id = t1.id
+    JOIN teams t2 ON m.away_team_id = t2.id
+    LEFT JOIN phases ph ON m.phase_id = ph.id
+    LEFT JOIN venues v ON m.venue_id = v.id -- JOIN vào bảng venues
+    WHERE m.id = ?
+`, [matchId]);
 
         if (matchRows.length === 0) return res.status(404).json({ status: "error", message: "Không tìm thấy trận đấu" });
         const matchData = matchRows[0];
@@ -71,7 +74,7 @@ router.get('/match/detail', async (req, res) => {
             scoreB: matchData.away_final_score || 0,
             time: matchData.scheduled_at,
             date: matchData.scheduled_at,
-            stadium: "Đang cập nhật",
+            stadium: matchData.venue_name || "Đang cập nhật",
             events: events,
             lineupA: lineupA,
             lineupB: lineupB,
@@ -90,5 +93,6 @@ router.get('/match/detail', async (req, res) => {
         return res.status(500).json({ status: "error", message: error.message });
     }
 });
+
 
 module.exports = router;

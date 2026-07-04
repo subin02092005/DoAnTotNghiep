@@ -108,6 +108,9 @@ fun ScheduleTabContent(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
+                                        text = "${DateUtils.calculateMinutes(match.time)}'",
+                                        color = Color.Red,fontSize = 12.sp)
+                                    Text(
                                         text = "${match.scoreA} - ${match.scoreB}",
                                         color = Color.White,
                                         fontSize = 18.sp,
@@ -215,4 +218,11 @@ fun PreviewScheduleTabContent() {
         matchList = mockMatchList,
         onMatchClick = {}
     )
+}
+@Composable
+fun getMinuteElapsed(actualStartTime: String?): String {
+    if (actualStartTime == null) return ""
+    // Sử dụng DateUtils để tính khoảng cách giữa thời gian hiện tại và actualStartTime
+    // Trả về dạng: "15'"
+    return DateUtils.calculateMinutes(actualStartTime)
 }

@@ -242,15 +242,14 @@ data class SeasonInfo(
 // =================================================================
 // 7. COMMON RESPONSE (Dùng chung cho các API chỉ trả về status)
 // =================================================================
-data class SeasonListResponse(
-    val status: String,
-    val data: List<SeasonInfo>
+data class PaymentRequest(
+    val transaction_ref: String,
+    val season_team_id: Int // Dùng Int thay vì String nếu ID của bạn là số
 )
 data class ApiResponse(
     val status: String,
     val message: String
 )
-
 
 
 
@@ -368,14 +367,15 @@ data class MatchDetailResponse(
 // =================================================================
 
 data class Notification(
-    val id: Int,
-    val title: String,        // Map với tieu_de
-    val content: String,      // Map với noi_dung
-    val time: String          // Map với ngay_tao
+    @SerializedName("id") val id: Int,
+    @SerializedName("title") val title: String,
+    @SerializedName("content") val content: String,
+    @SerializedName("created_at") val time: String, // Nếu JSON trả về là created_at
+    @SerializedName("is_read") val is_read: Int,    // Ánh xạ chính xác tên trường
+    @SerializedName("ref_entity_type") val ref_entity_type: String?,
+    @SerializedName("ref_entity_id") val ref_entity_id: Int?
 )
 
-data class NotificationResponse(
-    val status: String,
-    val message: String,
-    val data: List<Notification>
-)
+
+
+data class NotificationResponse(val status: String, val data: List<Notification>)

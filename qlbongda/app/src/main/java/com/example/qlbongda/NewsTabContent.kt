@@ -19,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.border
+
 import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.Notification
 import com.example.qlbongda.ui.theme.NeonGreen
@@ -30,13 +30,18 @@ fun NewsTabContent() {
     val context = LocalContext.current
     var newsList by remember { mutableStateOf<List<Notification>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
+    var refreshTrigger by remember { mutableStateOf(0) }
+    val sharedPref = remember {
+        context.getSharedPreferences("AUTH_PREF", android.content.Context.MODE_PRIVATE)
+    }
+    val userId = sharedPref.getInt("USER_ID", -1)
+    val teamId = sharedPref.getInt("TEAM_ID", 0)
+    LaunchedEffect(refreshTrigger) { // Chạy lại khi refreshTrigger thay đổi
+        isLoading = true
         try {
-            val response = RetrofitClient.getClient(context).getNotifications()
+            val response = RetrofitClient.getClient(context).getNotifications(userId, teamId)
             if (response.isSuccessful) {
-                val body = response.body() // Lấy dữ liệu
-                newsList = body?.data ?: emptyList()
+                newsList = response.body()?.data ?: emptyList()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -46,11 +51,17 @@ fun NewsTabContent() {
     }
 
     if (activeDetailNews != null) {
-        NewsDetailScreen(news = activeDetailNews!!) { activeDetailNews = null }
-    } else {
+        NewsDetailScreen(
+            news = activeDetailNews!!,
+            onBack = {
+                activeDetailNews = null
+                refreshTrigger++ // Tăng trigger để load lại danh sách khi quay về
+            }
+        )
+    } else  {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp),horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                "LỊCH THI ĐẤU",
+                "THÔNG BÁO",
                 color = NeonGreen,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Black,
@@ -96,7 +107,13 @@ fun NewsItemRow(news: Notification, onClick: () -> Unit) {
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = news.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                Text(
+                    text = news.title,
+                    color = if (news.is_read == 1) Color.Gray else Color.White, // Nhạt đi nếu đã đọc
+                    fontSize = 14.sp,
+                    fontWeight = if (news.is_read == 1) FontWeight.Normal else FontWeight.Bold,
+                    maxLines = 2
+                )
                 Text(text = news.time, color = Color.Gray, fontSize = 11.sp)
             }
         }
@@ -105,6 +122,17 @@ fun NewsItemRow(news: Notification, onClick: () -> Unit) {
 
 @Composable
 fun NewsDetailScreen(news: Notification, onBack: () -> Unit) {
+    val context = LocalContext.current
+    LaunchedEffect(news.id) {
+        if (news.is_read == 0) {
+            try {
+                // Giả định bạn đã có hàm markAsRead trong RetrofitClient
+                RetrofitClient.getClient(context).markAsRead(news.id)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
     Column(modifier = Modifier.fillMaxSize().background(Color.Black).padding(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth().clickable { onBack() }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = NeonGreen)

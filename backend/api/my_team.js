@@ -364,11 +364,12 @@ router.post('/register_team', async (req, res) => {
 });
 router.post('/register_to_season', async (req, res) => {
     const { team_id, season_id } = req.body;
+    let connection;
 
     try {
-        // 1. Kiểm tra giải đấu có mở đăng ký không
+        // 1. Kiểm tra giải đấu có mở đăng ký không (Thêm registrationFee vào SELECT)
         const [season] = await pool.query(
-            "SELECT status, max_teams FROM seasons WHERE id = ? AND is_active = 1", 
+            "SELECT status, max_teams, registration_fee FROM seasons WHERE id = ? AND is_active = 1", 
             [season_id]
         );
 
@@ -376,7 +377,7 @@ router.post('/register_to_season', async (req, res) => {
             return res.status(400).json({ status: "error", message: "Giải đấu không mở đăng ký!" });
         }
 
-        // --- MỚI: RÀNG BUỘC MỖI ĐỘI CHỈ ĐƯỢC ĐĂNG KÝ 1 GIẢI ĐANG MỞ ---
+        // 2. Ràng buộc: Mỗi đội chỉ được đăng ký 1 giải đang mở
         const [checkOther] = await pool.query(
             `SELECT st.id 
              FROM season_teams st
@@ -390,9 +391,8 @@ router.post('/register_to_season', async (req, res) => {
         if (checkOther.length > 0) {
             return res.status(400).json({ status: "error", message: "Bạn đã đăng ký một giải đấu khác rồi, vui lòng hủy giải cũ trước!" });
         }
-        // -----------------------------------------------------------
 
-        // 2. Kiểm tra xem đội đã đăng ký VÀO CHÍNH GIẢI NÀY chưa
+        // 3. Kiểm tra xem đội đã đăng ký VÀO CHÍNH GIẢI NÀY chưa
         const [existing] = await pool.query(
             "SELECT id FROM season_teams WHERE team_id = ? AND season_id = ? AND is_active = 1",
             [team_id, season_id]
@@ -401,7 +401,7 @@ router.post('/register_to_season', async (req, res) => {
             return res.status(400).json({ status: "error", message: "Đội bóng đã đăng ký giải này rồi!" });
         }
 
-        // 3. Kiểm tra số lượng đội
+        // 4. Kiểm tra số lượng đội
         const [count] = await pool.query(
             "SELECT COUNT(*) as total FROM season_teams WHERE season_id = ? AND is_active = 1",
             [season_id]
@@ -410,17 +410,34 @@ router.post('/register_to_season', async (req, res) => {
             return res.status(400).json({ status: "error", message: "Giải đấu đã đủ số lượng đội!" });
         }
 
-        // 4. Insert vào bảng season_teams
-        await pool.query(
+        // 5. Bắt đầu Transaction để tạo đồng thời season_team và record payment
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // Insert vào bảng season_teams
+        const [insertResult] = await connection.query(
             "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at) VALUES (?, ?, 'pending', 1, NOW())",
             [season_id, team_id]
         );
+        
+        const season_team_id = insertResult.insertId; 
+        const fee = season[0].registrationFee || 0; 
+        
+        // Insert vào bảng payments để chuẩn bị cho thanh toán
+        await connection.query(
+            "INSERT INTO payments (season_team_id, amount, status, is_active, created_at) VALUES (?, ?, 'pending', 1, NOW())",
+            [season_team_id, fee]
+        );
 
-        res.status(200).json({ status: "success", message: "Đăng ký thành công, chờ ban tổ chức duyệt!" });
+        await connection.commit();
+        res.status(200).json({ status: "success", message: "Đăng ký thành công, vui lòng thanh toán phí tham dự!" });
 
     } catch (error) {
+        if (connection) await connection.rollback();
         console.error("Lỗi đăng ký:", error);
-        res.status(500).json({ status: "error", message: "Lỗi hệ thống" });
+        res.status(500).json({ status: "error", message: "Lỗi hệ thống: " + error.message });
+    } finally {
+        if (connection) connection.release();
     }
 });
 router.get('/open_seasons', async (req, res) => {
@@ -442,8 +459,8 @@ router.get('/open_seasons', async (req, res) => {
         s.end_date, 
         s.registration_fee,
         IF(st.team_id IS NOT NULL, 1, 0) as is_registered,
-        st.id as season_team_id,     -- THÊM DÒNG NÀY
-        p.status as payment_status
+        st.id as season_team_id, 
+      IFNULL(p.status, 'pending') as payment_status 
     FROM seasons s
     LEFT JOIN season_teams st ON s.id = st.season_id AND st.team_id = ? AND st.deleted_at IS NULL
     LEFT JOIN (
@@ -497,7 +514,7 @@ router.post('/confirm_payment', async (req, res) => {
 
         // 2. Cập nhật bảng season_teams (nếu cần đổi trạng thái đội)
         await connection.query(
-            "UPDATE season_teams SET status = 'accepted' WHERE id = ?",
+            "UPDATE season_teams SET status = 'approved' WHERE id = ?",
             [season_team_id]
         );
 

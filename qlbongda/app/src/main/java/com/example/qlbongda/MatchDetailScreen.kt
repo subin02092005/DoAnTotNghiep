@@ -73,18 +73,42 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
 
                         // Khu vực trung tâm - Giới hạn độ rộng cố định để tránh vỡ giao diện
                         Box(modifier = Modifier.weight(0.2f), contentAlignment = Alignment.Center) {
-                            if (match.isStarted) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(text = match.scoreA.toString(), color = NeonGreen, fontSize = 28.sp, fontWeight = FontWeight.Black)
-                                    Text(text = ":", color = Color.Gray, fontSize = 24.sp, modifier = Modifier.padding(horizontal = 4.dp))
-                                    Text(text = match.scoreB.toString(), color = NeonGreen, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                            when (match.status) {
+                                // 1. TRẬN ĐANG DIỄN RA
+                                "ongoing" -> {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        // Hiển thị phút thi đấu thay vì chỉ tỉ số
+                                        Text(
+                                            text = "${DateUtils.calculateMinutes(match.time)}'",
+                                            color = Color.Red,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Black
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(text = match.scoreA.toString(), color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                            Text(text = ":", color = Color.Gray, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                                            Text(text = match.scoreB.toString(), color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                        }
+                                    }
                                 }
-                            } else {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 80.dp)) {
-                                    Text(text = DateUtils.formatTime(match.time), color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center, maxLines = 1)
-                                    Text(text = DateUtils.formatDate(match.date), color = Color.LightGray, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
-                                    Surface(color = Color(0xFF333333), shape = RoundedCornerShape(4.dp), modifier = Modifier.padding(top = 4.dp)) {
-                                        Text("SẮP ĐÁ", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+
+                                // 2. TRẬN ĐÃ KẾT THÚC
+                                "finished" -> {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = match.scoreA.toString(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                        Text(text = ":", color = Color.Gray, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                                        Text(text = match.scoreB.toString(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                    }
+                                }
+
+                                // 3. TRẬN CHƯA ĐÁ (PENDING)
+                                else -> {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 80.dp)) {
+                                        Text(text = DateUtils.formatTime(match.time), color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center, maxLines = 1)
+                                        Text(text = DateUtils.formatDate(match.date), color = Color.LightGray, fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 1)
+                                        Surface(color = Color(0xFF333333), shape = RoundedCornerShape(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                            Text("SẮP ĐÁ", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                        }
                                     }
                                 }
                             }

@@ -1,6 +1,7 @@
     package com.example.qlbongda.data.api
 
     import com.example.qlbongda.data.model.*
+    import okhttp3.ResponseBody
     import retrofit2.Response
     import retrofit2.http.Body
     import retrofit2.http.POST
@@ -43,6 +44,13 @@
         @POST("profile/change-password")
         suspend fun changePassword(@Body request: ChangePasswordRequest): Response<GeneralResponse>
 
+        @GET("my_notifications")
+        suspend fun getNotifications(
+            @Query("userId") userId: Int,
+            @Query("teamId") teamId: Int
+        ): Response<NotificationResponse>
+        @POST("mark_as_read/{id}")
+        suspend fun markAsRead(@Path("id") id: Int): Response<Unit>
         // ---- ĐỘI BÓNG CỦA TÔI (Cá nhân) ----
 
         @GET("my_team")
@@ -65,13 +73,13 @@
          suspend fun getOpenSeasons(@Query("teamId") teamId: Int): Response<List<SeasonInfo>>
         @POST("unregister_season") // Đảm bảo URL này khớp với route bên Node.js
         suspend fun unregisterFromSeason(
-            @Body request: Map<String, Int>
+            @Body request: Map<String, String>
         ): Response<ApiResponse>
         @POST("register_to_season")
         suspend fun registerToSeason(@Body request: Map<String, Int>): Response<Void>
         // Giả sử ApiResponse của bạn là:
-        @POST("/confirm_payment")
-        suspend fun confirmPayment(@Body body: Map<String, Any>): Response<Void>
+        @POST("confirm_payment")
+        suspend fun confirmPayment(@Body request: PaymentRequest): Response<ResponseBody>
 
         // ---- QUẢN LÝ THÀNH VIÊN TRONG ĐỘI ----
         // Dùng để thêm cầu thủ vào đội

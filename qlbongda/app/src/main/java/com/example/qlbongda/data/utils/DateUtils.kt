@@ -1,7 +1,9 @@
 package com.example.qlbongda.utils
 
+import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 object DateUtils {
@@ -41,6 +43,29 @@ object DateUtils {
         } catch (e: Exception) {
             android.util.Log.e("DateUtils", "Lỗi format ngày: $isoDate", e)
             "Sai định dạng"
+        }
+    }
+    fun calculateMinutes(actualStartTime: String?): String {
+        if (actualStartTime == null) return ""
+
+        return try {
+            // 1. Parse thời gian bắt đầu thực tế (Backend trả về ISO_DATE_TIME)
+            val formatter = DateTimeFormatter.ISO_DATE_TIME
+            // Nếu chuỗi có chứa ký tự lạ hoặc format khác, hãy dùng ZonedDateTime.parse nếu cần
+            val start = LocalDateTime.parse(actualStartTime, formatter)
+            val now = LocalDateTime.now()
+
+            val minutes = ChronoUnit.MINUTES.between(start, now)
+
+            // 2. Logic tính toán phút hiển thị
+            when {
+                minutes < 0 -> "0"
+                minutes in 45..59 -> "HT" // Nghỉ giải lao
+                minutes > 59 -> (minutes - 15).toString() // Trừ 15p nghỉ để ra phút thực
+                else -> minutes.toString()
+            }
+        } catch (e: Exception) {
+            "LIVE"
         }
     }
 }

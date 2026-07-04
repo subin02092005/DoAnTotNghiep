@@ -1,6 +1,7 @@
 const express = require('express');
 require('dotenv').config();
 
+require('./api/cronJobs');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -37,7 +38,6 @@ const myTeamRoutes = require('./api/my_team'); // import file my_team.js
 
 
 // 2. Thêm dòng app.use ở phần đăng ký route
-
 
 
  // Đăng ký đường dẫn
