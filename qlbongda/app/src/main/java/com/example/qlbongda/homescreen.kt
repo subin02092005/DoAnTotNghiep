@@ -9,7 +9,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
+
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -19,6 +19,10 @@ import com.example.qlbongda.data.model.PlayerInfo
 
 import com.example.qlbongda.data.model.TournamentPhase // 🌟 THÊM IMPORT NÀY
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.qlbongda.data.api.HomeViewModel
+import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.GroupStanding
 
 import com.example.qlbongda.ui.theme.NeonGreen
@@ -26,17 +30,19 @@ import com.example.qlbongda.ui.theme.NeonGreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    homeViewModel: HomeViewModel,
     selectedTab: Int, // Nhận từ MainActivity
     onTabSelected: (Int) -> Unit, // Nhận hàm callback[cite: 2]
     phaseList: List<TournamentPhase>, // 🌟 1. THÊM THAM SỐ ĐỂ ĐÓN MẢNG VÒNG ĐẤU ĐỘNG TỪ MAINACTIVITY
     matchList: List<FullMatchDetail>,
+  //  hotMatchList: List<FullMatchDetail> = emptyList(), // 🌟 THÊM DÒNG NÀY
     onNavigateToMatchDetail: (FullMatchDetail) -> Unit,
     standingList: List<GroupStanding>, // 🌟 Thêm tham số này
     selectedStandingTab: Int,           // Thêm tham số
     onStandingTabSelected: (Int) -> Unit, // Thêm tham số
     onNavigateToStandingDetail: () -> Unit,
     onLogout: () -> Unit,
-    onTeamClick: (String) -> Unit,
+    onTeamClick: (Int) -> Unit,
 
     isTeamRegistered: Boolean,
     onTeamRegisteredChange: (Boolean) -> Unit,
@@ -52,8 +58,6 @@ fun HomeScreen(
 
     playerList: SnapshotStateList<PlayerInfo>
 ) {
-
-
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             bottomBar = {
@@ -101,17 +105,21 @@ fun HomeScreen(
                     .fillMaxSize()
                     .background(Color.Black)
                     .padding(innerPadding)
-            ) {
-                when (selectedTab) {
+            ) { when (selectedTab) {
                     0 -> HomeTabContent(
+                        viewModel = homeViewModel,
                         phaseList = phaseList,
+                        //hotMatches = hotMatchList, // 🌟 TRUYỀN XUỐNG
                         standings = standingList,
                         selectedTabIndex = selectedStandingTab, // Truyền xuống
                         onTabSelected = onStandingTabSelected,  // Truyền xuống
                         onNavigateToStandingDetail = onNavigateToStandingDetail,
-                        onTeamClick = onTeamClick
+                        onTeamClick ={ teamId: Int ->
+                            // Đây là nơi nhận ID từ HomeTabContent và chuyển tiếp lên
+                            onTeamClick(teamId)}
                     )
                     1 -> ScheduleTabContent(
+                        viewModel = homeViewModel,
                         matchList = matchList,
                         onMatchClick = { clickedMatch -> // 🌟 Khai báo biến 'clickedMatch' ở đây
                             onNavigateToMatchDetail(clickedMatch)

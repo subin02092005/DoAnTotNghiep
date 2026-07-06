@@ -55,10 +55,10 @@ data class AdminMatchItem(
     @SerializedName("phase_id") val phaseId: Int?,
     @SerializedName("group_id") val groupId: Int?,
     @SerializedName("home_team_id") val homeTeamId: Int,
-    @SerializedName("home_team_name") val homeTeamName: String,
+    @SerializedName("home_team_name", alternate = ["teamA"]) val homeTeamName: String,
     @SerializedName("home_team_logo") val homeTeamLogo: String?,
     @SerializedName("away_team_id") val awayTeamId: Int,
-    @SerializedName("away_team_name") val awayTeamName: String,
+    @SerializedName("away_team_name", alternate = ["teamB"]) val awayTeamName: String,
     @SerializedName("away_team_logo") val awayTeamLogo: String?,
     @SerializedName("scheduled_at") val scheduledAt: String,
     @SerializedName("played_at") val playedAt: String?,
@@ -112,7 +112,36 @@ data class UpdateMatchRequest(
     val status: String? = null,
     @SerializedName("home_score") val homeScore: Int? = null,
     @SerializedName("away_score") val awayScore: Int? = null,
-    @SerializedName("scheduled_at") val scheduledAt: String? = null
+    @SerializedName("scheduled_at") val scheduledAt: String? = null,
+    @SerializedName("phase_id") val phaseId: Int? = null,
+    @SerializedName("group_id") val groupId: Int? = null,
+    @SerializedName("home_team_id") val homeTeamId: Int? = null,
+    @SerializedName("away_team_id") val awayTeamId: Int? = null,
+    @SerializedName("round") val round: Int? = null,
+    @SerializedName("leg") val leg: Int? = null,
+    @SerializedName("venue_id") val venueId: Int? = null,
+    @SerializedName("referee") val referee: String? = null,
+    @SerializedName("season_id") val seasonId: Int? = null,
+    @SerializedName("is_published") val isPublished: Int? = null
+)
+
+data class CreateMatchRequest(
+    @SerializedName("phase_id") val phaseId: Int? = null,
+    @SerializedName("group_id") val groupId: Int? = null,
+    @SerializedName("home_team_id") val homeTeamId: Int,
+    @SerializedName("away_team_id") val awayTeamId: Int,
+    @SerializedName("scheduled_at") val scheduledAt: String,
+    @SerializedName("venue_id") val venueId: Int? = null,
+    @SerializedName("round") val round: Int? = null,
+    @SerializedName("leg") val leg: Int? = null,
+    @SerializedName("referee") val referee: String? = null,
+    @SerializedName("season_id") val seasonId: Int? = null,
+    @SerializedName("is_published") val isPublished: Int = 1
+)
+
+data class RescheduleMatchRequest(
+    @SerializedName("scheduled_at") val scheduledAt: String? = null,
+    @SerializedName("venue_id") val venueId: Int? = null
 )
 
 // --- MATCH EVENTS MODELS ---
@@ -166,4 +195,78 @@ data class GenericEventResponse(
     val success: Boolean,
     val message: String,
     val data: Any? = null
+)
+
+// --- TOURNAMENT MODELS ---
+
+data class TournamentItem(
+    val id: Int,
+    val name: String,
+    val description: String?,
+    val logo: String?,
+    @SerializedName("max_teams") val maxTeams: Int?, // Có thể null do LEFT JOIN
+    @SerializedName("is_active") val isActive: Int,
+    @SerializedName("created_at") val createdAt: String?,
+    @SerializedName("updated_at") val updatedAt: String?
+)
+
+data class TournamentResponse(
+    val success: Boolean,
+    val data: List<TournamentItem>? = null,
+    val message: String? = null
+)
+
+data class SeasonAdminItem(
+    val id: Int,
+    val name: String,
+    val description: String?,
+    val status: String,
+    @SerializedName("start_date") val startDate: String?,
+    @SerializedName("end_date") val endDate: String?,
+    @SerializedName("registration_deadline") val registrationDeadline: String?,
+    @SerializedName("is_registration_open") val isRegistrationOpen: Int,
+    @SerializedName("is_active") val isActive: Int
+)
+
+data class SeasonRulesRequest(
+    @SerializedName("points_per_win") val pointsPerWin: Int? = 3,
+    @SerializedName("points_per_draw") val pointsPerDraw: Int? = 1,
+    @SerializedName("points_per_loss") val pointsPerLoss: Int? = 0,
+    @SerializedName("yellow_cards_suspension") val yellowCardsSuspension: Int? = 3,
+    @SerializedName("max_players_per_team") val maxPlayersPerTeam: Int? = 25,
+    @SerializedName("min_players_per_team") val minPlayersPerTeam: Int? = 11,
+    @SerializedName("registration_fee") val registrationFee: Double? = 0.0,
+    @SerializedName("forfeit_score") val forfeitScore: Int? = 3,
+    @SerializedName("teams_advance_per_group") val teamsAdvancePerGroup: Int? = 2,
+    @SerializedName("tiebreaker_order") val tiebreakerOrder: List<String>? = listOf("goal_difference", "goals_scored", "head_to_head"),
+    @SerializedName("user_id") val userId: Int? = null
+)
+
+data class TournamentDetailData(
+    val tournament: TournamentItem,
+    val seasons: List<SeasonAdminItem>
+)
+
+data class TournamentDetailResponse(
+    val success: Boolean,
+    val data: TournamentDetailData? = null,
+    val message: String? = null
+)
+
+data class CreateTournamentRequest(
+    val name: String,
+    val description: String?,
+    val logo: String?,
+    @SerializedName("max_teams") val maxTeams: Int,
+    @SerializedName("user_id") val userId: Int?
+)
+
+data class CreateSeasonRequest(
+    val name: String,
+    val description: String?,
+    @SerializedName("start_date") val startDate: String,
+    @SerializedName("end_date") val endDate: String,
+    @SerializedName("registration_deadline") val registrationDeadline: String,
+    @SerializedName("is_registration_open") val isRegistrationOpen: Boolean,
+    @SerializedName("user_id") val userId: Int?
 )

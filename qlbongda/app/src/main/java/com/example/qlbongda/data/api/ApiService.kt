@@ -97,10 +97,8 @@
         ): Response<GenericResponse>
 
         // ---- CHI TIẾT ĐỘI BÓNG & BXH ----
-        @GET("teams/{teamId}") // Khớp với router.get('/teams/:id') trong teamController.js
-        suspend fun getTeamDetail(
-            @Path("teamId") teamId: Int
-        ): Response<TeamDetailResponse>
+        @GET("team/{teamId}/detail") // 🌟 PHẢI CHÍNH XÁC LÀ "team/{teamId}/detail"
+        suspend fun getTeamDetail(@Path("teamId") teamId: Int): Response<TeamDetailResponse>
 
         @GET("standings")
         suspend fun getDetailedStandings(): Response<DetailedStandingResponse>
@@ -123,6 +121,9 @@
 
         @PATCH("players/{userId}/lock")
         suspend fun lockAccount(@Path("userId") userId: Int): Response<GenericAdminResponse>
+
+        @PATCH("players/{userId}/unlock")
+        suspend fun unlockAccount(@Path("userId") userId: Int): Response<GenericAdminResponse>
 
         @POST("users/{userId}/roles")
         suspend fun assignRole(@Path("userId") userId: Int, @Body request: RoleRequest): Response<GenericAdminResponse>
@@ -151,11 +152,18 @@
         suspend fun rejectTeam(@Path("id") id: Int): Response<GenericAdminResponse>
 
         // ---- ADMIN MATCHES ----
-        @GET("matches") // Bạn nên cân nhắc đặt path khác nếu bị trùng với public matches
+        @GET("matchesadmin")
         suspend fun getMatchesAdmin(
             @Query("status") status: String? = null,
-            @Query("season_id") seasonId: Int? = null
+            @Query("season_id") seasonId: Int? = null,
+            @Query("phase_id") phaseId: Int? = null,
+            @Query("teamId") teamId: Int? = null
         ): Response<AdminMatchResponse>
+
+        @POST("matches")
+        suspend fun createMatch(
+            @Body request: CreateMatchRequest
+        ): Response<GenericAdminResponse>
 
         @PUT("matches/{id}")
         suspend fun updateMatch(
@@ -166,14 +174,26 @@
         @PATCH("matches/{id}/cancel")
         suspend fun cancelMatch(@Path("id") id: Int): Response<GenericAdminResponse>
 
+        @PATCH("matches/{id}/start")
+        suspend fun startMatch(@Path("id") id: Int): Response<GenericAdminResponse>
+
+        @PATCH("matches/{id}/finish")
+        suspend fun finishMatch(@Path("id") id: Int): Response<GenericAdminResponse>
+
+        @PATCH("matches/{id}/reschedule")
+        suspend fun rescheduleMatch(
+            @Path("id") id: Int,
+            @Body request: RescheduleMatchRequest
+        ): Response<GenericAdminResponse>
+
         // ---- ADMIN FEATURED MATCHES ----
-        @PATCH("matches/{id}/featured")
+        @PATCH("admin/matches/{id}/featured")
         suspend fun updateFeaturedMatch(
             @Path("id") id: Int,
             @Body request: FeaturedMatchRequest
         ): Response<FeaturedMatchResponse>
 
-        @GET("featured")
+        @GET("admin/matches/featured")
         suspend fun getFeaturedMatches(
             @Query("limit") limit: Int? = 10,
             @Query("offset") offset: Int? = 0
@@ -213,4 +233,52 @@
         suspend fun deleteMatchEvent(
             @Path("eventId") eventId: Int
         ): Response<GenericEventResponse>
+
+        // ---- TOURNAMENT MANAGEMENT ----
+        @GET("tournaments")
+        suspend fun getTournamentsAdmin(
+            @Query("name") name: String? = null,
+            @Query("is_active") isActive: Int? = null
+        ): Response<TournamentResponse>
+
+        @GET("tournaments/{id}")
+        suspend fun getTournamentDetailAdmin(
+            @Path("id") id: Int
+        ): Response<TournamentDetailResponse>
+
+        @POST("tournaments")
+        suspend fun createTournament(
+            @Body request: CreateTournamentRequest
+        ): Response<GenericAdminResponse>
+
+        @PUT("tournaments/{id}")
+        suspend fun updateTournament(
+            @Path("id") id: Int,
+            @Body request: Map<String, Any?>
+        ): Response<GenericAdminResponse>
+
+        @POST("tournaments/{id}/seasons")
+        suspend fun createSeason(
+            @Path("id") id: Int,
+            @Body request: CreateSeasonRequest
+        ): Response<GenericAdminResponse>
+
+        @PUT("tournaments/{tournamentId}/seasons/{seasonId}/rules")
+        suspend fun updateSeasonRules(
+            @Path("tournamentId") tournamentId: Int,
+            @Path("seasonId") seasonId: Int,
+            @Body request: SeasonRulesRequest
+        ): Response<GenericAdminResponse>
+
+        @PATCH("tournaments/{tournamentId}/seasons/{seasonId}/open-registration")
+        suspend fun openRegistration(
+            @Path("tournamentId") tournamentId: Int,
+            @Path("seasonId") seasonId: Int
+        ): Response<GenericAdminResponse>
+
+        @PATCH("tournaments/{tournamentId}/seasons/{seasonId}/close-registration")
+        suspend fun closeRegistration(
+            @Path("tournamentId") tournamentId: Int,
+            @Path("seasonId") seasonId: Int
+        ): Response<GenericAdminResponse>
     }

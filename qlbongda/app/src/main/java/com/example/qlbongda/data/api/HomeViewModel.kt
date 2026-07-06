@@ -9,10 +9,12 @@ import com.example.qlbongda.data.model.GroupStanding
 import com.example.qlbongda.data.model.MyTeamData
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingItem
+import com.example.qlbongda.data.model.TeamDetailData
 import com.example.qlbongda.data.model.TournamentPhase
 import com.example.qlbongda.data.model.UpdateProfileRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 class HomeViewModel(private val apiService: ApiService) : ViewModel() {
 
@@ -21,6 +23,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
     val phases: StateFlow<List<TournamentPhase>> = _phases
 
     val matchList = MutableStateFlow<List<FullMatchDetail>>(emptyList())
+    val hotMatchList = MutableStateFlow<List<FullMatchDetail>>(emptyList())
     val standingList = MutableStateFlow<List<GroupStanding>>(emptyList())
 
     private val _isLoading = MutableStateFlow(false)
@@ -30,8 +33,8 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
         // Tự động load dữ liệu khi khởi tạo ViewModel
         loadTournamentPhases(seasonId = 1)
         loadMatches()
+        loadFeaturedMatches()
         loadStandings()
-
     }
 
     // --- CÁC HÀM GỌI API ---
@@ -54,6 +57,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
     fun loadMatches() {
+
         viewModelScope.launch {
             try {
                 val response = apiService.getMatches()
@@ -61,7 +65,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
                     val listDto = response.body()?.data ?: emptyList()
 
                     // Map từ DTO sang Model hiển thị
-                    matchList.value = listDto.map { dto ->
+                    matchList.value = listDto.map { dto ->android.util.Log.d("DEBUG_HOT", "ID: ${dto.id}, isFeatured: ${dto.isHot}")
                         FullMatchDetail(
                             id = dto.id,
                             teamA = dto.teamA, // Lấy từ MatchDto
@@ -78,7 +82,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
                             events = emptyList(), lineupA = emptyList(), lineupB = emptyList(),
                             subsA = emptyList(), subsB = emptyList(), PossessionA = "0%",
                             PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = "",
-                            isHot = false
+                            isHot = dto.isHot
                         )
                     }
                 }
@@ -87,6 +91,55 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
+
+    fun loadFeaturedMatches() {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getFeaturedMatches(limit = 5)
+
+                if (response.isSuccessful) {
+                    val listDto = response.body()?.data
+
+                    if (listDto != null) {
+                        hotMatchList.value = listDto.map { dto ->
+                            FullMatchDetail(
+                                id = dto.id,
+                                teamA = dto.homeTeamName ?: "TBD", // Tránh lỗi null nếu tên đội trống
+                                teamB = dto.awayTeamName ?: "TBD",
+                                status = dto.status ?: "scheduled",
+                                scoreA = dto.homeScore ?: 0,
+                                scoreB = dto.awayScore ?: 0,
+                                time = dto.scheduledAt ?: "",
+                                date = dto.scheduledAt ?: "",
+                                stadium = "Chưa cập nhật",
+                                isStarted = dto.status != "scheduled",
+                                events = emptyList(),
+                                lineupA = emptyList(),
+                                lineupB = emptyList(),
+                                subsA = emptyList(),
+                                subsB = emptyList(),
+                                PossessionA = "0%",
+                                PossessionB = "0%",
+                                ShotsA = "0",
+                                ShotsB = "0",
+                                mvp = "",
+                                isHot = true
+                            )
+                        }
+                        Log.d("API_SUCCESS", "Đã tải ${listDto.size} trận đấu hot")
+                    } else {
+                        Log.e("API_ERROR", "Body data bị null")
+                    }
+                } else {
+                    Log.e("API_ERROR", "Response không thành công: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("API_CRASH", "Lỗi mapping dữ liệu: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+    }
+
     private val _selectedMatchDetail = MutableStateFlow<FullMatchDetail?>(null)
     val selectedMatchDetail: StateFlow<FullMatchDetail?> = _selectedMatchDetail
     fun fetchMatchDetail(matchId: Int) {
@@ -103,22 +156,32 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
-    private val _teamState = MutableStateFlow<StandingItem?>(null)
-    val teamState: StateFlow<StandingItem?> = _teamState
+    private val _teamDetail = MutableStateFlow<TeamDetailData?>(null)
+    val teamDetail = _teamDetail.asStateFlow()
     fun fetchTeamDetail(teamId: Int) {
+        Log.d("TeamViewModel", "Đang gọi API chi tiết với teamId: $teamId")
+
+        // Kiểm tra nhanh: Nếu ID bằng 0, không gọi API nữa để tránh lỗi server
+        if (teamId <= 0) {
+            Log.e("TeamViewModel", "teamId không hợp lệ: $teamId")
+            _isLoading.value = false
+            return
+        }
+
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 val response = apiService.getTeamDetail(teamId)
-                // Kiểm tra response thành công và có dữ liệu
                 if (response.isSuccessful && response.body() != null) {
-                    val teamData = response.body()!!.data // Lấy trực tiếp từ class TeamDetailResponse
-
-                    // Cập nhật State
-                    _teamState.value = teamData
+                    _teamDetail.value = response.body()?.data
+                    Log.d("API_DEBUG", "Dữ liệu body: ${response.body()}")
+                    Log.d("TeamViewModel", "Lấy dữ liệu thành công cho teamId: $teamId")
+                } else {
+                    Log.e("TeamViewModel", "API trả về lỗi: ${response.code()}")
                 }
             } catch (e: Exception) {
-                Log.e("TeamViewModel", "Error: ${e.message}")
+                Log.e("API_DEBUG", "Lỗi API: ${e.message}")
+                Log.e("TeamViewModel", "Exception: ${e.message}")
             } finally {
                 _isLoading.value = false
             }

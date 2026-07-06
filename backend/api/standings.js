@@ -65,6 +65,7 @@ router.get('/standings', async (req, res) => {
             }
 
             groups[row.group_name].standings.push({
+                id: row.team_id,
                 rank: groups[row.group_name].standings.length + 1,
                 teamName: row.team_name,
                 played: row.played,

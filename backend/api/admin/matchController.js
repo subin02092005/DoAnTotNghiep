@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
-
+const { createAndSendNotification } = require('../notification/notifications');
 // Cấu hình kết nối Database
 const dbConfig = {
     host: 'localhost',
@@ -24,7 +24,7 @@ router.get('/matchesadmin', async (req, res) => {
             FROM matches m
             LEFT JOIN teams ht ON m.home_team_id = ht.id
             LEFT JOIN teams at ON m.away_team_id = at.id
-            WHERE m.deleted_at IS NULL
+            WHERE m.deleted_at IS NULL AND m.is_featured = 0
         `;
         const params = [];
 
@@ -127,7 +127,21 @@ router.post('/matches', async (req, res) => {
                 venue_id || null, round || null, leg || null, referee || null, season_id || null,
                 is_published ? 1 : 0]
         );
+// Gửi cho đội A
+        await createAndSendNotification(
+            team_a_id, 
+            "Lịch thi đấu mới", 
+            `Bạn có trận đấu sắp tới: ${title}`, 
+            'match_schedule'
+        );
 
+        // Gửi cho đội B
+        await createAndSendNotification(
+            team_b_id, 
+            "Lịch thi đấu mới", 
+            `Bạn có trận đấu sắp tới: ${title}`, 
+            'match_schedule'
+        );
         res.status(201).json({ success: true, message: 'Tạo lịch thi đấu thành công.', matchId: result.insertId });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -255,6 +269,66 @@ router.patch('/matches/:id/cancel', async (req, res) => {
         }
 
         res.json({ success: true, message: 'Đã hủy trận đấu.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Bắt đầu trận đấu
+router.patch('/matches/:id/start', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [matches] = await pool.execute(
+            'SELECT status FROM matches WHERE id = ? AND deleted_at IS NULL',
+            [id]
+        );
+
+        if (matches.length === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu hoặc đã bị xóa.' });
+        }
+
+        if (matches[0].status === 'ongoing') {
+            return res.status(400).json({ success: false, message: 'Trận đấu đã bắt đầu.' });
+        }
+
+        await pool.execute(
+            `UPDATE matches
+             SET status = 'ongoing', played_at = COALESCE(played_at, NOW()), updated_at = NOW()
+             WHERE id = ? AND deleted_at IS NULL`,
+            [id]
+        );
+
+        res.json({ success: true, message: 'Đã chuyển trạng thái trận đấu sang ongoing.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Kết thúc trận đấu
+router.patch('/matches/:id/finish', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [matches] = await pool.execute(
+            'SELECT status FROM matches WHERE id = ? AND deleted_at IS NULL',
+            [id]
+        );
+
+        if (matches.length === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu hoặc đã bị xóa.' });
+        }
+
+        if (matches[0].status === 'finished') {
+            return res.status(400).json({ success: false, message: 'Trận đấu đã kết thúc.' });
+        }
+
+        await pool.execute(
+            `UPDATE matches
+             SET status = 'finished', updated_at = NOW()
+             WHERE id = ? AND deleted_at IS NULL`,
+            [id]
+        );
+
+        res.json({ success: true, message: 'Đã chuyển trạng thái trận đấu sang finished.' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

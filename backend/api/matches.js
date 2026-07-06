@@ -19,19 +19,22 @@ router.get('/matches', async (req, res) => {
                    t2.name AS teamB,
                    IFNULL(mr.home_final_score, 0) AS home_final_score,
                    IFNULL(mr.away_final_score, 0) AS away_final_score,
+                   m.is_featured,
                    CASE 
                        WHEN mr.home_final_score IS NOT NULL OR mr.away_final_score IS NOT NULL THEN 'finished'
                        WHEN m.scheduled_at <= NOW() THEN 'ongoing'
                        ELSE 'pending'
                    END AS status, 
-                   /* Dấu phẩy ở đây là bắt buộc để ngăn cách các cột trong SELECT */
-                   CASE WHEN ph.type IN ('semi_final', 'final') THEN 1 ELSE 0 END AS isHot
+                  CASE 
+    WHEN m.is_featured = 1 OR ph.type IN ('semi_final', 'final') THEN 1 
+    ELSE 0 
+END AS isHot
             FROM matches m
             JOIN teams t1 ON m.home_team_id = t1.id
             JOIN teams t2 ON m.away_team_id = t2.id
             LEFT JOIN match_results mr ON m.id = mr.match_id
             LEFT JOIN phases ph ON m.phase_id = ph.id
-            WHERE m.is_active = 1 
+            WHERE m.is_active = 1 AND m.scheduled_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
             ORDER BY m.scheduled_at ASC
         `;
         

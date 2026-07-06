@@ -1,5 +1,6 @@
 package com.example.qlbongda.services
 
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -13,15 +14,18 @@ import com.google.firebase.messaging.RemoteMessage
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
-        Log.d("FCM_LOG", "Nhận tin nhắn từ: ${remoteMessage.from}")
+        super.onMessageReceived(remoteMessage)
 
-        // Hiển thị thông báo khi nhận được
-        remoteMessage.notification?.let {
-            showNotification(it.title, it.body)
-        }
+        // message.notification?.title và message.notification?.body chính là tiêu đề/nội dung bạn gửi từ Node.js
+        val title = remoteMessage.notification?.title
+        val body =remoteMessage.notification?.body
+
+        // Bạn có thể hiển thị nó lên Notification Bar thủ công tại đây nếu cần
+        showNotification(title, body)
     }
     override fun onNewToken(token: String) {
-        // Gửi token này lên Backend của bạn để lưu vào database
+        super.onNewToken(token)
+        // Gửi token này lên API /update_fcm_token của bạn để lưu vào DB
         Log.d("FCM", "New Token: $token")
     }
 

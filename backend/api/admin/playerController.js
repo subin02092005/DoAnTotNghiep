@@ -67,6 +67,32 @@ router.patch('/players/:userId/lock', async (req, res) => {
 });
 
 // =========================================================
+// 2b. MỞ KHÓA TÀI KHOẢN (CẦU THỦ/USER)
+// Chuyển is_active = 1 trong bảng users và players
+// =========================================================
+router.patch('/players/:userId/unlock', async (req, res) => {
+    const { userId } = req.params;
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // Mở khóa tài khoản user
+        await connection.execute('UPDATE users SET is_active = 1 WHERE id = ?', [userId]);
+        // Mở khóa thông tin player (nếu có)
+        await connection.execute('UPDATE players SET is_active = 1 WHERE user_id = ?', [userId]);
+
+        await connection.commit();
+        res.json({ success: true, message: 'Đã mở khóa tài khoản thành công.' });
+    } catch (error) {
+        if (connection) await connection.rollback();
+        res.status(500).json({ success: false, message: error.message });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+// =========================================================
 // 3. PHÂN QUYỀN TÀI KHOẢN
 // Thêm role vào bảng user_role
 // =========================================================

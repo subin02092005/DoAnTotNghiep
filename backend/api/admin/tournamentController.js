@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
-
+const { sendToAll } = require('../notification/notifications');
 // Cấu hình kết nối Database
 const dbConfig = {
     host: 'localhost',
@@ -16,11 +16,27 @@ const pool = mysql.createPool(dbConfig);
 router.get('/tournaments', async (req, res) => {
     try {
         const { name, is_active } = req.query;
-        let query = `SELECT id, name, description, logo, max_teams, is_active, created_at, updated_at FROM tournaments WHERE is_active = 1`;
+        let query = `
+            SELECT
+                t.id,
+                t.name,
+                t.description,
+                t.logo,
+                tr.max_players_per_team AS max_teams,
+                t.is_active,
+                t.created_at,
+                t.updated_at
+            FROM tournaments t
+            LEFT JOIN tournament_rules tr
+                ON tr.tournament_id = t.id
+                AND tr.deleted_at IS NULL
+                AND tr.is_active = 1
+            WHERE t.is_active = 1
+        `;
         const params = [];
 
         if (name) {
-            query += ' AND name LIKE ?';
+            query += ' AND t.name LIKE ?';
             params.push(`%${name}%`);
         }
 
@@ -43,9 +59,21 @@ router.get('/tournaments/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const [tournaments] = await pool.execute(
-            `SELECT id, name, description, logo, max_teams, is_active, created_at, updated_at
-             FROM tournaments
-             WHERE id = ?`,
+            `SELECT
+                t.id,
+                t.name,
+                t.description,
+                t.logo,
+                tr.max_players_per_team AS max_teams,
+                t.is_active,
+                t.created_at,
+                t.updated_at
+             FROM tournaments t
+             LEFT JOIN tournament_rules tr
+                ON tr.tournament_id = t.id
+                AND tr.deleted_at IS NULL
+                AND tr.is_active = 1
+             WHERE t.id = ?`,
             [id]
         );
 
@@ -73,18 +101,37 @@ router.get('/tournaments/:id', async (req, res) => {
 router.post('/tournaments', async (req, res) => {
     const { name, description, logo, max_teams, user_id } = req.body;
 
-    if (!name || !max_teams) {
-        return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên giải đấu và số đội tối đa.' });
+    if (!name) {
+        return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên giải đấu.' });
     }
 
     try {
         const [result] = await pool.execute(
-            `INSERT INTO tournaments (name, description, logo, max_teams, is_active, created_at, updated_at, user_id)
-             VALUES (?, ?, ?, ?, 1, NOW(), NOW(), ?)`,
-            [name, description || null, logo || null, max_teams, user_id || null]
+            `INSERT INTO tournaments (name, description, logo, is_active, created_at, updated_at, user_id)
+             VALUES (?, ?, ?, 1, NOW(), NOW(), ?)`,
+            [name, description || null, logo || null, user_id || null]
         );
 
-        res.status(201).json({ success: true, message: 'Tạo giải đấu thành công.', tournamentId: result.insertId });
+        const tournamentId = result.insertId;
+
+        if (max_teams !== undefined) {
+            await pool.execute(
+                `INSERT INTO tournament_rules (
+                    tournament_id, points_per_win, points_per_draw, points_per_loss,
+                    yellow_cards_suspension, max_players_per_team, min_players_per_team,
+                    teams_advance_per_group, tiebreaker_order, created_at, updated_at, deleted_at, user_id
+                 ) VALUES (?, 3, 1, 0, 3, ?, 11, 2, '["goal_difference","goals_scored","head_to_head"]', NOW(), NOW(), NULL, ?)`,
+                [tournamentId, max_teams, user_id || null]
+            );
+        }
+        //thong báo cho tất cả người dùng khi có giải đấu mới
+        try {
+   await sendToAll("Giải đấu mới", "Một giải đấu mới vừa được công bố, hãy kiểm tra ngay!");
+} catch (err) {
+    console.error("Gửi thông báo thất bại:", err);
+}
+
+        res.status(201).json({ success: true, message: 'Tạo giải đấu thành công.', tournamentId });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -110,29 +157,54 @@ router.put('/tournaments/:id', async (req, res) => {
         fields.push('logo = ?');
         params.push(logo);
     }
-    if (max_teams !== undefined) {
-        fields.push('max_teams = ?');
-        params.push(max_teams);
-    }
     if (is_active !== undefined) {
         fields.push('is_active = ?');
         params.push(is_active ? 1 : 0);
     }
 
-    if (fields.length === 0) {
+    if (fields.length === 0 && max_teams === undefined) {
         return res.status(400).json({ success: false, message: 'Không có trường nào để cập nhật.' });
     }
 
-    params.push(id);
-
     try {
-        const [result] = await pool.execute(
-            `UPDATE tournaments SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ?`,
-            params
-        );
+        let result = { affectedRows: 1 };
+
+        if (fields.length > 0) {
+            params.push(id);
+            const [updateResult] = await pool.execute(
+                `UPDATE tournaments SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+                params
+            );
+            result = updateResult;
+        }
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy giải đấu.' });
+        }
+
+        if (max_teams !== undefined) {
+            const [existingRule] = await pool.execute(
+                'SELECT id FROM tournament_rules WHERE tournament_id = ? AND deleted_at IS NULL',
+                [id]
+            );
+
+            if (existingRule.length > 0) {
+                await pool.execute(
+                    `UPDATE tournament_rules
+                     SET max_players_per_team = ?, updated_at = NOW()
+                     WHERE id = ?`,
+                    [max_teams, existingRule[0].id]
+                );
+            } else {
+                await pool.execute(
+                    `INSERT INTO tournament_rules (
+                        tournament_id, points_per_win, points_per_draw, points_per_loss,
+                        yellow_cards_suspension, max_players_per_team, min_players_per_team,
+                        teams_advance_per_group, tiebreaker_order, created_at, updated_at, deleted_at, user_id
+                     ) VALUES (?, 3, 1, 0, 3, ?, 11, 2, '["goal_difference","goals_scored","head_to_head"]', NOW(), NOW(), NULL, NULL)`,
+                    [id, max_teams]
+                );
+            }
         }
 
         res.json({ success: true, message: 'Cập nhật giải đấu thành công.' });

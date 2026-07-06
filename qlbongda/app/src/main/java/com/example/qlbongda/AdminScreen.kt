@@ -94,7 +94,7 @@ fun AdminScreen(
             when (currentSection) {
                 AdminSection.DASHBOARD -> AdminDashboard(onSectionSelect = { currentSection = it })
                 AdminSection.TEAMS -> TeamManagementScreen(adminViewModel)
-                AdminSection.LEAGUES -> LeagueManagementScreen()
+                AdminSection.LEAGUES -> LeagueManagementScreen(adminViewModel)
                 AdminSection.PLAYERS -> PlayerManagementAdminScreen(adminViewModel)
                 // 🌟 TRUYỀN DANH SÁCH VÀO MÀN HÌNH QUẢN LÝ LỊCH ĐẤU ĐỂ SWITCH
                 AdminSection.SCHEDULE -> MatchScheduleManagementScreen(adminViewModel, onManageMatch = { matchId ->
@@ -204,6 +204,7 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showAddDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchMatches()
@@ -211,7 +212,22 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        ManagementHeader("QUẢN LÝ LỊCH THI ĐẤU", "Cập nhật kết quả và trạng thái trận đấu")
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(text = "QUẢN LÝ LỊCH THI ĐẤU", color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(text = "Cập nhật kết quả và trạng thái trận đấu", color = Color.LightGray, fontSize = 13.sp)
+            }
+            IconButton(
+                onClick = { showAddDialog = true },
+                modifier = Modifier.background(NeonGreen, RoundedCornerShape(8.dp))
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add Match", tint = Color.Black)
+            }
+        }
 
         TabRow(
             selectedTabIndex = selectedTab,
@@ -255,80 +271,124 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
                     items(displayList) { match ->
                         MatchAdminCard(
                             match = match,
-                            onStatusChange = { newStatus -> viewModel.updateMatchStatus(match.id, newStatus) },
+                            onStart = { viewModel.startMatch(match.id) },
+                            onFinish = { viewModel.finishMatch(match.id) },
                             onToggleFeatured = { viewModel.toggleFeatured(match.id, match.isFeatured == 0) },
-                            onManage = { onManageMatch(match.id) }
+                            onManage = { onManageMatch(match.id) },
+                            onCancel = { viewModel.cancelMatch(match.id) },
+                            onReschedule = { newTime -> viewModel.rescheduleMatch(match.id, newTime) }
                         )
                     }
                 }
             }
         }
     }
+
+    if (showAddDialog) {
+        AddMatchDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = { request ->
+                viewModel.createMatch(request)
+                showAddDialog = false
+            }
+        )
+    }
 }
 
 @Composable
 fun MatchAdminCard(
     match: com.example.qlbongda.data.model.AdminMatchItem, 
-    onStatusChange: (String) -> Unit,
+    onStart: () -> Unit,
+    onFinish: () -> Unit,
     onToggleFeatured: () -> Unit,
-    onManage: () -> Unit
+    onManage: () -> Unit,
+    onCancel: () -> Unit,
+    onReschedule: (String) -> Unit
 ) {
+    var showRescheduleDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
-        border = BorderStroke(1.dp, if (match.status == "live") Color.Red else Color(0xFF222222))
+        border = BorderStroke(1.dp, if (match.status == "ongoing" || match.status == "live") Color.Red else if (match.status == "cancelled") Color.Gray else Color(0xFF222222))
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${match.homeTeamName} VS ${match.awayTeamName}",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Thời gian: ${match.scheduledAt}",
-                    color = Color.Gray,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "Trạng thái: ${match.status.uppercase()}",
-                    color = if (match.status == "live") Color.Red else NeonGreen,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onManage) {
-                    Icon(Icons.Default.Edit, contentDescription = "Manage Events", tint = Color.White)
-                }
-                
-                IconButton(onClick = onToggleFeatured) {
-                    Icon(
-                        imageVector = if (match.isFeatured == 1) Icons.Default.Star else Icons.Default.StarBorder,
-                        contentDescription = "Toggle Featured",
-                        tint = NeonGreen
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${match.homeTeamName} VS ${match.awayTeamName}",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Thời gian: ${match.scheduledAt}",
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        text = "Trạng thái: ${match.status.uppercase()}",
+                        color = when(match.status) {
+                            "ongoing", "live" -> Color.Red
+                            "cancelled" -> Color.Gray
+                            else -> NeonGreen
+                        },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-                
-                Spacer(modifier = Modifier.width(4.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onManage) {
+                        Icon(Icons.Default.Edit, contentDescription = "Manage Events", tint = Color.White)
+                    }
+                    
+                    IconButton(onClick = onToggleFeatured) {
+                        Icon(
+                            imageVector = if (match.isFeatured == 1) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = "Toggle Featured",
+                            tint = NeonGreen
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (match.status != "cancelled" && match.status != "finished") {
+                    TextButton(onClick = onCancel) {
+                        Text("HỦY", color = Color.Red, fontSize = 12.sp)
+                    }
+                    TextButton(onClick = { showRescheduleDialog = true }) {
+                        Text("DỜI LỊCH", color = NeonGreen, fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 if (match.status == "scheduled") {
                     Button(
-                        onClick = { onStatusChange("live") },
+                        onClick = {
+                            println("DEBUG: Starting match with ID ${match.id}")
+                            onStart() 
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
-                        Text("LIVE", color = Color.White, fontSize = 10.sp)
+                        Text("BẮT ĐẦU", color = Color.White, fontSize = 10.sp)
                     }
-                } else if (match.status == "live") {
+                } else if (match.status == "ongoing") {
                     Button(
-                        onClick = { onStatusChange("finished") },
+                        onClick = onFinish,
                         colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
@@ -338,6 +398,77 @@ fun MatchAdminCard(
             }
         }
     }
+
+    if (showRescheduleDialog) {
+        RescheduleDialog(
+            currentDateTime = match.scheduledAt,
+            onDismiss = { showRescheduleDialog = false },
+            onConfirm = { newTime ->
+                onReschedule(newTime)
+                showRescheduleDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun AddMatchDialog(onDismiss: () -> Unit, onConfirm: (com.example.qlbongda.data.model.CreateMatchRequest) -> Unit) {
+    var homeId by remember { mutableStateOf("") }
+    var awayId by remember { mutableStateOf("") }
+    var dateTime by remember { mutableStateOf("2025-06-01 19:00:00") }
+    var seasonId by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Tạo trận đấu mới") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = homeId, onValueChange = { homeId = it }, label = { Text("ID Đội nhà") })
+                OutlinedTextField(value = awayId, onValueChange = { awayId = it }, label = { Text("ID Đội khách") })
+                OutlinedTextField(value = dateTime, onValueChange = { dateTime = it }, label = { Text("Thời gian (YYYY-MM-DD HH:MM:SS)") })
+                OutlinedTextField(value = seasonId, onValueChange = { seasonId = it }, label = { Text("ID Mùa giải") })
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                onConfirm(com.example.qlbongda.data.model.CreateMatchRequest(
+                    homeTeamId = homeId.toIntOrNull() ?: 0,
+                    awayTeamId = awayId.toIntOrNull() ?: 0,
+                    scheduledAt = dateTime,
+                    seasonId = seasonId.toIntOrNull()
+                ))
+            }) {
+                Text("Tạo")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
+        }
+    )
+}
+
+@Composable
+fun RescheduleDialog(currentDateTime: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var newDateTime by remember { mutableStateOf(currentDateTime) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Dời lịch thi đấu") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Nhập thời gian mới:")
+                OutlinedTextField(value = newDateTime, onValueChange = { newDateTime = it }, label = { Text("YYYY-MM-DD HH:MM:SS") })
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(newDateTime) }) {
+                Text("Cập nhật")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
+        }
+    )
 }
 
 // Các màn hình con (Placeholders & Hoàn thiện UI)
@@ -388,7 +519,11 @@ fun PlayerManagementAdminScreen(viewModel: AdminViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(players) { player ->
-                    PlayerAdminCard(player, onLockClick = { player.userId?.let { viewModel.lockAccount(it) } })
+                    PlayerAdminCard(
+                        player = player,
+                        onLockClick = { player.userId?.let { viewModel.lockAccount(it) } },
+                        onUnlockClick = { player.userId?.let { viewModel.unlockAccount(it) } }
+                    )
                 }
             }
         }
@@ -396,7 +531,7 @@ fun PlayerManagementAdminScreen(viewModel: AdminViewModel) {
 }
 
 @Composable
-fun PlayerAdminCard(player: AdminPlayerItem, onLockClick: () -> Unit) {
+fun PlayerAdminCard(player: AdminPlayerItem, onLockClick: () -> Unit, onUnlockClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -436,13 +571,23 @@ fun PlayerAdminCard(player: AdminPlayerItem, onLockClick: () -> Unit) {
                 }
             }
 
-            if (player.userActive == 1) {
-                IconButton(onClick = onLockClick) {
-                    Icon(Icons.Default.Lock, contentDescription = "Lock", tint = Color.Red)
+            if (player.userActive == 0) {
+                // Tài khoản đang khóa -> Hiện nút Mở khóa
+                IconButton(onClick = onUnlockClick) {
+                    Icon(
+                        imageVector = Icons.Default.LockOpen, 
+                        contentDescription = "Unlock", 
+                        tint = NeonGreen
+                    )
                 }
             } else {
-                IconButton(onClick = {}) {
-                    Icon(Icons.Default.LockPerson, contentDescription = "Locked", tint = Color.Gray)
+                // Tài khoản đang hoạt động -> Hiện nút Khóa
+                IconButton(onClick = onLockClick) {
+                    Icon(
+                        imageVector = Icons.Default.Lock, 
+                        contentDescription = "Lock", 
+                        tint = Color.Red
+                    )
                 }
             }
         }
@@ -569,8 +714,117 @@ fun TeamAdminCard(team: AdminTeamItem, onApprove: () -> Unit, onReject: () -> Un
 }
 
 @Composable
-fun LeagueManagementScreen() {
-    ManagementHeader("QUẢN LÝ GIẢI ĐẤU", "Thiết lập thông số giải đấu Mùa Xuân 2026")
+fun LeagueManagementScreen(viewModel: AdminViewModel) {
+    val tournaments by viewModel.tournaments.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.fetchTournaments()
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(text = "QUẢN LÝ GIẢI ĐẤU", color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(text = "Danh sách các giải đấu đang diễn ra", color = Color.LightGray, fontSize = 13.sp)
+            }
+            IconButton(
+                onClick = { showAddDialog = true },
+                modifier = Modifier.background(NeonGreen, RoundedCornerShape(8.dp))
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add Tournament", tint = Color.Black)
+            }
+        }
+        HorizontalDivider(color = Color(0xFF222222))
+
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = NeonGreen)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(tournaments) { tournament ->
+                    TournamentAdminCard(
+                        tournament = tournament,
+                        onToggleStatus = { viewModel.updateTournamentStatus(tournament.id, tournament.isActive == 0) }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        AddTournamentDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = { name, desc, teams ->
+                viewModel.createTournament(name, desc, null, teams, null)
+                showAddDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun TournamentAdminCard(tournament: com.example.qlbongda.data.model.TournamentItem, onToggleStatus: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+        border = BorderStroke(1.dp, if (tournament.isActive == 1) NeonGreen.copy(alpha = 0.5f) else Color.Gray)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(tournament.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                tournament.description?.let {
+                    Text(it, color = Color.Gray, fontSize = 13.sp, maxLines = 1)
+                }
+                Text("Số đội tối đa: ${tournament.maxTeams ?: "Chưa thiết lập"}", color = Color.LightGray, fontSize = 12.sp)
+            }
+            Switch(
+                checked = tournament.isActive == 1,
+                onCheckedChange = { onToggleStatus() },
+                colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen, checkedTrackColor = NeonGreen.copy(alpha = 0.5f))
+            )
+        }
+    }
+}
+
+@Composable
+fun AddTournamentDialog(onDismiss: () -> Unit, onConfirm: (String, String, Int) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var desc by remember { mutableStateOf("") }
+    var teams by remember { mutableStateOf("16") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Tạo giải đấu mới") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Tên giải đấu") })
+                OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Mô tả") })
+                OutlinedTextField(value = teams, onValueChange = { teams = it }, label = { Text("Số đội tối đa") })
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(name, desc, teams.toIntOrNull() ?: 16) }) {
+                Text("Tạo")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
+        }
+    )
 }
 
 @Composable

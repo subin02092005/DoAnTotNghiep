@@ -25,7 +25,7 @@ const forgotpasswordRouter = require('./api/forgotPassword'); // Đảm bảo đ
 
 // 🌟 ĐÃ SỬA: Đường dẫn nạp file phases nằm cùng cấp trong thư mục api
 const phasesRouter = require('./api/phases');
-const notificationsRouter = require('./api/notification/notifications'); // Nạp file news phẳng
+const { router: notificationsRouter } = require('./api/notification/notifications'); // 🌟 SỬA ĐÂY (Destructuring)
 const standingsRoutes = require('./api/standings');
 const teamRoutes = require('./api/teamplayer');// import file bạn vừa tạo
 const matchRoutes = require('./api/matches');
@@ -54,7 +54,7 @@ app.use('/api', tournamentApi);
 app.use('/api', forgotpasswordRouter);
 
 app.use('/api', phasesRouter);
-app.use('/api', notificationsRouter);
+app.use('/api', notificationsRouter); // 🌟 SỬA ĐÂY (Truyền đúng router)
 app.use('/api', standingsRoutes);
 app.use('/api', teamRoutes);
 app.use('/api', matchRoutes);

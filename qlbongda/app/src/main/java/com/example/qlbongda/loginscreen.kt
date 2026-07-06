@@ -31,7 +31,7 @@ import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.LoginRequest
 import com.example.qlbongda.ui.theme.NeonGreen
 import kotlinx.coroutines.launch
-
+import com.google.firebase.messaging.FirebaseMessaging
 @Composable
 fun LoginScreen(
     onLoginSuccess: (String) -> Unit,
@@ -211,12 +211,14 @@ fun LoginScreen(
                     } else if (!isLoading) {
                         errorMessage = ""
                         isLoading = true
-
+                        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                            val token = if (task.isSuccessful) task.result else null
                         lifecycleScope.launch {
                             try {
                                 val loginRequest = LoginRequest(
                                     email = inputEmail,
-                                    password = inputPassword
+                                    password = inputPassword,
+                                    fcm_token = token
                                 )
                                 val apiService = RetrofitClient.getClient(context)
                                 val response = apiService.login(loginRequest)
@@ -279,7 +281,8 @@ fun LoginScreen(
                             }
                         }
                         }
-                    },
+                    }
+                },
 
                 modifier = Modifier
                     .weight(1f)

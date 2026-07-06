@@ -29,7 +29,10 @@ import com.example.qlbongda.data.api.HomeViewModel
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.StandingItem // 🌟 ĐÃ THÊM: Import Model chuẩn nhận từ API MySQL của bạn
 import com.example.qlbongda.ui.theme.NeonGreen
-
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+// Nếu bạn dùng phiên bản mới, có thể cần thêm:
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 val DarkBackground = Color(0xFF0A0A0A)
 val CardBackground = Color(0xFF121212)
 
@@ -77,7 +80,7 @@ fun TeamDetailScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = team.teamName.take(2).uppercase(),
+                            text = team.teamName?.take(2)?.uppercase() ?: "TN",
                             color = NeonGreen,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black
@@ -85,7 +88,7 @@ fun TeamDetailScreen(
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = team.teamName.uppercase(),
+                        text = team.teamName.toString()?.uppercase() ?: "",
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
@@ -242,15 +245,15 @@ fun TeamDetailScreen(
                     // Hiển thị tag vị trí bên góc phải màu sắc sinh động (Tiền đạo - FW, Tiền vệ - MF, v.v)
                     Text(
                         text = when(player.position) {
-                            "Tiền đạo", "FW" -> "FW"
-                            "Tiền vệ", "MF" -> "MF"
-                            "Hậu vệ", "DF" -> "DF"
+                            "defender" -> "DF"
+                            "midfielder" -> "MF"
+                            "forward" -> "FW"
                             else -> "GK"
                         },
                         color = when(player.position) {
-                            "Tiền đạo", "FW" -> Color(0xFFFF5252)
-                            "Tiền vệ", "MF" -> Color(0xFF69F0AE)
-                            "Hậu vệ", "DF" -> Color(0xFF40C4FF)
+                            "forward" -> Color(0xFFFF5252)
+                            "midfielder" -> Color(0xFF69F0AE)
+                            "defender" -> Color(0xFF40C4FF)
                             else -> Color(0xFFFFD740)
                         },
                         fontSize = 12.sp,
@@ -267,11 +270,8 @@ fun TeamDetailScreen(
 fun PreviewTeamDetailScreen() {
     // 1. Tạo dữ liệu giả khớp với data class của bạn
     val mockTeam = StandingItem(
-        rank = 1,
+        id=0,
         teamName = "FC BONG DA",
-        played = 5,
-        goalDifference = "+5",
-        points = 15,
         coachName = "Park Hang Seo",
         captainName = "Nguyen Van A",
         players = listOf(
@@ -297,22 +297,25 @@ fun TeamDetailContainer(
     teamId: Int,
     viewModel: HomeViewModel, // ViewModel đã có sẵn API Service
     onBackClick: () -> Unit
-) {
-    // Quan sát State từ ViewModel
-    val teamDetail by viewModel.teamState.collectAsState()
-
+) {// Cách 1: Nếu teamState là StateFlow
+    val teamDetail by viewModel.teamDetail.collectAsState(initial = null)
     // Gọi hàm load dữ liệu nếu chưa có
     LaunchedEffect(teamId) {
         viewModel.fetchTeamDetail(teamId)
     }
 
-    // Hiển thị màn hình khi có dữ liệu
-    if (teamDetail != null) {
-        TeamDetailScreen(team = teamDetail!!, onBackClick = onBackClick)
-    } else {
-        // Hiện loading trong khi đợi API trả về
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = NeonGreen)
-        }
+    teamDetail?.let { data ->
+        val mappedTeam = StandingItem(
+            id = data.id,
+            teamName = data.teamName ?: "Không có tên",
+            coachName = data.coachName ?: "Chưa cập nhật",
+            captainName = data.captainName ?: "Chưa cập nhật",
+            players = data.players // Đảm bảo kiểu dữ liệu PlayerInfo khớp nhau
+        )
+
+        // 3. Truyền biến đã chuyển đổi vào Screen
+        TeamDetailScreen(team = mappedTeam, onBackClick = onBackClick)
+    } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = NeonGreen)
     }
 }

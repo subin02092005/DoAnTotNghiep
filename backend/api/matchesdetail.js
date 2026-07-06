@@ -20,18 +20,21 @@ const [matchRows] = await pool.execute(`
     SELECT m.*, mr.home_final_score, mr.away_final_score,
            t1.name AS teamA, t2.name AS teamB,
            ph.type AS phase_type,
-           v.name AS venue_name, -- Lấy tên sân
+           v.name AS venue_name,
            CASE 
                WHEN mr.home_final_score IS NOT NULL OR mr.away_final_score IS NOT NULL THEN 'finished'
-               WHEN m.scheduled_at <= NOW() THEN 'ongoing'
+               WHEN m.scheduled_at <= NOW() AND DATE_ADD(m.scheduled_at, INTERVAL 90 MINUTE) >= NOW() THEN 'ongoing'
+               WHEN m.scheduled_at <= NOW() THEN 'finished' -- Nếu quá 90 phút mà admin chưa nhập kết quả thì coi như xong
                ELSE 'pending'
-           END AS status
+           END AS status,
+           -- Tính phút của trận đấu (nếu đang đá)
+           TIMESTAMPDIFF(MINUTE, m.scheduled_at, NOW()) AS current_minute
     FROM matches m
     LEFT JOIN match_results mr ON m.id = mr.match_id
     JOIN teams t1 ON m.home_team_id = t1.id
     JOIN teams t2 ON m.away_team_id = t2.id
     LEFT JOIN phases ph ON m.phase_id = ph.id
-    LEFT JOIN venues v ON m.venue_id = v.id -- JOIN vào bảng venues
+    LEFT JOIN venues v ON m.venue_id = v.id
     WHERE m.id = ?
 `, [matchId]);
 

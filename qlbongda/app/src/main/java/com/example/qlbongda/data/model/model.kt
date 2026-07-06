@@ -10,7 +10,8 @@ import com.google.gson.annotations.SerializedName
 // Dữ liệu gửi lên API login
 data class LoginRequest(
     val email: String,
-    val password: String
+    val password: String,
+    val fcm_token: String?= null
 )
 
 // Dữ liệu User nhận về
@@ -21,7 +22,8 @@ data class User(
     val phone: String?,
     val role:String?,
     val email_verified: Int,
-    @SerializedName("is_admin") val isAdmin: Boolean? = false
+    @SerializedName("is_admin") val isAdmin: Boolean? = false,
+    @SerializedName("fcm_token") val fcmToken: String?
 )
 
 // Response tổng từ API login
@@ -152,14 +154,11 @@ data class TournamentPhase(
 
 // Tạo Class hứng dữ liệu C# trả về
 data class StandingItem(
-    val rank: Int,
-    val teamName: String,
-    val played: Int,
-    val goalDifference: String,
-    val points: Int,
-    val coachName: String = "Chưa cập nhật",   // Thêm HLV
-    val captainName: String = "Chưa cập nhật", // Thêm Đội trưởng
-    val players: List<PlayerInfo> = emptyList() // Thêm danh sách cầu thủ
+    @SerializedName("id") val id: Int,
+    @SerializedName("name")val teamName: String,
+    @SerializedName("coach_name") val coachName: String = "Chưa cập nhật",   // Thêm HLV
+    @SerializedName("captainName") val captainName: String,
+    @SerializedName("players") val players: List<PlayerInfo>// Thêm danh sách cầu thủ
 )
 data class PlayerInfo(
     val id: Int=0, // 🌟 BẮT BUỘC THÊM ĐỂ CẬP NHẬT/XÓA
@@ -169,14 +168,22 @@ data class PlayerInfo(
     @SerializedName("date_of_birth") val dateOfBirth: String? = null,
    val isCaptain: Boolean = false, // Thêm trường này
     @SerializedName("user_id") val userId: Int=0,        // Thêm ID người dùng để so sánh
-
+    @SerializedName("role") val role: String? = null
 )
-
 data class TeamDetailResponse(
     val status: String,
     val message: String,
-    val data: StandingItem // Trả về object StandingItem chứa list cầu thủ, tên HLV, Đội trưởng
+    val data: TeamDetailData // Phải khớp với object 'data' trong JSON
 )
+
+data class TeamDetailData(
+    val id: Int,
+    val teamName: String?, // Dùng String? để an toàn nếu server trả về null
+    val coachName: String?,
+    val captainName: String?,
+    val players: List<PlayerInfo>
+)
+
 
 data class MyTeamResponse(
     val status: String,
@@ -237,7 +244,8 @@ data class SeasonInfo(
     @SerializedName("registration_fee")
     val registrationFee: Long,
     val is_registered: Int,
-    val payment_status: String?,val season_team_id: Int? = null// 1 nếu đã đăng ký, 0 nếu chưa
+    val payment_status: String?,
+    val season_team_id: Int? = null// 1 nếu đã đăng ký, 0 nếu chưa
 )
 // =================================================================
 // 7. COMMON RESPONSE (Dùng chung cho các API chỉ trả về status)
@@ -257,7 +265,7 @@ data class ApiResponse(
 
 // Model chi tiết bảng xếp hạng đầy đủ
 data class DetailedStanding(
-    @SerializedName("team_id") val id: Int, // <--- THÊM DÒNG NÀY VÀO
+    @SerializedName("id") val id: Int, // <--- THÊM DÒNG NÀY VÀO
     val rank: Int,
     val teamName: String,
     val logoUrl: String,
@@ -291,8 +299,8 @@ data class GroupStanding(
 // Chi tiết toàn bộ trận đấu (Gồm cả thông số sút bóng, kiểm soát bóng,...)
 data class FullMatchDetail(
     val id: Int,
-    val teamA: String,
-    val teamB: String,
+    @SerializedName("teamA", alternate = ["home_team_name"]) val teamA: String,
+    @SerializedName("teamB", alternate = ["away_team_name"]) val teamB: String,
     @SerializedName("home_team_id") val teamAId: Int = 0,
     @SerializedName("away_team_id") val teamBId: Int = 0,
     val status: String, // <--- THÊM DÒNG NÀY VÀO
@@ -332,7 +340,8 @@ data class MatchDto(
     @SerializedName("home_final_score") val home_score: Int?,
     @SerializedName("away_final_score") val away_score: Int?,
     val scheduled_at: String?,
-    @SerializedName("status") val status: String // Nhận về "pending", "ongoing", "finished"
+    @SerializedName("status") val status: String, // Nhận về "pending", "ongoing", "finished"
+    @SerializedName("is_featured") val is_featured: Int? = 0
 ) {
     // 1. Chuyển đổi String sang Enum để dễ dùng
     val matchStatus: MatchStatus
@@ -341,7 +350,7 @@ data class MatchDto(
             "finished" -> MatchStatus.FINISHED
             else -> MatchStatus.PENDING
         }
-
+    val isHot: Boolean get() = is_featured == 1
     // 2. Các flag tiện lợi cho UI
     val isFinished: Boolean get() = matchStatus == MatchStatus.FINISHED
     val isLive: Boolean get() = matchStatus == MatchStatus.ONGOING
@@ -370,8 +379,8 @@ data class Notification(
     @SerializedName("id") val id: Int,
     @SerializedName("title") val title: String,
     @SerializedName("content") val content: String,
-    @SerializedName("created_at") val time: String, // Nếu JSON trả về là created_at
-    @SerializedName("is_read") val is_read: Int,    // Ánh xạ chính xác tên trường
+    @SerializedName("created_at") val time: String,
+    @SerializedName("is_read") val is_read: Int,
     @SerializedName("ref_entity_type") val ref_entity_type: String?,
     @SerializedName("ref_entity_id") val ref_entity_id: Int?
 )

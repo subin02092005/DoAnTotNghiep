@@ -16,3 +16,6 @@
 # Bỏ qua file rác của hệ điều hành
 .DS_Store
 Thumbs.db
+
+# Bỏ qua file cấu hình Firebase chứa khóa bí mật
+backend/config/service-account.json

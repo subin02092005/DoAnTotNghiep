@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
             Log.d("FCM_PERMISSION", "Người dùng từ chối cấp quyền thông báo")
         }
     }
+    private var fcmToken: String = ""
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         askNotificationPermission()
@@ -49,8 +50,8 @@ class MainActivity : ComponentActivity() {
                 return@addOnCompleteListener
             }
             // Chỉ lấy result khi thành công
-            val token = task.result
-            Log.d("FCM_TOKEN", "Token của tôi là: $token")
+            fcmToken = task.result
+            Log.d("FCM_TOKEN", "Token của tôi là: $fcmToken")
         }
         setContent {
             QlbongdaTheme {
@@ -62,6 +63,7 @@ class MainActivity : ComponentActivity() {
                     var currentStandingTabIndex by remember { mutableIntStateOf(0) }
 
                     val matchList by homeViewModel.matchList.collectAsState()
+                   // val hotMatchList by homeViewModel.hotMatchList.collectAsState()
                     val phaseList by homeViewModel.phases.collectAsState()
                     val standingList by homeViewModel.standingList.collectAsState()
                     val isLoading by homeViewModel.isLoading.collectAsState()
@@ -124,10 +126,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             } else {
                                 HomeScreen(
+                                    homeViewModel = homeViewModel,
                                     selectedTab = selectedTab,
                                     onTabSelected = { selectedTab = it },
                                     phaseList = phaseList,
                                     matchList = matchList,
+                                    // 🌟 TRUYỀN DÒNG NÀY
                                     onNavigateToMatchDetail = { match ->
                                         homeViewModel.fetchMatchDetail(match.id)
                                         currentScreen = "match_detail"
@@ -143,16 +147,14 @@ class MainActivity : ComponentActivity() {
                                         currentScreen = "login"
                                         Toast.makeText(this@MainActivity, "Đã đăng xuất thành công!", Toast.LENGTH_SHORT).show()
                                     },
-                                    onTeamClick = { teamNameClicked ->
-                                        // Tìm ID từ danh sách (đảm bảo Model của bạn có trường id của team)
-                                        val clickedTeam = standingList.flatMap { it.standings }
-                                            .find { it.teamName.equals(teamNameClicked, ignoreCase = true) }
+                                    onTeamClick = { teamIdClicked ->
+                                        Log.d("DEBUG_MA", "Đã nhận ID: $teamIdClicked")
 
-                                        if (clickedTeam != null) {
-                                            currentTeamId = clickedTeam.id // Cập nhật ID để Container lấy dữ liệu
-                                            previousScreen = "home"
-                                            currentScreen = "team_detail"
-                                        }
+                                        // Cập nhật ID trực tiếp vào state
+                                        currentTeamId = teamIdClicked
+                                        previousScreen = "home"
+                                        currentScreen = "team_detail"
+
                                     },
                                     isTeamRegistered = isTeamRegistered,
                                     onTeamRegisteredChange = { isTeamRegistered = it },
@@ -192,7 +194,7 @@ class MainActivity : ComponentActivity() {
                                     val clickedTeam = standingList.flatMap { it.standings }
                                         .find { it.teamName.equals(teamName, ignoreCase = true) }
                                     if (clickedTeam != null) {
-                                        selectedTeamObjectForDetail = StandingItem(clickedTeam.rank, clickedTeam.teamName, clickedTeam.played, clickedTeam.goalDifference, clickedTeam.points, "Đang cập nhật", "Đang cập nhật", emptyList())
+                                       selectedTeamObjectForDetail = StandingItem(clickedTeam.id, clickedTeam.teamName,  clickedTeam.goalDifference,  "Đang cập nhật", emptyList())
                                         previousScreen = "standing_detail"
                                         currentScreen = "team_detail"
                                     }
@@ -201,21 +203,16 @@ class MainActivity : ComponentActivity() {
                         }
 
                         "team_detail" -> {
-                            val safeTeamData = selectedTeamObjectForDetail ?: StandingItem(
-                                2, "Manchester City", 38, "+62", 88,
-                                if (coachName.isNotEmpty()) coachName else "Pep Guardiola",
-                                if (leaderName.isNotEmpty()) leaderName else "Kyle Walker",
-                                if (playerList.isNotEmpty()) playerList else listOf(
-                                    PlayerInfo( 1, number = "9", name = "Erling Haaland", position = "forward"),
-                                    PlayerInfo( 2, number = "17", name = "Kevin De Bruyne", position = "midfielder"),
-                                    PlayerInfo(3, number = "31", name = "Ederson", position = "goalkeeper")
+                            if (currentTeamId != 0) {
+                                TeamDetailContainer(
+                                    teamId = currentTeamId,
+                                    viewModel = homeViewModel,
+                                    onBackClick = { currentScreen = previousScreen }
                                 )
-                            )
-                            TeamDetailContainer(
-                                teamId = currentTeamId, // ID của đội bóng người dùng vừa click vào
-                                viewModel = homeViewModel,
-                                onBackClick = { currentScreen = previousScreen }
-                            )
+                            } else {
+                                // Nếu ID là 0, đừng gọi Container mà hãy quay lại hoặc hiện lỗi
+                                currentScreen = "home"
+                            }
                         }
                     }
                 }

@@ -16,7 +16,7 @@ const dbConfig = {
 router.post('/login', async (req, res) => {
     const email = req.body.email?.trim();
     const password = req.body.password?.trim();
-
+    const fcm_token = req.body.fcm_token?.trim();
     if (!email || !password) {
         return res.status(400).json({ success: false, message: 'Vui lòng nhập đầy đủ email và mật khẩu!' });
     }
@@ -48,7 +48,8 @@ const [role] = await connection.execute(queryRole, [user.id]);
 
 // Nếu không tìm thấy role trong team_players, mặc định là 'player'
 const userRole = role.length > 0 ? role[0].role : 'player';
-        await connection.end();
+
+
 
         if (rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Email không tồn tại!' });
@@ -62,6 +63,23 @@ const userRole = role.length > 0 ? role[0].role : 'player';
         if (!isMatch) {
             return res.status(400).json({ success: false, message: 'Mật khẩu không chính xác!' });
         }
+
+
+
+// --- BẮT ĐẦU LOGIC CẬP NHẬT FCM TOKEN ---
+        // --- CẬP NHẬT FCM TOKEN ---
+        if (fcm_token) { // 🌟 Dùng biến fcm_token đã khai báo ở trên
+            await connection.execute(
+                'UPDATE users SET fcm_token = ?, updated_at = NOW() WHERE id = ?',
+                [fcm_token, user.id]
+            );
+            console.log(`Đã gán fcm_token thành công cho user: ${user.name}`);
+        }
+        // --- KẾT THÚC LOGIC CẬP NHẬT FCM TOKEN ---
+
+      await connection.end();
+
+
 
         const secret = process.env.JWT_SECRET || 'YOUR_JWT_SECRET_KEY';
         const token = jwt.sign(
