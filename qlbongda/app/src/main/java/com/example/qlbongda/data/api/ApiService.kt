@@ -263,6 +263,11 @@
             @Body request: CreateSeasonRequest
         ): Response<GenericAdminResponse>
 
+        @POST("seasons")
+        suspend fun createSeasonDirect(
+            @Body request: CreateSeasonRequest
+        ): Response<GenericAdminResponse>
+
         @POST("seasons/{seasonId}/phases")
         suspend fun createSeasonPhase(
             @Path("seasonId") seasonId: Int,
@@ -287,4 +292,10 @@
             @Path("tournamentId") tournamentId: Int,
             @Path("seasonId") seasonId: Int
         ): Response<GenericAdminResponse>
+
+        @POST("phases/{phaseId}/generate-schedule")
+        suspend fun autoGenerateSchedule(
+            @Path("phaseId") phaseId: Int,
+            @Body request: Any // Thêm tham số này
+        ): Response<BaseResponse>
     }

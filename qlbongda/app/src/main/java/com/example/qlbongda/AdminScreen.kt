@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -206,6 +208,7 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddDialog by remember { mutableStateOf(false) }
 
+    var showAutoScheduleDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         viewModel.fetchMatches()
         viewModel.fetchFeaturedMatches()
@@ -221,6 +224,7 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
                 Text(text = "QUẢN LÝ LỊCH THI ĐẤU", color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(text = "Cập nhật kết quả và trạng thái trận đấu", color = Color.LightGray, fontSize = 13.sp)
             }
+
             IconButton(
                 onClick = { showAddDialog = true },
                 modifier = Modifier.background(NeonGreen, RoundedCornerShape(8.dp))
@@ -228,6 +232,7 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
                 Icon(Icons.Default.Add, contentDescription = "Add Match", tint = Color.Black)
             }
         }
+
 
         TabRow(
             selectedTabIndex = selectedTab,
@@ -293,7 +298,40 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
             }
         )
     }
+    if (showAutoScheduleDialog) {
+        var inputPhaseId by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showAutoScheduleDialog = false },
+            title = { Text("Tạo lịch thi đấu tự động") },
+            text = {
+                Column {
+                    Text("Hệ thống sẽ tự động tạo cặp đấu vòng tròn cho tất cả các bảng trong Vòng đấu này.", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = inputPhaseId,
+                        onValueChange = { inputPhaseId = it },
+                        label = { Text("Nhập ID Vòng đấu (Phase ID)") }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    inputPhaseId.toIntOrNull()?.let {
+                        viewModel.autoGenerateSchedule(it)
+                    }
+                    showAutoScheduleDialog = false
+                }) {
+                    Text("Chạy tự động")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAutoScheduleDialog = false }) { Text("Hủy") }
+            }
+        )
+    }
 }
+
 
 @Composable
 fun MatchAdminCard(
@@ -716,76 +754,262 @@ fun TeamAdminCard(team: AdminTeamItem, onApprove: () -> Unit, onReject: () -> Un
 @Composable
 fun LeagueManagementScreen(viewModel: AdminViewModel) {
     val tournaments by viewModel.tournaments.collectAsStateWithLifecycle()
+    val tournamentDetail by viewModel.tournamentDetail.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    var showAddDialog by remember { mutableStateOf(false) }
+    
+    var showAddTournamentDialog by remember { mutableStateOf(false) }
+    var showAddSeasonDialog by remember { mutableStateOf(false) }
+    var selectedTournamentId by remember { mutableIntStateOf(-1) }
+    var selectedSeasonIdForPhase by remember { mutableIntStateOf(-1) }
+    var selectedSeasonIdForAutoSchedule by remember { mutableIntStateOf(-1) }
 
-    var showAddPhaseDialog by remember { mutableStateOf(false) }
-    var selectedSeasonId by remember { mutableIntStateOf(-1) }
     LaunchedEffect(Unit) {
         viewModel.fetchTournaments()
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(text = "QUẢN LÝ GIẢI ĐẤU", color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text(text = "Danh sách các giải đấu đang diễn ra", color = Color.LightGray, fontSize = 13.sp)
-            }
-            IconButton(
-                onClick = { showAddDialog = true },
-                modifier = Modifier.background(NeonGreen, RoundedCornerShape(8.dp))
+        if (selectedTournamentId == -1) {
+            // DANH SÁCH GIẢI ĐẤU
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Tournament", tint = Color.Black)
+                Column {
+                    Text(text = "QUẢN LÝ GIẢI ĐẤU", color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "Chọn giải đấu để quản lý", color = Color.LightGray, fontSize = 13.sp)
+                }
+                IconButton(
+                    onClick = { showAddTournamentDialog = true },
+                    modifier = Modifier.background(NeonGreen, RoundedCornerShape(8.dp))
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Tournament", tint = Color.Black)
+                }
             }
-        }
-        HorizontalDivider(color = Color(0xFF222222))
+            HorizontalDivider(color = Color(0xFF222222))
 
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NeonGreen)
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(tournaments) { tournament ->
+                        TournamentAdminCard(
+                            tournament = tournament,
+                            onToggleStatus = { viewModel.updateTournamentStatus(tournament.id, tournament.isActive == 0) },
+                            onClick = {
+                                selectedTournamentId = tournament.id
+                                viewModel.fetchTournamentDetail(tournament.id)
+                            }
+                        )
+                    }
+                }
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // CHI TIẾT GIẢI ĐẤU & CÁC MÙA GIẢI
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                items(tournaments) { tournament ->
-                    TournamentAdminCard(
-                        tournament = tournament,
-                        onToggleStatus = { viewModel.updateTournamentStatus(tournament.id, tournament.isActive == 0) },
-                        onAddPhaseClick = {
-                            // Giả sử giải đấu có thuộc tính seasonId hiện tại (bạn cần truyền đúng ID của season)
-                            selectedSeasonId = tournament.id // Tạm dùng id giải đấu làm seasonId nếu cấu trúc 1-1
-                            showAddPhaseDialog = true
-                        }
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { selectedTournamentId = -1 }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = NeonGreen)
+                    }
+                    Text(text = tournamentDetail?.tournament?.name ?: "Mùa giải", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+                
+                IconButton(
+                    onClick = { showAddSeasonDialog = true },
+                    modifier = Modifier.background(NeonGreen, RoundedCornerShape(8.dp))
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Season", tint = Color.Black)
+                }
+            }
+
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                    val seasons = tournamentDetail?.seasons ?: emptyList()
+                    items(seasons) { season ->
+                        SeasonAdminCard(
+                            season = season,
+                            onAddPhase = { selectedSeasonIdForPhase = season.id },
+                            onAutoSchedule = {
+                                viewModel.fetchSeasonPhasesForAdmin(season.id)
+                                selectedSeasonIdForAutoSchedule = season.id
+                            },
+                            onToggleRegistration = { open ->
+                                viewModel.toggleRegistration(selectedTournamentId, season.id, open)
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
-    if (showAddDialog) {
-        AddTournamentDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { name, desc, teams ->
-                viewModel.createTournament(name, desc, null, teams, null)
-                showAddDialog = false
+    val phasesOfSeason by viewModel.phasesOfSeason.collectAsStateWithLifecycle()
+
+    if (showAddSeasonDialog && selectedTournamentId != -1) {
+        AddSeasonDialog(
+            onDismiss = { showAddSeasonDialog = false },
+            onConfirm = { request ->
+                viewModel.createSeason(selectedTournamentId, request)
+                showAddSeasonDialog = false
             }
         )
     }
-    if (showAddPhaseDialog && selectedSeasonId != -1) {
-        AddPhaseDialog(
-            seasonId = selectedSeasonId,
-            onDismiss = { showAddPhaseDialog = false },
-            onConfirm = { request ->
-                viewModel.createPhase(selectedSeasonId, request)
-                showAddPhaseDialog = false
+
+    if (selectedSeasonIdForAutoSchedule != -1) {
+        AutoSchedulePhaseSelectorDialog(
+            phases = phasesOfSeason,
+            onDismiss = { selectedSeasonIdForAutoSchedule = -1 },
+            onConfirm = { phaseId ->
+                viewModel.autoGenerateSchedule(phaseId)
+                selectedSeasonIdForAutoSchedule = -1
             }
         )
+    }
+
+    if (showAddTournamentDialog) {
+        AddTournamentDialog(
+            onDismiss = { showAddTournamentDialog = false },
+            onConfirm = { name, desc, teams ->
+                viewModel.createTournament(name, desc, null, teams, null)
+                showAddTournamentDialog = false
+            }
+        )
+    }
+
+    if (selectedSeasonIdForPhase != -1) {
+        AddPhaseDialog(
+            seasonId = selectedSeasonIdForPhase,
+            onDismiss = { selectedSeasonIdForPhase = -1 },
+            onConfirm = { request ->
+                viewModel.createPhase(selectedSeasonIdForPhase, request)
+                selectedSeasonIdForPhase = -1
+            }
+        )
+    }
+}
+
+@Composable
+fun AddSeasonDialog(onDismiss: () -> Unit, onConfirm: (com.example.qlbongda.data.model.CreateSeasonRequest) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var desc by remember { mutableStateOf("") }
+    var startDate by remember { mutableStateOf("2025-01-01") }
+    var endDate by remember { mutableStateOf("2025-06-30") }
+    var deadline by remember { mutableStateOf("2024-12-25") }
+    var maxTeams by remember { mutableStateOf("16") }
+    var fee by remember { mutableStateOf("0") }
+    var isRegOpen by remember { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Thêm Mùa giải mới") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Tên mùa giải (VD: Mùa Xuân 2025)") })
+                OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Mô tả ngắn") })
+                OutlinedTextField(value = startDate, onValueChange = { startDate = it }, label = { Text("Ngày bắt đầu (YYYY-MM-DD)") })
+                OutlinedTextField(value = endDate, onValueChange = { endDate = it }, label = { Text("Ngày kết thúc (YYYY-MM-DD)") })
+                OutlinedTextField(value = deadline, onValueChange = { deadline = it }, label = { Text("Hạn đăng ký (YYYY-MM-DD)") })
+                OutlinedTextField(value = maxTeams, onValueChange = { maxTeams = it }, label = { Text("Số đội tối đa") })
+                OutlinedTextField(value = fee, onValueChange = { fee = it }, label = { Text("Lệ phí đăng ký (VNĐ)") })
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = isRegOpen, onCheckedChange = { isRegOpen = it })
+                    Text("Mở cổng đăng ký ngay")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        onConfirm(com.example.qlbongda.data.model.CreateSeasonRequest(
+                            name = name,
+                            description = desc.ifBlank { null },
+                            startDate = startDate,
+                            endDate = endDate,
+                            registrationDeadline = deadline,
+                            isRegistrationOpen = isRegOpen,
+                            userId = null,
+                            maxTeams = maxTeams.toIntOrNull() ?: 16,
+                            registrationFee = fee.toDoubleOrNull() ?: 0.0
+                        ))
+                    }
+                },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Tạo")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
+        }
+    )
+}
+
+@Composable
+fun SeasonAdminCard(
+    season: com.example.qlbongda.data.model.SeasonAdminItem, 
+    onAddPhase: () -> Unit, 
+    onAutoSchedule: () -> Unit,
+    onToggleRegistration: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
+        border = BorderStroke(1.dp, Color(0xFF333333))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text(text = season.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(text = "Trạng thái: ${season.status.uppercase()}", color = NeonGreen, fontSize = 12.sp)
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Cổng đăng ký", color = Color.Gray, fontSize = 10.sp)
+                    Switch(
+                        checked = season.isRegistrationOpen == 1,
+                        onCheckedChange = onToggleRegistration,
+                        colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
+                    )
+                }
+            }
+
+            Text(text = "Hạn đăng ký: ${season.registrationDeadline}", color = Color.Gray, fontSize = 12.sp)
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onAddPhase,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text("Thêm Vòng", fontSize = 11.sp, color = NeonGreen)
+                }
+                Button(
+                    onClick = onAutoSchedule,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text("Auto Xếp Lịch", fontSize = 11.sp, color = Color.Black)
+                }
+            }
+        }
     }
 }
 
@@ -848,9 +1072,42 @@ fun AddPhaseDialog(
 }
 
 @Composable
-fun TournamentAdminCard(tournament: com.example.qlbongda.data.model.TournamentItem, onToggleStatus: () -> Unit, onAddPhaseClick: () -> Unit) {
+fun AutoSchedulePhaseSelectorDialog(
+    phases: List<com.example.qlbongda.data.model.TournamentPhase>,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Chọn Vòng đấu để xếp lịch") },
+        text = {
+            if (phases.isEmpty()) {
+                Text("Không có vòng đấu nào. Hãy thêm vòng đấu trước.")
+            } else {
+                LazyColumn {
+                    items(phases) { phase ->
+                        ListItem(
+                            headlineContent = { Text(phase.name) },
+                            supportingContent = { Text("Định dạng: ${phase.format}") },
+                            modifier = Modifier.clickable { onConfirm(phase.id) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Đóng") } }
+    )
+}
+
+@Composable
+fun TournamentAdminCard(
+    tournament: com.example.qlbongda.data.model.TournamentItem, 
+    onToggleStatus: () -> Unit,
+    onClick: () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
         border = BorderStroke(1.dp, if (tournament.isActive == 1) NeonGreen.copy(alpha = 0.5f) else Color.Gray)
@@ -872,21 +1129,6 @@ fun TournamentAdminCard(tournament: com.example.qlbongda.data.model.TournamentIt
                 colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen, checkedTrackColor = NeonGreen.copy(alpha = 0.5f))
             )
         }
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // THÊM NÚT TẠO VÒNG ĐẤU DƯỚI CARD
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Button(
-                onClick = onAddPhaseClick,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Thêm Vòng đấu", color = NeonGreen, fontSize = 12.sp)
-            }
-        }
-
     }
 }
 

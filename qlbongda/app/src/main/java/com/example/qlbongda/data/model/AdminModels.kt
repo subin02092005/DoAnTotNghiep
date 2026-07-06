@@ -268,7 +268,10 @@ data class CreateSeasonRequest(
     @SerializedName("end_date") val endDate: String,
     @SerializedName("registration_deadline") val registrationDeadline: String,
     @SerializedName("is_registration_open") val isRegistrationOpen: Boolean,
-    @SerializedName("user_id") val userId: Int?
+    @SerializedName("tournament_id") val tournamentId: Int? = null,
+    @SerializedName("user_id") val userId: Int? = null,
+    @SerializedName("max_teams") val maxTeams: Int? = 16,
+    @SerializedName("registration_fee") val registrationFee: Double? = 0.0
 )
 
 data class CreatePhaseRequest(
@@ -280,5 +283,6 @@ data class CreatePhaseRequest(
     @SerializedName("end_date") val endDate: String? = null,
     @SerializedName("group_count") val groupCount: Int? = null,
     @SerializedName("group_names") val groupNames: List<String>? = null,
-    @SerializedName("team_ids") val teamIds: List<Int>? = null
+    @SerializedName("team_ids") val teamIds: List<Int>? = null,
+    @SerializedName("autoSchedule") val autoSchedule: Boolean? = true
 )

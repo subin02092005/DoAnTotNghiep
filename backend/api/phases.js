@@ -22,6 +22,48 @@ function defaultGroupName(index) {
     return `Bảng ${String.fromCharCode(65 + index)}`;
 }
 
+function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+function buildRoundRobinMatches(teamIds) {
+    const teams = [...teamIds];
+    if (teams.length % 2 !== 0) {
+        teams.push(null);
+    }
+
+    const numTeams = teams.length;
+    const rounds = numTeams - 1;
+    const matchesPerRound = numTeams / 2;
+    const schedule = [];
+
+    for (let round = 0; round < rounds; round += 1) {
+        for (let i = 0; i < matchesPerRound; i += 1) {
+            const home = teams[i];
+            const away = teams[numTeams - 1 - i];
+            if (home !== null && away !== null) {
+                schedule.push({ home, away });
+            }
+        }
+        teams.splice(1, 0, teams.pop());
+    }
+
+    return schedule;
+}
+
+async function clearScheduledMatchesForGroup(connection, phaseId, groupId) {
+    await connection.execute(
+        `DELETE FROM matches
+         WHERE phase_id = ? AND group_id = ? AND status = 'scheduled' AND deleted_at IS NULL`,
+        [phaseId, groupId]
+    );
+}
+
 async function createBracketSlots(connection, phaseId, teamIds) {
     const totalTeams = teamIds.length;
     const bracketSize = isPowerOfTwo(totalTeams) ? totalTeams : 2 ** Math.ceil(Math.log2(totalTeams));
@@ -245,7 +287,115 @@ router.post('/seasons/:seasonId/phases', async (req, res) => {
         return res.status(500).json({ status: 'error', message: 'Lỗi server khi tạo phase' });
     }
 });
+router.post('/phases/:phaseId/generate-schedule', async (req, res) => {
+    try {
+        const phaseId = req.params.phaseId;
+        // Thêm || {} để tránh lỗi TypeError khi req.body là undefined
+        const { start_date, start_time, interval_hours, interval_minutes } = req.body || {}; 
+
+        const result = await generateScheduleForPhase(phaseId, { start_date, start_time, interval_hours, interval_minutes });
+        return res.status(200).json({ 
+            status: 'success', 
+            message: `Đã tự động xếp thành công ${result.matchesCreated} trận đấu!`, 
+            data: { matchesCreated: result.matchesCreated } 
+        });
+    } catch (error) {
+        console.error('Lỗi tự động xếp lịch:', error);
+        return res.status(500).json({ status: 'error', message: 'Lỗi server khi xếp lịch tự động' });
+    }
+});
+
+// Reusable function to generate schedule for a phase (can be called from other modules)
+async function generateScheduleForPhase(phaseId, options = {}) {
+    const { start_date, start_time, interval_hours, interval_minutes } = options;
+    const connection = await mysql.createConnection(dbConfig);
+
+    try {
+        const [groups] = await connection.execute(
+            'SELECT id FROM `groups` WHERE phase_id = ?',
+            [phaseId]
+        );
+
+        if (groups.length === 0) {
+            await connection.end();
+            return { matchesCreated: 0 };
+        }
+
+        const [phaseRows] = await connection.execute(
+            'SELECT season_id FROM phases WHERE id = ?',
+            [phaseId]
+        );
+        const seasonId = phaseRows.length > 0 ? phaseRows[0].season_id : null;
+
+        let totalMatchesCreated = 0;
+        let baseDate = start_date ? new Date(start_date) : new Date();
+
+        if (!start_date) {
+            baseDate.setDate(baseDate.getDate() + 7);
+        }
+
+        if (start_time) {
+            const [hourString, minuteString] = start_time.split(':');
+            const hour = parseInt(hourString, 10);
+            const minute = parseInt(minuteString, 10);
+            if (!Number.isNaN(hour) && !Number.isNaN(minute)) {
+                baseDate.setHours(hour, minute, 0, 0);
+            }
+        } else {
+            baseDate.setHours(18, 0, 0, 0);
+        }
+
+        const intervalMs = ((interval_hours || 2) * 60 + (interval_minutes || 0)) * 60 * 1000;
+
+        for (const group of groups) {
+            await clearScheduledMatchesForGroup(connection, phaseId, group.id);
+
+            const [teams] = await connection.execute(
+                'SELECT team_id FROM season_teams WHERE group_id = ? AND is_active = 1',
+                [group.id]
+            );
+
+            const teamIds = teams.map(t => t.team_id);
+            if (teamIds.length === 0) {
+                await connection.execute(
+                    'UPDATE `groups` SET status = "SCHEDULED", scheduleGeneratedAt = NOW() WHERE id = ?',
+                    [group.id]
+                );
+                continue;
+            }
+
+            const randomizedTeamIds = shuffleArray(teamIds);
+            const schedule = buildRoundRobinMatches(randomizedTeamIds);
+            const randomizedSchedule = shuffleArray(schedule);
+
+            for (const matchInfo of randomizedSchedule) {
+                const matchDate = new Date(baseDate.getTime() + (totalMatchesCreated * intervalMs));
+
+                await connection.execute(
+                    `INSERT INTO matches (phase_id, group_id, home_team_id, away_team_id, scheduled_at, status, season_id, created_at, updated_at) 
+                     VALUES (?, ?, ?, ?, ?, 'scheduled', ?, NOW(), NOW())`,
+                    [phaseId, group.id, matchInfo.home, matchInfo.away, matchDate, seasonId]
+                );
+                totalMatchesCreated++;
+            }
+
+            await connection.execute(
+                'UPDATE `groups` SET status = "SCHEDULED", scheduleGeneratedAt = NOW() WHERE id = ?',
+                [group.id]
+            );
+        }
+
+        await connection.end();
+        return { matchesCreated: totalMatchesCreated };
+    } catch (err) {
+        await connection.end();
+        throw err;
+    }
+}
 
 module.exports = router;
 
-module.exports = router;
+// Export helper for external callers (e.g., auto-scheduling after season creation)
+module.exports.generateScheduleForPhase = generateScheduleForPhase;
+module.exports.createGroupsAndAssignTeams = createGroupsAndAssignTeams;
+module.exports.createBracketSlots = createBracketSlots;

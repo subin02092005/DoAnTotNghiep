@@ -514,6 +514,47 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
+    fun createSeason(tournamentId: Int, request: CreateSeasonRequest) {
+        viewModelScope.launch {
+            try {
+                // Đảm bảo tournamentId được gán vào body
+                val finalRequest = request.copy(tournamentId = tournamentId)
+                val response = apiService.createSeasonDirect(finalRequest)
+                
+                if (response.isSuccessful) {
+                    _message.value = "Tạo mùa giải thành công"
+                    fetchTournamentDetail(tournamentId) // Cập nhật lại danh sách
+                } else {
+                    val errorMsg = response.errorBody()?.string() ?: ""
+                    _message.value = "Lỗi từ Server: ${response.code()} $errorMsg"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun toggleRegistration(tournamentId: Int, seasonId: Int, open: Boolean) {
+        viewModelScope.launch {
+            try {
+                val response = if (open) {
+                    apiService.openRegistration(tournamentId, seasonId)
+                } else {
+                    apiService.closeRegistration(tournamentId, seasonId)
+                }
+                
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = if (open) "Đã mở cổng đăng ký" else "Đã đóng cổng đăng ký"
+                    fetchTournamentDetail(tournamentId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi cập nhật trạng thái đăng ký"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
     fun updateTournamentStatus(id: Int, isActive: Boolean) {
         viewModelScope.launch {
             try {
@@ -578,4 +619,43 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
+    fun autoGenerateSchedule(phaseId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                // Sửa dòng dưới đây để truyền body rỗng
+                val response = apiService.autoGenerateSchedule(phaseId, mapOf<String, String>())
+
+                if (response.isSuccessful) {
+                    // Thành công thì refresh lại danh sách trận đấu
+                    _message.value = "Tạo lịch tự động thành công!"
+                    fetchMatches()
+                } else {
+                    val errorMsg = response.errorBody()?.string() ?: ""
+                    _message.value = "Lỗi tạo lịch: $errorMsg"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private val _phasesOfSeason = MutableStateFlow<List<TournamentPhase>>(emptyList())
+    val phasesOfSeason: StateFlow<List<TournamentPhase>> = _phasesOfSeason
+
+    fun fetchSeasonPhasesForAdmin(seasonId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getSeasonPhases(seasonId)
+                if (response.isSuccessful && response.body()?.status == "success") {
+                    _phasesOfSeason.value = response.body()?.data?.phases ?: emptyList()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
 }

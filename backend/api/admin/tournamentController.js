@@ -214,6 +214,116 @@ router.put('/tournaments/:id', async (req, res) => {
 });
 
 // Tạo mùa giải (season) cho một giải đấu
+router.post('/seasons', async (req, res) => {
+    const { name, description, start_date, end_date, registration_deadline, tournament_id, is_registration_open, user_id, max_teams, registration_fee } = req.body;
+
+    if (!name || !start_date || !end_date || !registration_deadline || !tournament_id || max_teams === undefined) {
+        return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên, ngày bắt đầu, ngày kết thúc, hạn đăng ký, tournament_id và max_teams.' });
+    }
+
+    try {
+        const [tournamentRows] = await pool.execute(
+            'SELECT id FROM tournaments WHERE id = ? AND deleted_at IS NULL',
+            [tournament_id]
+        );
+
+        if (tournamentRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Giải đấu không tồn tại.' });
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO seasons (name, description, status, start_date, end_date, registration_deadline, is_registration_open, is_active, created_at, updated_at, deleted_at, tournament_id, user_id, max_teams, registration_fee)
+             VALUES (?, ?, 'upcoming', ?, ?, ?, ?, 1, NOW(), NOW(), NULL, ?, ?, ?, ?)`,
+            [name, description || null, start_date, end_date, registration_deadline, is_registration_open ? 1 : 0, tournament_id, user_id || null, max_teams, registration_fee || 0.00]
+        );
+
+        const seasonId = result.insertId;
+
+        // If caller provided phases to create immediately, forward them to the phases API
+        const createdPhases = [];
+        if (Array.isArray(req.body.phases) && req.body.phases.length > 0) {
+            const phasesModule = require('../phases');
+
+            for (const phaseData of req.body.phases) {
+                const connection = await pool.getConnection();
+                try {
+                    const {
+                        name: pName,
+                        type: pType,
+                        format: pFormat,
+                        order: pOrder,
+                        start_date: pStartDate,
+                        end_date: pEndDate,
+                        group_count: pGroupCount,
+                        groupCount: pGroupCountAlt,
+                        group_names: pGroupNames,
+                        groupNames: pGroupNamesAlt,
+                        team_ids: pTeamIds,
+                        teamIds: pTeamIdsAlt
+                    } = phaseData;
+
+                    const effectiveGroupCount = pGroupCount || pGroupCountAlt;
+                    const effectiveGroupNames = pGroupNames || pGroupNamesAlt;
+                    const effectiveTeamIds = pTeamIds || pTeamIdsAlt;
+
+                    const [phaseResult] = await connection.execute(
+                        `INSERT INTO phases (season_id, name, type, format, \`order\`, start_date, end_date, is_active, created_at, updated_at, status)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW(), 'draft')`,
+                        [seasonId, pName, pType, pFormat, pOrder, pStartDate || null, pEndDate || null]
+                    );
+
+                    const createdPhaseId = phaseResult.insertId;
+                    const created = { input: phaseData, phaseId: createdPhaseId };
+
+                    if (pFormat === 'round_robin') {
+                        const { groupIds, teamIds: assignedTeams } = await phasesModule.createGroupsAndAssignTeams(connection, seasonId, createdPhaseId, effectiveGroupCount, effectiveGroupNames);
+                        created.groups = groupIds;
+
+                        if (assignedTeams && assignedTeams.length > 0) {
+                            const placeholders = assignedTeams
+                                .map(() => '(?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 1, NOW(), NOW(), NULL)')
+                                .join(', ');
+                            const values = assignedTeams.flatMap((teamId, idx) => [teamId, groupIds[idx % groupIds.length]]);
+
+                            await connection.execute(
+                                `INSERT INTO team_standings (team_id, group_id, position, matches_played, wins, draws, losses, goals_for, goals_against, points, is_active, created_at, updated_at, deleted_at)
+                                 VALUES ${placeholders}`,
+                                values
+                            );
+                        }
+                    }
+
+                    if (pFormat === 'knockout') {
+                        const teamIdsList = Array.isArray(effectiveTeamIds) ? effectiveTeamIds : [];
+                        if (teamIdsList.length >= 2) {
+                            await phasesModule.createBracketSlots(connection, createdPhaseId, teamIdsList);
+                        }
+                    }
+
+                    // Optionally auto-schedule this phase now
+                    if (phaseData.autoSchedule && typeof phasesModule.generateScheduleForPhase === 'function') {
+                        try {
+                            await phasesModule.generateScheduleForPhase(createdPhaseId, phaseData.scheduleOptions || {});
+                        } catch (schedErr) {
+                            created.scheduleError = String(schedErr.message || schedErr);
+                        }
+                    }
+
+                    createdPhases.push(created);
+                } catch (e) {
+                    createdPhases.push({ input: phaseData, error: e.message || String(e) });
+                } finally {
+                    try { connection.release(); } catch (_) {}
+                }
+            }
+        }
+
+        res.status(201).json({ success: true, message: 'Tạo mùa giải thành công.', seasonId, phases: createdPhases });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 router.post('/tournaments/:id/seasons', async (req, res) => {
     const { id } = req.params;
     const { name, description, start_date, end_date, registration_deadline, is_registration_open, user_id } = req.body;

@@ -385,6 +385,11 @@ data class Notification(
     @SerializedName("ref_entity_id") val ref_entity_id: Int?
 )
 
+data class BaseResponse(
+    val status: String? = null,
+    val message: String? = null,
+    val success: Boolean? = null
+)
 
 
 data class NotificationResponse(val status: String, val data: List<Notification>)
