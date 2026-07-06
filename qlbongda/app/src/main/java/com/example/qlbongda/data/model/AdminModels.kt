@@ -270,3 +270,15 @@ data class CreateSeasonRequest(
     @SerializedName("is_registration_open") val isRegistrationOpen: Boolean,
     @SerializedName("user_id") val userId: Int?
 )
+
+data class CreatePhaseRequest(
+    val name: String,
+    val type: String, // group_stage, quarter_final, semi_final, final...
+    val format: String, // round_robin, knockout
+    val order: Int,
+    @SerializedName("start_date") val startDate: String? = null,
+    @SerializedName("end_date") val endDate: String? = null,
+    @SerializedName("group_count") val groupCount: Int? = null,
+    @SerializedName("group_names") val groupNames: List<String>? = null,
+    @SerializedName("team_ids") val teamIds: List<Int>? = null
+)

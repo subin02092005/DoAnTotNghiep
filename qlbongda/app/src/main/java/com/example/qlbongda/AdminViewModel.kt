@@ -462,6 +462,25 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     private val _tournaments = MutableStateFlow<List<TournamentItem>>(emptyList())
     val tournaments: StateFlow<List<TournamentItem>> = _tournaments
 
+    private val _tournamentDetail = MutableStateFlow<TournamentDetailData?>(null)
+    val tournamentDetail: StateFlow<TournamentDetailData?> = _tournamentDetail
+
+    fun fetchTournamentDetail(id: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.getTournamentDetailAdmin(id)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _tournamentDetail.value = response.body()?.data
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi tải chi tiết giải đấu: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun fetchTournaments(name: String? = null, isActive: Int? = null) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -540,6 +559,22 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun createPhase(seasonId: Int, request: CreatePhaseRequest) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.createSeasonPhase(seasonId, request)
+                if (response.isSuccessful) {
+                    _message.value = "Tạo vòng đấu thành công"
+                } else {
+                    val errorMsg = response.errorBody()?.string() ?: ""
+                    _message.value = "Lỗi tạo vòng đấu: $errorMsg"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
             }
         }
     }

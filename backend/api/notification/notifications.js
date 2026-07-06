@@ -3,7 +3,17 @@ const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
 const { cert } = require('firebase-admin/app'); // 🌟 Import module 'cert' trực tiếp
-const serviceAccount = require('../../config/service-account.json');
+
+let serviceAccount;
+try {
+    serviceAccount = require('../../config/service-account.json');
+} catch (error) {
+    if (error.code === 'MODULE_NOT_FOUND') {
+        console.warn('Warning: service-account.json not found in backend/config. Firebase notifications will be disabled.');
+    } else {
+        throw error;
+    }
+}
 
 // 1. Cấu hình Database Pool
 const pool = mysql.createPool({
@@ -15,8 +25,12 @@ const pool = mysql.createPool({
 console.log("DEBUG: Giá trị của admin là:", typeof admin); // Phải là 'object'
 console.log("DEBUG: Nội dung của admin:", admin);
 
+function isFirebaseInitialized() {
+    return admin.getApps().length > 0;
+}
+
 // Kiểm tra xem admin đã được khởi tạo chưa
-if (admin.getApps().length === 0) {
+if (admin.getApps().length === 0 && serviceAccount) {
     try {
         admin.initializeApp({
             credential: cert(serviceAccount) // 🌟 Sử dụng hàm 'cert' đã import
@@ -26,8 +40,14 @@ if (admin.getApps().length === 0) {
         console.error("Lỗi khi khởi tạo Firebase Admin:", error);
     }
 }
+
 // 🌟 ĐỊNH NGHĨA HÀM GỬI FCM (Thiếu hàm này nên bạn bị lỗi)
 async function sendFCMNotification(token, title, body) {
+    if (!isFirebaseInitialized()) {
+        console.warn('Firebase Admin chưa được khởi tạo. Bỏ qua gửi thông báo FCM.');
+        return;
+    }
+
     try {
         const message = {
             notification: {

@@ -263,6 +263,12 @@
             @Body request: CreateSeasonRequest
         ): Response<GenericAdminResponse>
 
+        @POST("seasons/{seasonId}/phases")
+        suspend fun createSeasonPhase(
+            @Path("seasonId") seasonId: Int,
+            @Body request: CreatePhaseRequest
+        ): Response<GenericAdminResponse>
+
         @PUT("tournaments/{tournamentId}/seasons/{seasonId}/rules")
         suspend fun updateSeasonRules(
             @Path("tournamentId") tournamentId: Int,

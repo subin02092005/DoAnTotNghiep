@@ -719,6 +719,8 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
 
+    var showAddPhaseDialog by remember { mutableStateOf(false) }
+    var selectedSeasonId by remember { mutableIntStateOf(-1) }
     LaunchedEffect(Unit) {
         viewModel.fetchTournaments()
     }
@@ -754,7 +756,12 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
                 items(tournaments) { tournament ->
                     TournamentAdminCard(
                         tournament = tournament,
-                        onToggleStatus = { viewModel.updateTournamentStatus(tournament.id, tournament.isActive == 0) }
+                        onToggleStatus = { viewModel.updateTournamentStatus(tournament.id, tournament.isActive == 0) },
+                        onAddPhaseClick = {
+                            // Giả sử giải đấu có thuộc tính seasonId hiện tại (bạn cần truyền đúng ID của season)
+                            selectedSeasonId = tournament.id // Tạm dùng id giải đấu làm seasonId nếu cấu trúc 1-1
+                            showAddPhaseDialog = true
+                        }
                     )
                 }
             }
@@ -770,10 +777,78 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
             }
         )
     }
+    if (showAddPhaseDialog && selectedSeasonId != -1) {
+        AddPhaseDialog(
+            seasonId = selectedSeasonId,
+            onDismiss = { showAddPhaseDialog = false },
+            onConfirm = { request ->
+                viewModel.createPhase(selectedSeasonId, request)
+                showAddPhaseDialog = false
+            }
+        )
+    }
 }
 
 @Composable
-fun TournamentAdminCard(tournament: com.example.qlbongda.data.model.TournamentItem, onToggleStatus: () -> Unit) {
+fun AddPhaseDialog(
+    seasonId: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (com.example.qlbongda.data.model.CreatePhaseRequest) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf("group_stage") }
+    var format by remember { mutableStateOf("round_robin") }
+    var order by remember { mutableStateOf("1") }
+    var groupCount by remember { mutableStateOf("1") }
+
+    val phaseTypes = listOf("group_stage", "round_of_16", "quarter_final", "semi_final", "final")
+    val formats = listOf("round_robin", "knockout")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Thêm Vòng đấu") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Tên vòng đấu (VD: Vòng Bảng)") })
+                
+                Text("Kiểu vòng:")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    phaseTypes.take(3).forEach { pType ->
+                        FilterChip(selected = type == pType, onClick = { type = pType }, label = { Text(pType, fontSize = 10.sp) })
+                    }
+                }
+
+                Text("Định dạng:")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    formats.forEach { fmt ->
+                        FilterChip(selected = format == fmt, onClick = { format = fmt }, label = { Text(fmt) })
+                    }
+                }
+
+                OutlinedTextField(value = order, onValueChange = { order = it }, label = { Text("Thứ tự (Order)") })
+                
+                if (format == "round_robin") {
+                    OutlinedTextField(value = groupCount, onValueChange = { groupCount = it }, label = { Text("Số lượng bảng") })
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                onConfirm(com.example.qlbongda.data.model.CreatePhaseRequest(
+                    name = name,
+                    type = type,
+                    format = format,
+                    order = order.toIntOrNull() ?: 1,
+                    groupCount = if (format == "round_robin") groupCount.toIntOrNull() else null
+                ))
+            }) { Text("Tạo") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
+    )
+}
+
+@Composable
+fun TournamentAdminCard(tournament: com.example.qlbongda.data.model.TournamentItem, onToggleStatus: () -> Unit, onAddPhaseClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -797,6 +872,21 @@ fun TournamentAdminCard(tournament: com.example.qlbongda.data.model.TournamentIt
                 colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen, checkedTrackColor = NeonGreen.copy(alpha = 0.5f))
             )
         }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // THÊM NÚT TẠO VÒNG ĐẤU DƯỚI CARD
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Button(
+                onClick = onAddPhaseClick,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Thêm Vòng đấu", color = NeonGreen, fontSize = 12.sp)
+            }
+        }
+
     }
 }
 
