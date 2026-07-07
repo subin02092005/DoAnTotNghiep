@@ -43,7 +43,6 @@ fun HomeScreen(
     onNavigateToStandingDetail: () -> Unit,
     onLogout: () -> Unit,
     onTeamClick: (Int) -> Unit,
-
     isTeamRegistered: Boolean,
     onTeamRegisteredChange: (Boolean) -> Unit,
     teamName: String,
@@ -55,7 +54,6 @@ fun HomeScreen(
     isLeagueRegistered: Boolean,
     onLeagueRegisteredChange: (Boolean) -> Unit,
     currentUserRole: String,
-
     playerList: SnapshotStateList<PlayerInfo>
 ) {
         Scaffold(
@@ -126,7 +124,7 @@ fun HomeScreen(
                         }
                     )
                     2 -> NewsTabContent()
-                    3 -> TeamTabContent(
+                    3 ->  TeamTabContent(
                         playerList = playerList,
                         isTeamRegistered = isTeamRegistered,
                         onTeamRegisteredChange = onTeamRegisteredChange,
@@ -140,7 +138,8 @@ fun HomeScreen(
                         onLeagueRegisteredChange = onLeagueRegisteredChange,
                         currentUserRole = currentUserRole, // Biến này cần được khai báo trong HomeScreen
                     )
-                    4 -> ProfileTabContent(onLogout = onLogout)
+                    4 -> ProfileTabContent(onLogout = onLogout
+                    )// Thay đổi biến này để kích hoạt lại các nơi khá)
                 }
             }
         }

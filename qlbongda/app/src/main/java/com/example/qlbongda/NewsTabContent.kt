@@ -1,5 +1,6 @@
 package com.example.qlbongda
 
+import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,8 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 import com.example.qlbongda.data.api.RetrofitClient
+
 import com.example.qlbongda.data.model.Notification
 import com.example.qlbongda.ui.theme.NeonGreen
+import com.example.qlbongda.utils.DateUtils
 
 @Composable
 fun NewsTabContent() {
@@ -103,7 +107,12 @@ fun NewsItemRow(news: Notification, onClick: () -> Unit) {
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(50.dp).background(Color(0xFF1F1F1F), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                Text("🔔", fontSize = 20.sp)
+                Icon(
+                    imageVector = Icons.Default.Notifications, // Biểu tượng chuông chuẩn
+                    contentDescription = "Thông báo",
+                    tint = NeonGreen, // Đổi màu cực kỳ chuẩn xác
+                    modifier = Modifier.size(24.dp)
+                )
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -114,7 +123,7 @@ fun NewsItemRow(news: Notification, onClick: () -> Unit) {
                     fontWeight = if (news.is_read == 1) FontWeight.Normal else FontWeight.Bold,
                     maxLines = 2
                 )
-                Text(text = news.time, color = Color.Gray, fontSize = 11.sp)
+                Text(text = DateUtils.formatTime(news.time), color = Color.Gray, fontSize = 11.sp)
             }
         }
     }
@@ -123,16 +132,13 @@ fun NewsItemRow(news: Notification, onClick: () -> Unit) {
 @Composable
 fun NewsDetailScreen(news: Notification, onBack: () -> Unit) {
     val context = LocalContext.current
-    LaunchedEffect(news.id) {
-        if (news.is_read == 0) {
-            try {
-                // Giả định bạn đã có hàm markAsRead trong RetrofitClient
-                RetrofitClient.getClient(context).markAsRead(news.id)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+    val sharedPreferences = remember {
+        context.getSharedPreferences("AUTH_PREF", Context.MODE_PRIVATE) // Phải là "AUTH_PREF"
     }
+    val currentUserId = remember {
+        sharedPreferences.getInt("USER_ID", -1)
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(Color.Black).padding(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth().clickable { onBack() }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = NeonGreen)
@@ -142,7 +148,7 @@ fun NewsDetailScreen(news: Notification, onBack: () -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
         Text(text = news.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-        Text(text = news.time, color = Color.Gray, fontSize = 12.sp)
+        Text(text = DateUtils.formatTime(news.time), color = Color.Gray, fontSize = 12.sp)
         Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider(color = Color(0xFF222222))
         Spacer(modifier = Modifier.height(16.dp))

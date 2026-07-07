@@ -370,7 +370,11 @@ data class MatchDetailResponse(
     val data: FullMatchDetail // Đây chính là class bạn dùng trong App
 )
 
-
+data class BaseResponse(
+    val status: String? = null,
+    val message: String? = null,
+    val success: Boolean? = null
+)
 // =================================================================
 // 6. NEWS MODELS (TIN TỨC BÓNG ĐÁ)
 // =================================================================
@@ -380,16 +384,7 @@ data class Notification(
     @SerializedName("title") val title: String,
     @SerializedName("content") val content: String,
     @SerializedName("created_at") val time: String,
-    @SerializedName("is_read") val is_read: Int,
-    @SerializedName("ref_entity_type") val ref_entity_type: String?,
-    @SerializedName("ref_entity_id") val ref_entity_id: Int?
+    @SerializedName("is_read") var is_read: Int,
+
 )
-
-data class BaseResponse(
-    val status: String? = null,
-    val message: String? = null,
-    val success: Boolean? = null
-)
-
-
 data class NotificationResponse(val status: String, val data: List<Notification>)

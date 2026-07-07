@@ -86,6 +86,7 @@ fun TeamTabContent(
                 } catch (e: Exception) {
                     e.printStackTrace()
                 } finally {
+
                     isLoading = false
                 }
             }
@@ -93,6 +94,10 @@ fun TeamTabContent(
     }
     // Trong fetchSeasons:
     LaunchedEffect(userId) {
+        isLoading = true
+        hasTeam = false
+        myTeamId = -1
+        playerList.clear()
         if (userId != -1) {
             try {
                 val response = RetrofitClient.getClient(context).getMyTeam(userId)
@@ -163,6 +168,7 @@ fun TeamTabContent(
     }
     // 🌟 Nếu không ở mode thanh toán thì mới hiển thị màn hình chính
     else {
+
     if (isLoading) {
         // Hiển thị vòng xoay tải hoặc một màn hình trống để tránh nhấp nháy
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

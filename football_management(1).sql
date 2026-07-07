@@ -492,20 +492,20 @@ INSERT INTO `phases` (`id`, `season_id`, `name`, `type`, `format`, `order`, `sta
 -- Table structure for table `players`
 --
 
-	CREATE TABLE `players` (
-	  `id` int NOT NULL,
-	  `date_of_birth` datetime(3) NOT NULL,
-	  `position` enum('goalkeeper','defender','midfielder','forward') COLLATE utf8mb4_unicode_ci NOT NULL,
-	  `height` decimal(5,2) DEFAULT NULL,
-	  `weight` decimal(5,2) DEFAULT NULL,
-	  `nationality` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-	  `avatar` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-	  `is_active` tinyint(1) NOT NULL DEFAULT '1',
-	  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-	  `updated_at` datetime(3) DEFAULT NULL,
-	  `deleted_at` datetime(3) DEFAULT NULL,
-	  `user_id` int NOT NULL
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+		CREATE TABLE `players` (
+		  `id` int NOT NULL,
+		  `date_of_birth` datetime(3) NOT NULL,
+		  `position` enum('goalkeeper','defender','midfielder','forward') COLLATE utf8mb4_unicode_ci NOT NULL,
+		  `height` decimal(5,2) DEFAULT NULL,
+		  `weight` decimal(5,2) DEFAULT NULL,
+		  `nationality` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+		  `avatar` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+		  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+		  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+		  `updated_at` datetime(3) DEFAULT NULL,
+		  `deleted_at` datetime(3) DEFAULT NULL,
+		  `user_id` int NOT NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `players`

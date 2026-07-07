@@ -33,10 +33,17 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.qlbongda.data.model.AdminPlayerItem
 import com.example.qlbongda.data.model.AdminTeamItem
+import com.example.qlbongda.data.model.CreateNotificationRequest
 import com.example.qlbongda.data.model.FullMatchDetail
+import com.example.qlbongda.data.model.NotificationItem
 import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.ui.theme.NeonGreen
 
+val NeonBlack = Color(0xFF0A0A0A)      // Đen sâu
+val NeonSurface = Color(0xFF161616)    // Xám rất tối (cho Card & Tab)
+val NeonGray = Color(0xFF666666)       // Xám cho chữ phụ
+val NeonRed = Color(0xFFFF003C)
+val NeonWhite = Color(0xFFFFFFFF) // <--- THÊM DÒNG NÀY VÀO
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminScreen(
@@ -103,7 +110,7 @@ fun AdminScreen(
                     selectedMatchId = matchId
                     currentSection = AdminSection.MATCH_DETAIL_MANAGE
                 })
-                AdminSection.STATS -> StatisticsScreen()
+                AdminSection.STATS -> NotificationManagementScreen(adminViewModel)
                 AdminSection.PAYMENTS -> PaymentConfirmationScreen()
                 AdminSection.MATCH_DETAIL_MANAGE -> {
                     if (selectedMatchId != -1) {
@@ -138,7 +145,7 @@ fun AdminDashboard(onSectionSelect: (AdminSection) -> Unit) {
         AdminMenuItem("Quản lý Giải đấu", "Thiết lập mùa giải và vòng đấu", Icons.Default.EmojiEvents, AdminSection.LEAGUES),
         AdminMenuItem("Quản lý Cầu thủ", "Cơ sở dữ liệu cầu thủ toàn hệ thống", Icons.Default.Person, AdminSection.PLAYERS),
         AdminMenuItem("Lịch thi đấu", "Sắp xếp và cập nhật trạng thái HOT", Icons.Default.CalendarMonth, AdminSection.SCHEDULE),
-        AdminMenuItem("Thống kê & Báo cáo", "Xem hiệu suất và dữ liệu giải đấu", Icons.Default.Assessment, AdminSection.STATS),
+        AdminMenuItem("Thông Báo", "Xem hiệu suất và dữ liệu giải đấu", Icons.Default.Assessment, AdminSection.STATS),
         AdminMenuItem("Xác nhận Thanh toán", "Phê duyệt lệ phí tham gia của các đội", Icons.Default.Payments, AdminSection.PAYMENTS, Color.Yellow)
     )
 
@@ -1160,10 +1167,280 @@ fun AddTournamentDialog(onDismiss: () -> Unit, onConfirm: (String, String, Int) 
 }
 
 @Composable
-fun StatisticsScreen() {
-    ManagementHeader("THỐNG KÊ & BÁO CÁO", "Tổng quan doanh thu và dữ liệu chuyên môn")
-}
+fun NotificationManagementScreen(viewModel: AdminViewModel) {
+    // Biến nhớ tab hiện tại
+    var selectedTab by remember { mutableIntStateOf(0) }
 
+    // Thu thập state từ ViewModel
+    val selectedNotification by viewModel.selectedNotification.collectAsStateWithLifecycle()
+    val showCleanupDialog by viewModel.showCleanupDialog.collectAsStateWithLifecycle()
+    val showAddDialog by viewModel.showAddDialog.collectAsStateWithLifecycle()
+
+    val generalList by viewModel.generalNotifications.collectAsStateWithLifecycle()
+    val teamList by viewModel.teamNotifications.collectAsStateWithLifecycle()
+    val personalList by viewModel.personalNotifications.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        viewModel.fetchNotifications() // Đảm bảo hàm này trong ViewModel gọi 3 API của bạn
+    }
+    // Lọc dữ liệu dựa trên tab đang chọn
+    val displayList = remember(selectedTab, generalList, teamList, personalList) {
+        when (selectedTab) {
+            0 -> generalList
+            1 -> teamList
+            else -> personalList
+        }
+    }
+    if (showAddDialog) {
+        AddNotificationDialog(
+            onDismiss = { viewModel.setShowAddDialog(false) },
+            // Cập nhật ở đây để nhận đủ 6 tham số
+            onConfirm = { title, content, type, source, teamId, userId ->
+                viewModel.createNotification(title, content, type, teamId, userId)
+                viewModel.setShowAddDialog(false)
+            }
+        )
+    }
+
+    // Dialog chỉnh sửa (sẽ hiển thị khi selectedNotification khác null)
+    if (selectedNotification != null) {
+        EditNotificationDialog(
+            notification = selectedNotification!!,
+            onDismiss = { viewModel.setSelectedNotification(null) },
+            onConfirm = { title, content, type, isActive ->
+                viewModel.updateNotification(selectedNotification!!.id, title, content, type, isActive)
+                viewModel.setSelectedNotification(null)
+            }
+        )
+    }
+    if (showCleanupDialog) {
+        CleanupConfirmationDialog(
+            onDismiss = { viewModel.setShowCleanupDialog(false) },
+            onConfirm = {
+                viewModel.triggerCleanupNotifications()
+                viewModel.setShowCleanupDialog(false)
+            }
+        )
+    }
+
+    // Màn hình chính
+    Scaffold(
+        containerColor = NeonBlack,
+        floatingActionButton = {
+            Column {
+                // Nút Dọn dẹp: Đỏ Neon + Icon Đen
+                // Nút Dọn dẹp: Bấm vào chỉ làm hiện Dialog
+                FloatingActionButton(
+                    onClick = { viewModel.setShowCleanupDialog(true) },
+                    containerColor = NeonRed,
+                    contentColor = Color.Black
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Dọn dẹp")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Nút Thêm: Xanh Neon + Icon Đen
+                FloatingActionButton(
+                    onClick = { viewModel.setShowAddDialog(true) },
+                    containerColor = NeonGreen, // Dùng biến NeonGreen của bạn
+                    contentColor = Color.Black
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Thêm")
+                }
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+                .background(NeonBlack)
+        ) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = NeonSurface,
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator( // Sử dụng SecondaryIndicator cho Compose mới
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = NeonGreen,
+                        height = 3.dp
+                    )
+                }
+            ) {
+                val tabs = listOf("Chung", "Theo Team", "Cá nhân")
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = {
+                            Text(
+                                text = title,
+                                // Hiệu ứng đổi màu chữ dựa trên trạng thái chọn
+                                color = if (selectedTab == index) NeonGreen else NeonGray,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    )
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(bottom = 160.dp)
+            ) {
+                items(displayList) { item ->
+                    // Card sẽ tự hòa vào nền đen vì dùng NeonSurface
+                    NotificationItemCard(
+                        item = item,
+                        onDelete = { viewModel.deleteNotification(item.id) },
+                        onEdit = { viewModel.setSelectedNotification(item) }
+                    )
+                }
+            }
+        }
+    }
+}
+@Composable
+fun AddNotificationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, String, Int?, Int?) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf("general") }
+    var targetTeamId by remember { mutableStateOf("") }
+    var recipientUserId by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NeonSurface,
+        title = { Text("Thêm thông báo mới", color = NeonWhite) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Tiêu đề") })
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = content, onValueChange = { content = it }, label = { Text("Nội dung") })
+
+                // Chọn loại thông báo
+                Text("Loại: $type", color = NeonGreen)
+                Row {
+                    RadioButton(selected = type == "general", onClick = { type = "general" })
+                    Text("Chung", color = NeonWhite)
+                    RadioButton(selected = type == "match_schedule", onClick = { type = "match_schedule" })
+                    Text("Đội", color = NeonWhite)
+                    RadioButton(selected = type == "player_approved", onClick = { type = "player_approved" })
+                    Text("Cá nhân", color = NeonWhite)
+                }
+
+                if (type == "match_schedule") {
+                    OutlinedTextField(value = targetTeamId, onValueChange = { targetTeamId = it }, label = { Text("ID Team") })
+                }
+                if (type == "player_approved") {
+                    OutlinedTextField(value = recipientUserId, onValueChange = { recipientUserId = it }, label = { Text("ID Người nhận") })
+                }
+                errorMessage?.let {
+                    Text(it, color = NeonRed, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                // LOGIC VALIDATE
+                when {
+                    title.isBlank() -> errorMessage = "Vui lòng nhập tiêu đề"
+                    content.isBlank() -> errorMessage = "Vui lòng nhập nội dung"
+                    type == "match_schedule" && targetTeamId.isBlank() -> errorMessage = "Vui lòng nhập ID Team"
+                    type == "player_approved" && recipientUserId.isBlank() -> errorMessage = "Vui lòng nhập ID Người nhận"
+                    else -> {
+                        // Nếu mọi thứ đều ổn
+                        onConfirm(title, content, type, "admin_panel", targetTeamId.toIntOrNull(), recipientUserId.toIntOrNull())
+                    }
+                }
+            }) {
+                Text("Gửi", color = NeonGreen)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy", color = NeonGray) } }
+    )
+}
+@Composable
+fun CleanupConfirmationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NeonSurface, // Màu nền đen xám của bạn
+        title = { Text("Xác nhận dọn dẹp", color = NeonRed) },
+        text = {
+            Text(
+                "Dọn dẹp tất cả thông báo cũ hơn 30 ngày? Hành động này không thể hoàn tác.",
+                color = NeonGray
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Xác nhận", color = NeonRed) // Màu đỏ Neon cho hành động nguy hiểm
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy", color = NeonGreen)
+            }
+        }
+    )
+}
+@Composable
+fun EditNotificationDialog(
+    notification: NotificationItem,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, Int) -> Unit
+) {
+    var title by remember { mutableStateOf(notification.title) }
+    var content by remember { mutableStateOf(notification.content) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Chỉnh sửa thông báo") },
+        text = {
+            Column {
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Tiêu đề") })
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = content, onValueChange = { content = it }, label = { Text("Nội dung") })
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(title, content, notification.type, 1) }) {
+                Text("Lưu")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
+    )
+}
+@Composable
+fun NotificationItemCard(item: NotificationItem, onDelete: () -> Unit, onEdit: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .padding(8.dp)
+            .fillMaxWidth(), // Chiếm hết chiều rộng
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(item.content, maxLines = 2, fontSize = 14.sp)
+            }
+            IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Sửa") }
+            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Xóa") }
+        }
+    }
+}
 @Composable
 fun PaymentConfirmationScreen() {
     ManagementHeader("XÁC NHẬN THANH TOÁN", "Danh sách các giao dịch chờ phê duyệt")

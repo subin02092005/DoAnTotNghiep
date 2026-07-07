@@ -26,9 +26,12 @@ import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+
 class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
+
     ) { isGranted: Boolean ->
         if (!isGranted) {
             // Bạn có thể hiện một Toast thông báo nếu người dùng từ chối quyền
@@ -39,6 +42,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         askNotificationPermission()
+
         val apiService = RetrofitClient.getClient(this@MainActivity)
         val homeViewModel = HomeViewModel(apiService)
         val adminViewModel = AdminViewModel(apiService)
@@ -46,6 +50,7 @@ class MainActivity : ComponentActivity() {
         // Tìm đoạn này trong MainActivity.onCreate
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener { task ->
             if (!task.isSuccessful) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
                 Log.w("FCM_TOKEN", "Lấy token thất bại", task.exception)
                 return@addOnCompleteListener
             }

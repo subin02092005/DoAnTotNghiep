@@ -1,11 +1,16 @@
 package com.example.qlbongda
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.qlbongda.data.api.ApiService
 import com.example.qlbongda.data.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class AdminViewModel(private val apiService: ApiService) : ViewModel() {
@@ -24,6 +29,164 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
+
+    // Trong AdminViewModel
+    private val _notifications = MutableStateFlow<List<NotificationItem>>(emptyList())
+    val notifications = _notifications.asStateFlow()
+    // Cách dùng StateFlow để luôn phản ánh dữ liệu mới nhất
+    val generalNotifications = notifications.map { list ->
+        list.filter { it.target_team_id == null && it.recipient_user_id == null }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val teamNotifications = notifications.map { list ->
+        list.filter { it.target_team_id != null }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // 3. Thông báo cá nhân
+    val personalNotifications = notifications.map { list ->
+        list.filter { it.recipient_user_id != null }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun fetchNotifications() {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getAllNotifications()
+                if (response.isSuccessful) {
+                    val result = response.body()
+                    // Lấy list từ biến "data" của result
+                    val notificationList = result?.data ?: emptyList()
+                    _notifications.value = notificationList
+                }
+            } catch (e: Exception) {
+                Log.e("API_ERROR", "Chi tiết lỗi: ", e)
+                _message.value = "Lỗi: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun createNotification(
+        title: String,
+        content: String,
+        type: String,
+        target_team_id: Int?,
+        recipient_user_id: Int?
+    ) {
+        viewModelScope.launch {
+            try {
+                // Tạo đối tượng request với đầy đủ dữ liệu
+                val request = CreateNotificationRequest(
+                    title = title,
+                    content = content,
+                    type = type,
+                    target_team_id = target_team_id,
+                    recipient_user_id = recipient_user_id,
+                    source = "admin_panel" // Giá trị mặc định
+                )
+                Log.d("API_DEBUG", "Request gửi đi: $request")
+                val response = apiService.createNotification(request)
+                if (response.isSuccessful) {
+                    _message.value = "Đã gửi thông báo!"
+                    fetchNotifications() // Tải lại danh sách sau khi thêm thành công
+                } else {
+                    val errorMsg = response.errorBody()?.string()
+                    Log.e("API_DEBUG", "Server trả về lỗi: $errorMsg")
+                    _message.value = "Lỗi: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối server"
+            }
+        }
+    }
+
+    fun deleteNotification(id: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.deleteNotification(id)
+                if (response.isSuccessful) {
+                    fetchNotifications()
+                    _message.value="Xóa thành công"
+                } else {
+                    // IN RA LỖI TỪ SERVER
+                    val errorMsg = response.errorBody()?.string()
+                    Log.e("DELETE_DEBUG", "Server trả về lỗi code ${response.code()}: $errorMsg")
+                    _message.value = "Lỗi ${response.code()}: Không thể xóa"
+                }
+            } catch (e: Exception) {
+                Log.e("DELETE_DEBUG", "Lỗi kết nối: ${e.message}")
+                _message.value = "Lỗi kết nối server"
+            }
+        }
+    }
+    fun updateNotification(id: Int, title: String, content: String, type: String, isActive: Int) {
+        viewModelScope.launch {
+            try {
+                // Chuẩn bị dữ liệu theo yêu cầu API PUT
+                val body = mapOf(
+                    "title" to title,
+                    "content" to content,
+                    "type" to type,
+                    "is_active" to isActive
+                )
+
+                val requestBody = UpdateNotificationRequest(title, content, type, isActive)
+                val response = apiService.updateNotification(id, requestBody)
+                if (response.isSuccessful) {
+                    _message.value = "Cập nhật thành công!"
+                    fetchNotifications() // Tải lại danh sách để cập nhật UI
+                } else {
+                    _message.value = "Cập nhật thất bại"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối server"
+            }
+        }
+    }
+    fun triggerCleanupNotifications() {
+        viewModelScope.launch {
+            try {
+                // Giả định bạn đã khai báo @POST("notifications/cleanup_notifications") trong ApiService
+                val response = apiService.cleanupNotifications()
+                if (response.isSuccessful) {
+                    _message.value = "Đã dọn dẹp các thông báo cũ!"
+                    fetchNotifications() // Tải lại để thấy danh sách đã ẩn bớt
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi dọn dẹp hệ thống"
+            }
+        }
+    }
+    private val _selectedNotification = MutableStateFlow<NotificationItem?>(null)
+    val selectedNotification = _selectedNotification.asStateFlow()
+
+    fun setSelectedNotification(notification: NotificationItem?) {
+        _selectedNotification.value = notification
+    }
+    private val _showCleanupDialog = MutableStateFlow(false)
+    val showCleanupDialog = _showCleanupDialog.asStateFlow()
+
+    fun setShowCleanupDialog(show: Boolean) {
+        _showCleanupDialog.value = show
+    }
+    private val _showAddDialog = MutableStateFlow(false)
+    val showAddDialog = _showAddDialog.asStateFlow()
+
+    fun setShowAddDialog(show: Boolean) {
+        _showAddDialog.value = show
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     fun fetchPlayers(name: String? = null) {
         viewModelScope.launch {

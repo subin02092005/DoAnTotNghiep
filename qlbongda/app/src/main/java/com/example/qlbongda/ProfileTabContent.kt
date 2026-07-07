@@ -184,7 +184,14 @@
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                Button(onClick = { onLogout() }, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Red), shape = RoundedCornerShape(8.dp)) {
+                Button(onClick = {
+                    val sharedPref = context.getSharedPreferences("AUTH_PREF", android.content.Context.MODE_PRIVATE)
+                    sharedPref.edit().apply {
+                        remove("USER_ID")
+                        apply()
+                    }
+                    onLogout()
+                                 }, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Red), shape = RoundedCornerShape(8.dp)) {
                     Text(text = "ĐĂNG XUẤT TÀI KHOẢN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }

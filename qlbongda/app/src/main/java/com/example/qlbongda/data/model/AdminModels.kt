@@ -1,7 +1,35 @@
 package com.example.qlbongda.data.model
 
 import com.google.gson.annotations.SerializedName
-
+data class NotificationItem(
+    val id: Int,
+    val title: String,
+    val content: String,
+    val type: String,
+    val source: String,
+    val target_team_id: Int?,
+    val recipient_user_id: Int?,
+    val is_active: Int,
+    val created_at: String
+)
+data class UpdateNotificationRequest(
+    val title: String,
+    val content: String,
+    val type: String,
+    @SerializedName("is_active") val is_active: Int
+)
+data class NotificationResponseadmin(
+    val status: String,
+    val data: List<NotificationItem> // Chứa danh sách thông báo bên trong
+)
+data class CreateNotificationRequest(
+    val title: String,
+    val content: String,
+    val type: String="general",
+    val source: String,
+    @SerializedName("target_team_id") val target_team_id: Int?,
+    @SerializedName("recipient_user_id") val recipient_user_id: Int?,
+)
 data class AdminPlayerItem(
     @SerializedName("player_id") val playerId: Int? = null,
     @SerializedName("date_of_birth") val dateOfBirth: String? = null,

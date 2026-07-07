@@ -125,11 +125,20 @@ router.post('/tournaments', async (req, res) => {
             );
         }
         //thong báo cho tất cả người dùng khi có giải đấu mới
-        try {
-   await sendToAll("Giải đấu mới", "Một giải đấu mới vừa được công bố, hãy kiểm tra ngay!");
-} catch (err) {
-    console.error("Gửi thông báo thất bại:", err);
+      
+
+// 1. Lấy tên mùa giải từ DB
+let seasonName = "Mùa giải hiện tại";
+if (season_id) {
+    const [seasons] = await pool.execute("SELECT name FROM seasons WHERE id = ?", [season_id]);
+    if (seasons.length > 0) seasonName = seasons[0].name;
 }
+
+// 2. Gửi thông báo chi tiết
+const notifyTitle = `Giải đấu ${name} đã mở!`;
+const notifyBody = `Nằm trong khuôn khổ ${seasonName}. ${description || ''}`;
+
+await sendToAll(notifyTitle, notifyBody);
 
         res.status(201).json({ success: true, message: 'Tạo giải đấu thành công.', tournamentId });
     } catch (error) {

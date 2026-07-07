@@ -88,7 +88,7 @@ fun TeamDetailScreen(
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = team.teamName.toString()?.uppercase() ?: "",
+                        text = team?.teamName?.uppercase() ?: "",
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,

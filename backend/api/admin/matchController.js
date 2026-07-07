@@ -128,18 +128,21 @@ router.post('/matches', async (req, res) => {
                 is_published ? 1 : 0]
         );
 // Gửi cho đội A
+        const matchTitle = `Trận đấu giữa đội nhà và đội khách`; 
+
+        // Gửi cho đội nhà (home_team_id)
         await createAndSendNotification(
-            team_a_id, 
+            home_team_id, 
             "Lịch thi đấu mới", 
-            `Bạn có trận đấu sắp tới: ${title}`, 
+            `Bạn có trận đấu sắp tới vào lúc ${scheduled_at}`, 
             'match_schedule'
         );
 
-        // Gửi cho đội B
+        // Gửi cho đội khách (away_team_id)
         await createAndSendNotification(
-            team_b_id, 
+            away_team_id, 
             "Lịch thi đấu mới", 
-            `Bạn có trận đấu sắp tới: ${title}`, 
+            `Bạn có trận đấu sắp tới vào lúc ${scheduled_at}`, 
             'match_schedule'
         );
         res.status(201).json({ success: true, message: 'Tạo lịch thi đấu thành công.', matchId: result.insertId });

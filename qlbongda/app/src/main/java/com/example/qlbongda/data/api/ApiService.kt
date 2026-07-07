@@ -49,8 +49,8 @@
             @Query("userId") userId: Int,
             @Query("teamId") teamId: Int
         ): Response<NotificationResponse>
-        @POST("mark_as_read/{id}")
-        suspend fun markAsRead(@Path("id") id: Int): Response<Unit>
+
+
         // ---- ĐỘI BÓNG CỦA TÔI (Cá nhân) ----
 
         @GET("my_team")
@@ -298,4 +298,25 @@
             @Path("phaseId") phaseId: Int,
             @Body request: Any // Thêm tham số này
         ): Response<BaseResponse>
+
+        ///////////////////////////thong báo admin
+        @GET("all_notifications")
+        suspend fun getAllNotifications(): Response<NotificationResponseadmin>
+
+        @POST("create_notification")
+        suspend fun createNotification(@Body request: CreateNotificationRequest): Response<Unit>
+
+        @PUT("update_notification/{id}")
+        suspend fun updateNotification(
+            @Path("id") id: Int,
+            @Body request: UpdateNotificationRequest // Dùng object thay cho Map
+        ): Response<ResponseBody>
+
+        @DELETE("delete_notification/{id}") // Phải có dấu {id} ở đây
+        suspend fun deleteNotification(
+            @Path("id") id: Int // Phải khớp với tên {id} bên trên
+        ): Response<Unit>
+
+        @POST("notifications/cleanup_notifications")
+        suspend fun cleanupNotifications(): Response<Unit>
     }
