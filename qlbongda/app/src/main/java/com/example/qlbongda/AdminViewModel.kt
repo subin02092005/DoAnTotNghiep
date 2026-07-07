@@ -659,12 +659,28 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
-
-    fun createTournament(name: String, description: String?, logo: String?, maxTeams: Int, userId: Int?) {
+    private val _currentUserId = MutableStateFlow<Int?>(null)
+    fun createTournament(
+        name: String,
+        description: String?,
+        maxPlayers: Int, // Thêm tham số
+        minPlayers: Int ,
+       // userId: Int? // Thêm tham số
+    ) {val userId = _currentUserId.value
         viewModelScope.launch {
             try {
-                val request = CreateTournamentRequest(name, description, logo, maxTeams, userId)
+                // Truyền giá trị vào request
+                val request = CreateTournamentRequest(
+                    name = name,
+                    description = description,
+                    logo="",
+                    maxplayer = maxPlayers,
+                    min_players = minPlayers,
+                    userId = userId
+                )
+
                 val response = apiService.createTournament(request)
+
                 if (response.isSuccessful && response.body()?.success == true) {
                     _message.value = "Tạo giải đấu thành công"
                     fetchTournaments()

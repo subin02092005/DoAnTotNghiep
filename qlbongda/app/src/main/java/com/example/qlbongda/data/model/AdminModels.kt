@@ -232,7 +232,8 @@ data class TournamentItem(
     val name: String,
     val description: String?,
     val logo: String?,
-    @SerializedName("max_teams") val maxTeams: Int?, // Có thể null do LEFT JOIN
+   @SerializedName("max_players") val maxplayer: Int?, // Có thể null do LEFT JOIN
+    @SerializedName("min_players") val minplayer: Int?, // Có thể null do LEFT JOIN
     @SerializedName("is_active") val isActive: Int,
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("updated_at") val updatedAt: String?
@@ -285,7 +286,8 @@ data class CreateTournamentRequest(
     val name: String,
     val description: String?,
     val logo: String?,
-    @SerializedName("max_teams") val maxTeams: Int,
+   @SerializedName("max_players") val maxplayer: Int,
+    val min_players:Int,
     @SerializedName("user_id") val userId: Int?
 )
 

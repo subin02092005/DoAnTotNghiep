@@ -376,7 +376,31 @@ router.post('/register_to_season', async (req, res) => {
         if (season.length === 0 || season[0].status !== 'registration_open') {
             return res.status(400).json({ status: "error", message: "Giải đấu không mở đăng ký!" });
         }
+// --- BỔ SUNG: Kiểm tra số lượng cầu thủ (Tối thiểu & Tối đa) ---
+        // Lấy quy tắc của giải đấu (để biết min/max players)
+        const [rules] = await pool.query(
+            'SELECT min_players_per_team, max_players_per_team FROM tournament_rules WHERE tournament_id = (SELECT tournament_id FROM seasons WHERE id = ?)',
+            [season_id]
+        );
+        
+        if (rules.length === 0) {
+            return res.status(400).json({ status: "error", message: "Không tìm thấy quy tắc của giải đấu!" });
+        }
+        const { min_players_per_team, max_players_per_team } = rules[0];
 
+        // Đếm cầu thủ của đội
+        const [countResult] = await pool.query(
+            'SELECT COUNT(*) as playerCount FROM team_players WHERE team_id = ? AND is_active = 1',
+            [team_id]
+        );
+        const currentPlayers = countResult[0].playerCount;
+
+        if (currentPlayers < min_players_per_team) {
+            return res.status(400).json({ status: "error", message: `Đội không đủ cầu thủ tối thiểu (${min_players_per_team} người).` });
+        }
+        if (currentPlayers > max_players_per_team) {
+            return res.status(400).json({ status: "error", message: `Đội vượt quá số cầu thủ tối đa (${max_players_per_team} người).` });
+        }
         // 2. Ràng buộc: Mỗi đội chỉ được đăng ký 1 giải đang mở
         const [checkOther] = await pool.query(
             `SELECT st.id 
@@ -430,6 +454,8 @@ router.post('/register_to_season', async (req, res) => {
         );
 
         await connection.commit();
+        const { sendRegistrationNotification } = require('../nodification/notifications'); // Đường dẫn file của bạn
+        sendRegistrationNotification(team_id, season_id, "Vui lòng hoàn tất thanh toán phí tham dự.");
         res.status(200).json({ status: "success", message: "Đăng ký thành công, vui lòng thanh toán phí tham dự!" });
 
     } catch (error) {

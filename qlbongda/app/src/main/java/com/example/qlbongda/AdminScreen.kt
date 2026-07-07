@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -886,8 +888,8 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
     if (showAddTournamentDialog) {
         AddTournamentDialog(
             onDismiss = { showAddTournamentDialog = false },
-            onConfirm = { name, desc, teams ->
-                viewModel.createTournament(name, desc, null, teams, null)
+            onConfirm = { name, desc, max,min ->
+                viewModel.createTournament(name, desc, max, min)
                 showAddTournamentDialog = false
             }
         )
@@ -1128,7 +1130,8 @@ fun TournamentAdminCard(
                 tournament.description?.let {
                     Text(it, color = Color.Gray, fontSize = 13.sp, maxLines = 1)
                 }
-                Text("Số đội tối đa: ${tournament.maxTeams ?: "Chưa thiết lập"}", color = Color.LightGray, fontSize = 12.sp)
+               Text("Số cầu thủ tối đa: ${tournament.maxplayer ?: "Chưa thiết lập"}", color = Color.LightGray, fontSize = 12.sp)
+                Text("Số cầu thủ tối thiểu: ${tournament.minplayer ?: "Chưa thiết lập"}", color = Color.LightGray, fontSize = 12.sp)
             }
             Switch(
                 checked = tournament.isActive == 1,
@@ -1140,23 +1143,57 @@ fun TournamentAdminCard(
 }
 
 @Composable
-fun AddTournamentDialog(onDismiss: () -> Unit, onConfirm: (String, String, Int) -> Unit) {
+fun AddTournamentDialog(
+    onDismiss: () -> Unit,
+    // Cập nhật onConfirm để nhận thêm tham số: (Tên, Mô tả, Cầu thủ tối đa, Cầu thủ tối thiểu)
+    onConfirm: (String, String, Int, Int) -> Unit
+) {
     var name by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
-    var teams by remember { mutableStateOf("16") }
+    var maxPlayers by remember { mutableStateOf("20") } // Mặc định là 20
+    var minPlayers by remember { mutableStateOf("7") }  // Mặc định là 7
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Tạo giải đấu mới") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Tên giải đấu") })
-                OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Mô tả") })
-                OutlinedTextField(value = teams, onValueChange = { teams = it }, label = { Text("Số đội tối đa") })
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Tên giải đấu") }
+                )
+                OutlinedTextField(
+                    value = desc,
+                    onValueChange = { desc = it },
+                    label = { Text("Mô tả") }
+                )
+                // Ô nhập cầu thủ tối đa
+                OutlinedTextField(
+                    value = maxPlayers,
+                    onValueChange = { maxPlayers = it },
+                    label = { Text("Cầu thủ tối đa/đội") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                // Ô nhập cầu thủ tối thiểu
+                OutlinedTextField(
+                    value = minPlayers,
+                    onValueChange = { minPlayers = it },
+                    label = { Text("Cầu thủ tối thiểu/đội") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(name, desc, teams.toIntOrNull() ?: 16) }) {
+            Button(onClick = {
+                // Chuyển đổi String sang Int khi xác nhận
+                onConfirm(
+                    name,
+                    desc,
+                    maxPlayers.toIntOrNull() ?: 20,
+                    minPlayers.toIntOrNull() ?: 7
+                )
+            }) {
                 Text("Tạo")
             }
         },

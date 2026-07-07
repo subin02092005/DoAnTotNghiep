@@ -22,7 +22,8 @@ router.get('/tournaments', async (req, res) => {
                 t.name,
                 t.description,
                 t.logo,
-                tr.max_players_per_team AS max_teams,
+                tr.max_players_per_team AS max_players,
+                tr.min_players_per_team AS min_players,
                 t.is_active,
                 t.created_at,
                 t.updated_at
@@ -99,7 +100,25 @@ router.get('/tournaments/:id', async (req, res) => {
 
 // Tạo giải đấu mới
 router.post('/tournaments', async (req, res) => {
-    const { name, description, logo, max_teams, user_id } = req.body;
+    // Thêm max_players và min_players vào đây
+    const { name, description, logo,max_players, min_players ,  user_id} = req.body;
+
+    const fields = [];
+    const params = [];
+
+    // Xây dựng danh sách các trường cần cập nhật động
+    if (name !== undefined) {
+        fields.push('name = ?');
+        params.push(name);
+    }
+    if (description !== undefined) {
+        fields.push('description = ?');
+        params.push(description);
+    }
+    if (logo !== undefined) {
+        fields.push('logo = ?');
+        params.push(logo);
+    }
 
     if (!name) {
         return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên giải đấu.' });
@@ -109,43 +128,36 @@ router.post('/tournaments', async (req, res) => {
         const [result] = await pool.execute(
             `INSERT INTO tournaments (name, description, logo, is_active, created_at, updated_at, user_id)
              VALUES (?, ?, ?, 1, NOW(), NOW(), ?)`,
-            [name, description || null, logo || null, user_id || null]
+            [name, description || null, logo || null, user_id || 1]
         );
 
         const tournamentId = result.insertId;
 
-        if (max_teams !== undefined) {
-            await pool.execute(
-                `INSERT INTO tournament_rules (
-                    tournament_id, points_per_win, points_per_draw, points_per_loss,
-                    yellow_cards_suspension, max_players_per_team, min_players_per_team,
-                    teams_advance_per_group, tiebreaker_order, created_at, updated_at, deleted_at, user_id
-                 ) VALUES (?, 3, 1, 0, 3, ?, 11, 2, '["goal_difference","goals_scored","head_to_head"]', NOW(), NOW(), NULL, ?)`,
-                [tournamentId, max_teams, user_id || null]
-            );
-        }
-        //thong báo cho tất cả người dùng khi có giải đấu mới
-      
+        // Giữ nguyên cấu trúc cũ, thay thế số 20 và 7 bằng biến (hoặc giá trị mặc định nếu không có)
+        await pool.execute(
+            `INSERT INTO tournament_rules (
+                tournament_id, points_per_win, points_per_draw, points_per_loss,
+                yellow_cards_suspension, max_players_per_team, min_players_per_team,
+                teams_advance_per_group, tiebreaker_order, created_at, updated_at, deleted_at, user_id
+             ) VALUES (?, 3, 1, 0, 3, ?, ?, 2, '["goal_difference","goals_scored","head_to_head"]', NOW(), NOW(), NULL, ?)`,
+            [tournamentId, max_players || 20, min_players || 7, user_id || 1]
+        );
 
-// 1. Lấy tên mùa giải từ DB
-let seasonName = "Mùa giải hiện tại";
-if (season_id) {
-    const [seasons] = await pool.execute("SELECT name FROM seasons WHERE id = ?", [season_id]);
-    if (seasons.length > 0) seasonName = seasons[0].name;
-}
+        // 1. Lấy tên mùa giải từ DB
+       let seasonName = "Mùa giải hiện tại";
+        // Vì không còn season_id trong req.body, đoạn này sẽ luôn lấy giá trị mặc định
+        // hoặc bạn có thể điều chỉnh logic tại đây nếu cần truy vấn theo cách khác.
 
-// 2. Gửi thông báo chi tiết
-const notifyTitle = `Giải đấu ${name} đã mở!`;
-const notifyBody = `Nằm trong khuôn khổ ${seasonName}. ${description || ''}`;
-
-await sendToAll(notifyTitle, notifyBody);
+        // 2. Gửi thông báo chi tiết
+        const notifyTitle = `Giải đấu ${name} đã mở!`;
+        const notifyBody = `Nằm trong khuôn khổ ${seasonName}. ${description || ''}`;
+        await sendToAll(notifyTitle, notifyBody);
 
         res.status(201).json({ success: true, message: 'Tạo giải đấu thành công.', tournamentId });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-
 // Cập nhật giải đấu
 router.put('/tournaments/:id', async (req, res) => {
     const { id } = req.params;
