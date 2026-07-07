@@ -878,8 +878,8 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
         AutoSchedulePhaseSelectorDialog(
             phases = phasesOfSeason,
             onDismiss = { selectedSeasonIdForAutoSchedule = -1 },
-            onConfirm = { phaseId ->
-                viewModel.autoGenerateSchedule(phaseId)
+            onConfirm = { phaseId, options ->
+                viewModel.autoGenerateSchedule(phaseId, options)
                 selectedSeasonIdForAutoSchedule = -1
             }
         )
@@ -1084,28 +1084,62 @@ fun AddPhaseDialog(
 fun AutoSchedulePhaseSelectorDialog(
     phases: List<com.example.qlbongda.data.model.TournamentPhase>,
     onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
+    onConfirm: (Int, com.example.qlbongda.data.model.ScheduleOptionsRequest) -> Unit
 ) {
+    var selectedPhaseId by remember { mutableIntStateOf(-1) }
+    var startDate by remember { mutableStateOf("2025-06-01") }
+    var startTime by remember { mutableStateOf("18:00") }
+    var intervalHours by remember { mutableStateOf("2") }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Chọn Vòng đấu để xếp lịch") },
+        title = { Text("Cấu hình xếp lịch tự động") },
         text = {
-            if (phases.isEmpty()) {
-                Text("Không có vòng đấu nào. Hãy thêm vòng đấu trước.")
-            } else {
-                LazyColumn {
-                    items(phases) { phase ->
-                        ListItem(
-                            headlineContent = { Text(phase.name) },
-                            supportingContent = { Text("Định dạng: ${phase.format}") },
-                            modifier = Modifier.clickable { onConfirm(phase.id) }
-                        )
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("1. Chọn Vòng đấu:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                if (phases.isEmpty()) {
+                    Text("Không có vòng đấu nào. Hãy thêm vòng đấu trước.", color = Color.Red)
+                } else {
+                    phases.forEach { phase ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { selectedPhaseId = phase.id }.padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(selected = selectedPhaseId == phase.id, onClick = { selectedPhaseId = phase.id })
+                            Text(phase.name, fontSize = 14.sp)
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("2. Tùy chọn thời gian:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                OutlinedTextField(value = startDate, onValueChange = { startDate = it }, label = { Text("Ngày bắt đầu (YYYY-MM-DD)") })
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = startTime, onValueChange = { startTime = it }, label = { Text("Giờ bắt đầu (HH:MM)") })
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = intervalHours, onValueChange = { intervalHours = it }, label = { Text("Cách nhau (giờ)") })
             }
         },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Đóng") } }
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm(
+                        selectedPhaseId,
+                        com.example.qlbongda.data.model.ScheduleOptionsRequest(
+                            startDate = startDate.ifBlank { null },
+                            startTime = startTime.ifBlank { null },
+                            intervalHours = intervalHours.toIntOrNull() ?: 2
+                        )
+                    )
+                },
+                enabled = selectedPhaseId != -1
+            ) {
+                Text("Chạy tự động")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
     )
 }
 
@@ -1130,8 +1164,8 @@ fun TournamentAdminCard(
                 tournament.description?.let {
                     Text(it, color = Color.Gray, fontSize = 13.sp, maxLines = 1)
                 }
-               Text("Số cầu thủ tối đa: ${tournament.maxplayer ?: "Chưa thiết lập"}", color = Color.LightGray, fontSize = 12.sp)
-                Text("Số cầu thủ tối thiểu: ${tournament.minplayer ?: "Chưa thiết lập"}", color = Color.LightGray, fontSize = 12.sp)
+               Text("Số cầu thủ tối đa: ${tournament.maxPlayers ?: "Chưa thiết lập"}", color = Color.LightGray, fontSize = 12.sp)
+                Text("Số cầu thủ tối thiểu: ${tournament.minPlayers ?: "Chưa thiết lập"}", color = Color.LightGray, fontSize = 12.sp)
             }
             Switch(
                 checked = tournament.isActive == 1,
@@ -1752,30 +1786,33 @@ fun SubstitutionDialog(
         onDismissRequest = onDismiss,
         title = { Text("Thay người") },
         text = {
-            Column {
-                Text("Đội bóng:")
-                Row {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Chọn đội bóng:", fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = selectedTeamId == 0, onClick = { selectedTeamId = 0 })
-                    Text("Đội nhà")
+                    Text(matchDetail.teamA, fontSize = 14.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     RadioButton(selected = selectedTeamId == 1, onClick = { selectedTeamId = 1 })
-                    Text("Đội khách")
+                    Text(matchDetail.teamB, fontSize = 14.sp)
                 }
                 
-                // Demo purposes: normally we'd have a dropdown here
-                Text("Minute:")
-                OutlinedTextField(value = minute, onValueChange = { minute = it })
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = minute, onValueChange = { minute = it }, label = { Text("Phút thay người") })
+                OutlinedTextField(value = period, onValueChange = { period = it }, label = { Text("Hiệp (1 hoặc 2)") })
                 
-                Text("Cầu thủ vào (ID):")
-                OutlinedTextField(value = playerInId.toString(), onValueChange = { playerInId = it.toIntOrNull() ?: 0 })
-                
-                Text("Cầu thủ ra (ID):")
-                OutlinedTextField(value = playerOutId.toString(), onValueChange = { playerOutId = it.toIntOrNull() ?: 0 })
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Nhập ID Cầu thủ (Primary Key từ DB):", fontSize = 12.sp, color = Color.Gray)
+                OutlinedTextField(value = playerInId.toString(), onValueChange = { playerInId = it.toIntOrNull() ?: 0 }, label = { Text("ID Cầu thủ VÀO") })
+                OutlinedTextField(value = playerOutId.toString(), onValueChange = { playerOutId = it.toIntOrNull() ?: 0 }, label = { Text("ID Cầu thủ RA") })
             }
         },
         confirmButton = {
             val teamId = if (selectedTeamId == 0) matchDetail.teamAId else matchDetail.teamBId
-            Button(onClick = { onConfirm(teamId, playerInId, playerOutId, minute.toIntOrNull() ?: 0, period) }) {
+            Button(onClick = { 
+                if (teamId != 0 && playerInId != 0 && playerOutId != 0) {
+                    onConfirm(teamId, playerInId, playerOutId, minute.toIntOrNull() ?: 0, period) 
+                }
+            }) {
                 Text("Thêm")
             }
         },
@@ -1794,27 +1831,27 @@ fun CardDialog(
     var selectedTeamId by remember { mutableIntStateOf(0) }
     var playerId by remember { mutableIntStateOf(0) }
     var minute by remember { mutableStateOf("45") }
+    var period by remember { mutableStateOf("1") }
     var isRed by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Thẻ phạt") },
+        title = { Text("Ghi nhận thẻ phạt") },
         text = {
-            Column {
-                Text("Đội bóng:")
-                Row {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Chọn đội bóng:", fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = selectedTeamId == 0, onClick = { selectedTeamId = 0 })
-                    Text("Đội nhà")
+                    Text(matchDetail.teamA, fontSize = 14.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     RadioButton(selected = selectedTeamId == 1, onClick = { selectedTeamId = 1 })
-                    Text("Đội khách")
+                    Text(matchDetail.teamB, fontSize = 14.sp)
                 }
 
-                Text("ID Cầu thủ:")
-                OutlinedTextField(value = playerId.toString(), onValueChange = { playerId = it.toIntOrNull() ?: 0 })
-                
-                Text("Phút:")
-                OutlinedTextField(value = minute, onValueChange = { minute = it })
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = playerId.toString(), onValueChange = { playerId = it.toIntOrNull() ?: 0 }, label = { Text("ID Cầu thủ nhận thẻ") })
+                OutlinedTextField(value = minute, onValueChange = { minute = it }, label = { Text("Phút") })
+                OutlinedTextField(value = period, onValueChange = { period = it }, label = { Text("Hiệp") })
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = isRed, onCheckedChange = { isRed = it })
@@ -1824,7 +1861,11 @@ fun CardDialog(
         },
         confirmButton = {
             val teamId = if (selectedTeamId == 0) matchDetail.teamAId else matchDetail.teamBId
-            Button(onClick = { onConfirm(teamId, playerId, minute.toIntOrNull() ?: 0, "1", isRed) }) {
+            Button(onClick = { 
+                if (teamId != 0 && playerId != 0) {
+                    onConfirm(teamId, playerId, minute.toIntOrNull() ?: 0, period, isRed) 
+                }
+            }) {
                 Text("Thêm")
             }
         },

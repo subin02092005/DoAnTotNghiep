@@ -366,7 +366,8 @@ data class MatchResponse(
     @SerializedName("data") val data: List<MatchDto> // 🌟 Dùng MatchDto ở đây
 )
 data class MatchDetailResponse(
-    val status: String,
+    val status: String? = null,
+    val success: Boolean? = null,
     val data: FullMatchDetail // Đây chính là class bạn dùng trong App
 )
 

@@ -146,16 +146,77 @@ async function createGroupsAndAssignTeams(connection, seasonId, phaseId, groupCo
     );
 
     if (teams.length > 0) {
-        for (let i = 0; i < teams.length; i += 1) {
+        const randomizedTeams = shuffleArray(teams);
+        for (let i = 0; i < randomizedTeams.length; i += 1) {
             const groupId = groupIds[i % groupCount];
             await connection.execute(
                 'UPDATE season_teams SET group_id = ? WHERE id = ?',
-                [groupId, teams[i].season_team_id]
+                [groupId, randomizedTeams[i].season_team_id]
             );
         }
     }
 
     return { groupIds, teamIds: teams.map(team => team.team_id) };
+}
+
+async function assignUnassignedSeasonTeamsToGroups(connection, phaseId, seasonId, groupIds) {
+    if (!Array.isArray(groupIds) || groupIds.length === 0) {
+        return [];
+    }
+
+    const [teams] = await connection.execute(
+        `SELECT id AS season_team_id, team_id
+         FROM season_teams
+         WHERE season_id = ? AND is_active = 1 AND status = 'active'
+           AND (group_id IS NULL OR group_id NOT IN (SELECT id FROM \`groups\` WHERE phase_id = ?))
+         ORDER BY id ASC`,
+        [seasonId, phaseId]
+    );
+
+    if (teams.length === 0) {
+        return [];
+    }
+
+    const randomizedTeams = shuffleArray(teams);
+    for (let i = 0; i < randomizedTeams.length; i += 1) {
+        const groupId = groupIds[i % groupIds.length];
+        await connection.execute(
+            'UPDATE season_teams SET group_id = ? WHERE id = ?',
+            [groupId, randomizedTeams[i].season_team_id]
+        );
+    }
+
+    return randomizedTeams;
+}
+
+async function importTeamsIntoSeasonAndAssignGroups(connection, seasonId, phaseId, teamIds = []) {
+    if (!seasonId || !phaseId) {
+        return { importedCount: 0 };
+    }
+
+    let importedCount = 0;
+    const teamList = Array.isArray(teamIds) ? teamIds : [];
+
+    for (const teamId of teamList) {
+        const [existing] = await connection.execute(
+            'SELECT id FROM season_teams WHERE season_id = ? AND team_id = ? AND deleted_at IS NULL',
+            [seasonId, teamId]
+        );
+        if (existing.length === 0) {
+            await connection.execute(
+                "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at, updated_at) VALUES (?, ?, 'active', 1, NOW(), NOW())",
+                [seasonId, teamId]
+            );
+            importedCount += 1;
+        }
+    }
+
+    const [groups] = await connection.execute('SELECT id FROM `groups` WHERE phase_id = ? ORDER BY id ASC', [phaseId]);
+    if (groups.length > 0) {
+        await assignUnassignedSeasonTeamsToGroups(connection, phaseId, seasonId, groups.map(group => group.id));
+    }
+
+    return { importedCount };
 }
 
 router.get('/seasons/:seasonId/phases', async (req, res) => {
@@ -290,18 +351,72 @@ router.post('/seasons/:seasonId/phases', async (req, res) => {
 router.post('/phases/:phaseId/generate-schedule', async (req, res) => {
     try {
         const phaseId = req.params.phaseId;
-        // Thêm || {} để tránh lỗi TypeError khi req.body là undefined
-        const { start_date, start_time, interval_hours, interval_minutes } = req.body || {}; 
+        const { start_date, start_time, interval_hours, interval_minutes, teamIds } = req.body || {};
+
+        const connection = await mysql.createConnection(dbConfig);
+        try {
+            const [phaseRows] = await connection.execute('SELECT season_id FROM phases WHERE id = ?', [phaseId]);
+            const seasonId = phaseRows.length > 0 ? phaseRows[0].season_id : null;
+
+            if (seasonId) {
+                await importTeamsIntoSeasonAndAssignGroups(connection, seasonId, phaseId, teamIds);
+            }
+        } finally {
+            try { await connection.end(); } catch (_) {}
+        }
 
         const result = await generateScheduleForPhase(phaseId, { start_date, start_time, interval_hours, interval_minutes });
         return res.status(200).json({ 
             status: 'success', 
             message: `Đã tự động xếp thành công ${result.matchesCreated} trận đấu!`, 
-            data: { matchesCreated: result.matchesCreated } 
+            data: result
         });
     } catch (error) {
         console.error('Lỗi tự động xếp lịch:', error);
-        return res.status(500).json({ status: 'error', message: 'Lỗi server khi xếp lịch tự động' });
+        return res.status(500).json({ status: 'error', message: error.message || 'Lỗi server khi xếp lịch tự động' });
+    }
+});
+
+router.post('/seasons/:seasonId/auto-import-teams-and-schedule', async (req, res) => {
+    const seasonId = req.params.seasonId;
+    const { phaseId, teamIds, start_date, start_time, interval_hours, interval_minutes } = req.body || {};
+
+    if (!seasonId) {
+        return res.status(400).json({ status: 'error', message: 'Thiếu seasonId' });
+    }
+
+    try {
+        let targetPhaseId = phaseId;
+        const connection = await mysql.createConnection(dbConfig);
+        try {
+            if (!targetPhaseId) {
+                const [phaseRows] = await connection.execute(
+                    'SELECT id FROM phases WHERE season_id = ? ORDER BY `order` ASC LIMIT 1',
+                    [seasonId]
+                );
+                targetPhaseId = phaseRows[0] ? phaseRows[0].id : null;
+            }
+
+            if (!targetPhaseId) {
+                await connection.end();
+                return res.status(404).json({ status: 'error', message: 'Không tìm thấy phase phù hợp cho mùa này.' });
+            }
+
+            await importTeamsIntoSeasonAndAssignGroups(connection, seasonId, targetPhaseId, teamIds);
+        } finally {
+            try { await connection.end(); } catch (_) {}
+        }
+
+        const result = await generateScheduleForPhase(targetPhaseId, { start_date, start_time, interval_hours, interval_minutes });
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'Đã tự động thêm đội vào mùa và xếp lịch thành công.',
+            data: result
+        });
+    } catch (error) {
+        console.error('Lỗi auto import teams and schedule:', error);
+        return res.status(500).json({ status: 'error', message: error.message || 'Lỗi server khi tự động thêm đội và xếp lịch' });
     }
 });
 
@@ -318,7 +433,7 @@ async function generateScheduleForPhase(phaseId, options = {}) {
 
         if (groups.length === 0) {
             await connection.end();
-            return { matchesCreated: 0 };
+            return { matchesCreated: 0, reason: 'Không có nhóm bảng nào cho phase này.' };
         }
 
         const [phaseRows] = await connection.execute(
@@ -327,7 +442,12 @@ async function generateScheduleForPhase(phaseId, options = {}) {
         );
         const seasonId = phaseRows.length > 0 ? phaseRows[0].season_id : null;
 
+        if (seasonId) {
+            await assignUnassignedSeasonTeamsToGroups(connection, phaseId, seasonId, groups.map(group => group.id));
+        }
+
         let totalMatchesCreated = 0;
+        let skippedGroups = 0;
         let baseDate = start_date ? new Date(start_date) : new Date();
 
         if (!start_date) {
@@ -357,6 +477,7 @@ async function generateScheduleForPhase(phaseId, options = {}) {
 
             const teamIds = teams.map(t => t.team_id);
             if (teamIds.length === 0) {
+                skippedGroups += 1;
                 await connection.execute(
                     'UPDATE `groups` SET status = "SCHEDULED", scheduleGeneratedAt = NOW() WHERE id = ?',
                     [group.id]
@@ -386,7 +507,11 @@ async function generateScheduleForPhase(phaseId, options = {}) {
         }
 
         await connection.end();
-        return { matchesCreated: totalMatchesCreated };
+        return {
+            matchesCreated: totalMatchesCreated,
+            skippedGroups,
+            reason: totalMatchesCreated === 0 ? 'Không có đội nào được gán vào phase này để tạo trận.' : undefined
+        };
     } catch (err) {
         await connection.end();
         throw err;

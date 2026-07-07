@@ -296,7 +296,7 @@
         @POST("phases/{phaseId}/generate-schedule")
         suspend fun autoGenerateSchedule(
             @Path("phaseId") phaseId: Int,
-            @Body request: Any // Thêm tham số này
+            @Body options: ScheduleOptionsRequest = ScheduleOptionsRequest()
         ): Response<BaseResponse>
 
         ///////////////////////////thong báo admin
@@ -319,4 +319,10 @@
 
         @POST("notifications/cleanup_notifications")
         suspend fun cleanupNotifications(): Response<Unit>
+
+        @POST("seasons/{seasonId}/auto-import-teams-and-schedule")
+        suspend fun autoImportTeamsAndSchedule(
+            @Path("seasonId") seasonId: Int,
+            @Body options: ScheduleOptionsRequest
+        ): Response<BaseResponse>
     }

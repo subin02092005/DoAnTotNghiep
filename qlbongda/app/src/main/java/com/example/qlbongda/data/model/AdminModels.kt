@@ -232,8 +232,8 @@ data class TournamentItem(
     val name: String,
     val description: String?,
     val logo: String?,
-   @SerializedName("max_players") val maxplayer: Int?, // Có thể null do LEFT JOIN
-    @SerializedName("min_players") val minplayer: Int?, // Có thể null do LEFT JOIN
+    @SerializedName("max_players") val maxPlayers: Int?, 
+    @SerializedName("min_players") val minPlayers: Int?,
     @SerializedName("is_active") val isActive: Int,
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("updated_at") val updatedAt: String?
@@ -286,8 +286,8 @@ data class CreateTournamentRequest(
     val name: String,
     val description: String?,
     val logo: String?,
-   @SerializedName("max_players") val maxplayer: Int,
-    val min_players:Int,
+    @SerializedName("max_players") val maxPlayers: Int,
+    @SerializedName("min_players") val minPlayers: Int,
     @SerializedName("user_id") val userId: Int?
 )
 
@@ -315,4 +315,29 @@ data class CreatePhaseRequest(
     @SerializedName("group_names") val groupNames: List<String>? = null,
     @SerializedName("team_ids") val teamIds: List<Int>? = null,
     @SerializedName("autoSchedule") val autoSchedule: Boolean? = true
+)
+
+data class ScheduleOptionsRequest(
+    @SerializedName("start_date") val startDate: String? = null,
+    @SerializedName("start_time") val startTime: String? = null,
+    @SerializedName("interval_hours") val intervalHours: Int? = 2,
+    @SerializedName("interval_minutes") val intervalMinutes: Int? = 0,
+    @SerializedName("teamIds") val teamIds: List<Int>? = null,
+    @SerializedName("phaseId") val phaseId: Int? = null // For season-level API
+)
+
+data class AutoImportAndScheduleRequest(
+    val phaseId: Int? = null,
+    val teamIds: List<Int>? = emptyList(),
+    val start_date: String? = null,
+    val start_time: String? = null,
+    val interval_hours: Int? = null,
+    val interval_minutes: Int? = null
+)
+
+// Class hứng phản hồi từ API (nếu bạn muốn lấy data từ result của server)
+data class AutoImportAndScheduleResponse(
+    val status: String,
+    val message: String,
+
 )

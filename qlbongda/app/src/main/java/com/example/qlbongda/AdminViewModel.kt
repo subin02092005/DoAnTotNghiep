@@ -503,8 +503,12 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             _isLoading.value = true
             try {
                 val response = apiService.getMatchDetail(matchId)
-                if (response.isSuccessful && response.body()?.status == "success") {
-                    _matchDetail.value = response.body()?.data
+                val body = response.body()
+                if (response.isSuccessful && body != null) {
+                    // Chấp nhận cả status=="success" hoặc success==true
+                    if (body.status == "success" || body.success == true) {
+                        _matchDetail.value = body.data
+                    }
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi tải chi tiết: ${e.message}"
@@ -554,11 +558,13 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             try {
                 val response = apiService.updateMatchScore(matchId, UpdateScoreRequest(homeScore, awayScore, status))
-                if (response.isSuccessful && response.body()?.success == true) {
+                val body = response.body()
+                if (response.isSuccessful && body?.success == true) {
                     _message.value = "Cập nhật tỉ số thành công"
-                    fetchMatches() // Refresh list để thấy tỉ số mới
+                    fetchMatchDetail(matchId) // Refresh UI chi tiết để thấy tỉ số mới
+                    fetchMatches() // Refresh list ngoài
                 } else {
-                    _message.value = response.body()?.message ?: "Lỗi cập nhật tỉ số"
+                    _message.value = body?.message ?: "Lỗi cập nhật tỉ số"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
@@ -570,11 +576,13 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             try {
                 val response = apiService.addSubstitution(matchId, SubstitutionRequest(teamId, playerInId, playerOutId, minute, period))
-                if (response.isSuccessful && response.body()?.success == true) {
+                val body = response.body()
+                if (response.isSuccessful && body?.success == true) {
                     _message.value = "Thay người thành công"
                     fetchMatchEvents(matchId)
+                    fetchMatchDetail(matchId) // Refresh để cập nhật lineup/subs nếu cần
                 } else {
-                    _message.value = response.body()?.message ?: "Lỗi thay người"
+                    _message.value = body?.message ?: "Lỗi thay người"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
@@ -592,11 +600,12 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     apiService.addYellowCard(matchId, request)
                 }
                 
-                if (response.isSuccessful && response.body()?.success == true) {
+                val body = response.body()
+                if (response.isSuccessful && body?.success == true) {
                     _message.value = "Đã thêm thẻ ${if (isRed) "đỏ" else "vàng"}"
                     fetchMatchEvents(matchId)
                 } else {
-                    _message.value = response.body()?.message ?: "Lỗi thêm thẻ"
+                    _message.value = body?.message ?: "Lỗi thêm thẻ"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
@@ -673,9 +682,9 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 val request = CreateTournamentRequest(
                     name = name,
                     description = description,
-                    logo="",
-                    maxplayer = maxPlayers,
-                    min_players = minPlayers,
+                    logo = "",
+                    maxPlayers = maxPlayers,
+                    minPlayers = minPlayers,
                     userId = userId
                 )
 
@@ -798,20 +807,37 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
-    fun autoGenerateSchedule(phaseId: Int) {
+    fun autoGenerateSchedule(phaseId: Int, options: ScheduleOptionsRequest = ScheduleOptionsRequest()) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Sửa dòng dưới đây để truyền body rỗng
-                val response = apiService.autoGenerateSchedule(phaseId, mapOf<String, String>())
-
+                val response = apiService.autoGenerateSchedule(phaseId, options)
                 if (response.isSuccessful) {
-                    // Thành công thì refresh lại danh sách trận đấu
-                    _message.value = "Tạo lịch tự động thành công!"
+                    _message.value = "Tự động import đội và xếp lịch thành công!"
                     fetchMatches()
                 } else {
                     val errorMsg = response.errorBody()?.string() ?: ""
-                    _message.value = "Lỗi tạo lịch: $errorMsg"
+                    _message.value = "Lỗi: $errorMsg"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun autoImportTeamsAndSchedule(seasonId: Int, options: ScheduleOptionsRequest = ScheduleOptionsRequest()) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.autoImportTeamsAndSchedule(seasonId, options)
+                if (response.isSuccessful) {
+                    _message.value = "Đã tự động thêm đội và xếp lịch mùa giải thành công!"
+                    fetchMatches()
+                } else {
+                    val errorMsg = response.errorBody()?.string() ?: ""
+                    _message.value = "Lỗi xử lý: $errorMsg"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.localizedMessage}"
