@@ -254,26 +254,30 @@
         @PUT("tournaments/{id}")
         suspend fun updateTournament(
             @Path("id") id: Int,
-            @Body request: Map<String, Any?>
+            @Body request: TournamentUpdateRequest // Thay Map bằng Data Class
         ): Response<GenericAdminResponse>
-
-        @POST("tournaments/{id}/seasons")
-        suspend fun createSeason(
-            @Path("id") id: Int,
-            @Body request: CreateSeasonRequest
-        ): Response<GenericAdminResponse>
+//        @POST("tournaments/{id}/seasons")
+//        suspend fun createSeason(
+//            @Path("id") id: Int,
+//            @Body request: CreateSeasonRequest
+//        ): Response<GenericAdminResponse>
 
         @POST("seasons")
         suspend fun createSeasonDirect(
             @Body request: CreateSeasonRequest
         ): Response<GenericAdminResponse>
-
+        @GET("seasons/{id}")
+        suspend fun getSeasonDetails(@Path("id") seasonId: Int): Response<GenericResponseAdmin<SeasonDetailResponse>>
         @POST("seasons/{seasonId}/phases")
         suspend fun createSeasonPhase(
             @Path("seasonId") seasonId: Int,
             @Body request: CreatePhaseRequest
         ): Response<GenericAdminResponse>
-
+        @POST("phases/{phaseId}/add-team")
+        suspend fun addTeamToPhase(
+            @Path("phaseId") phaseId: Int,
+            @Body request: AddTeamRequestadmin
+        ): Response<Any> // Hoặc Response<Unit>
         @PUT("tournaments/{tournamentId}/seasons/{seasonId}/rules")
         suspend fun updateSeasonRules(
             @Path("tournamentId") tournamentId: Int,

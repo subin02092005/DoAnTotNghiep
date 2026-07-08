@@ -220,44 +220,52 @@ async function importTeamsIntoSeasonAndAssignGroups(connection, seasonId, phaseI
 }
 
 router.get('/seasons/:seasonId/phases', async (req, res) => {
-    const seasonId = req.params.seasonId;
+    const seasonId = req.params.seasonId; // Đảm bảo biến này có giá trị
 
-    if (!seasonId) {
-        return res.status(400).json({ 
-            status: "error", 
-            message: 'Thiếu thông tin mã mùa giải (seasonId)!' 
-        });
-    }
 
     try {
         const connection = await mysql.createConnection(dbConfig);
         
-        // 1. Sửa tên bảng từ 'tournament_phases' thành 'phases'
-        // 2. Chọn thêm cột 'type' và các trường cần thiết
-        const [rows] = await connection.execute(
-            'SELECT id, name, type, format FROM phases WHERE season_id = ? ORDER BY `order` ASC', 
+        // Query nâng cấp: lấy cả Phase và Group
+        const [rows] = await connection.execute(`
+            SELECT p.id as phase_id, p.name as phase_name, p.type, p.format, 
+                   g.id as group_id, g.name as group_name
+            FROM phases p
+            LEFT JOIN groups g ON p.id = g.phase_id
+            WHERE p.season_id = ?
+            ORDER BY p.order ASC`, 
             [seasonId]
         );
         await connection.end();
 
-        // Trả về dữ liệu thật từ DB
-        return res.status(200).json({
-            status: "success",
-            message: "Tải danh sách vòng đấu thành công từ Database!",
-            data: {
-                seasonId: parseInt(seasonId),
-                phases: rows.map(item => ({
-                    id: item.id,
-                    name: item.name, 
-                    type: item.type,
-                    format: item.format  // Giá trị này sẽ khớp với ENUM trong DB
-                }))
+        // Xử lý nhóm dữ liệu (Grouping)
+        const phasesMap = {};
+        rows.forEach(row => {
+            if (!phasesMap[row.phase_id]) {
+                phasesMap[row.phase_id] = {
+                    id: row.phase_id,
+                    name: row.phase_name,
+                    type: row.type,
+                    format: row.format,
+                    groups: [] // Danh sách group sẽ nằm ở đây
+                };
+            }
+            if (row.group_id) {
+                phasesMap[row.phase_id].groups.push({
+                    id: row.group_id,
+                    name: row.group_name
+                });
             }
         });
 
+        return res.status(200).json({
+            status: "success",
+            data: {
+                phases: Object.values(phasesMap)
+            }
+        });
     } catch (error) {
-        console.error("Lỗi API lấy vòng đấu:", error);
-        return res.status(500).json({ status: "error", message: 'Lỗi kết nối Server hoặc Database!' });
+        // ... (phần error như cũ)
     }
 });
 
@@ -294,7 +302,7 @@ router.post('/seasons/:seasonId/phases', async (req, res) => {
     if (format === 'round_robin' && (!effectiveGroupCount || effectiveGroupCount < 1)) {
         return res.status(400).json({ status: 'error', message: 'Cần số lượng bảng hợp lệ cho vòng tròn' });
     }
-
+let connection;
     try {
         const connection = await mysql.createConnection(dbConfig);
 
@@ -324,14 +332,14 @@ router.post('/seasons/:seasonId/phases', async (req, res) => {
                 );
             }
         }
-
-        if (format === 'knockout') {
-            if (!Array.isArray(effectiveTeamIds) || effectiveTeamIds.length < 2) {
-                await connection.end();
-                return res.status(400).json({ status: 'error', message: 'Cần danh sách teamIds để tạo bracket loại trực tiếp' });
+if (format === 'knockout') {
+    if (!Array.isArray(effectiveTeamIds) || effectiveTeamIds.length < 2) {
+        // KHÔNG CẦN await connection.end() ở đây nếu đã có khối finally
+       return res.status(400).json({ status: 'error', message: 'Cần danh sách teamIds để tạo bracket loại trực tiếp' });
             }
-            await createBracketSlots(connection, phaseId, effectiveTeamIds);
-        }
+    await createBracketSlots(connection, phaseId, effectiveTeamIds);
+}
+       
 
         await connection.end();
 
@@ -344,9 +352,15 @@ router.post('/seasons/:seasonId/phases', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Lỗi tạo phase:', error);
-        return res.status(500).json({ status: 'error', message: 'Lỗi server khi tạo phase' });
-    }
+       console.error('Lỗi chi tiết:', error); // Log ra để xem lỗi là gì
+    return res.status(500).json({ 
+        status: 'error', 
+        message: 'Lỗi server: ' + error.message // Trả về nội dung lỗi để App hiển thị
+    });
+    } finally {
+    // Luôn đóng kết nối dù thành công hay thất bại
+    if (connection) await connection.end(); 
+}
 });
 router.post('/phases/:phaseId/generate-schedule', async (req, res) => {
     try {
@@ -419,13 +433,76 @@ router.post('/seasons/:seasonId/auto-import-teams-and-schedule', async (req, res
         return res.status(500).json({ status: 'error', message: error.message || 'Lỗi server khi tự động thêm đội và xếp lịch' });
     }
 });
+// Trong file phases.js
+router.post('/phases/:phaseId/add-team', async (req, res) => {
+    const { phaseId } = req.params;
+    const { teamId, groupId } = req.body;
+    console.log("Dữ liệu nhận được:", req.body);
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        
+        // 1. Kiểm tra đội có tồn tại không
+        const [teamCheck] = await connection.execute('SELECT id FROM teams WHERE id = ?', [teamId]);
+        if (teamCheck.length === 0) {
+             return res.status(400).json({ success: false, message: "Đội không tồn tại trong hệ thống." });
+        }
 
+        // 2. (Tùy chọn) Kiểm tra xem đội đã có trong bảng này chưa để tránh bị trùng
+        if (groupId) {
+            const [exists] = await connection.execute(
+                'SELECT id FROM team_standings WHERE team_id = ? AND group_id = ?', 
+                [teamId, groupId]
+            );
+            if (exists.length > 0) {
+                return res.status(400).json({ success: false, message: "Đội này đã nằm trong bảng đấu rồi!" });
+            }
+        }
+        
+        // 3. Thêm đội vào bảng xếp hạng
+      const [result] = await connection.execute(`
+            UPDATE season_teams 
+            SET group_id = ? 
+            WHERE team_id = ? 
+            AND season_id = (SELECT season_id FROM phases WHERE id = ?)`, 
+            [groupId || null, teamId, phaseId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ success: false, message: "Không tìm thấy đội trong mùa giải này!" });
+        }
+      const safeGroupId = groupId ?? null; 
+const safeTeamId = teamId ?? null;
+
+await connection.execute(
+    `INSERT INTO team_standings (team_id, group_id, position, matches_played, wins, draws, losses, points) 
+     VALUES (?, ?, 0, 0, 0, 0, 0, 0) 
+     ON DUPLICATE KEY UPDATE group_id = ?`, 
+    [safeTeamId, safeGroupId, safeGroupId] // Sử dụng các biến đã "safe"
+);
+await connection.commit(); // Lưu thay đổi
+        res.status(200).json({ success: true, message: "Đã thêm đội bóng vào bảng thành công!" });
+
+        // 4. Trả về thông báo thành công
+        res.status(200).json({ 
+            success: true, 
+            message: "Đã thêm đội bóng vào bảng đấu thành công!" 
+        });
+
+    } catch (e) {
+        console.error("Lỗi khi thêm đội:", e);
+        res.status(500).json({ success: false, message: "Lỗi server: " + e.message });
+    } finally {
+        if (connection) await connection.end();
+    }
+});
 // Reusable function to generate schedule for a phase (can be called from other modules)
 async function generateScheduleForPhase(phaseId, options = {}) {
     const { start_date, start_time, interval_hours, interval_minutes } = options;
-    const connection = await mysql.createConnection(dbConfig);
-
+   
+let connection; // Khai báo biến connection ở ngoài
     try {
+         const connection = await mysql.createConnection(dbConfig);
         const [groups] = await connection.execute(
             'SELECT id FROM `groups` WHERE phase_id = ?',
             [phaseId]

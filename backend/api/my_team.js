@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
-
+const { sendRegistrationNotification } = require('./notification/notifications'); // Đường dẫn file của bạn
 const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
@@ -454,7 +454,7 @@ router.post('/register_to_season', async (req, res) => {
         );
 
         await connection.commit();
-        const { sendRegistrationNotification } = require('../nodification/notifications'); // Đường dẫn file của bạn
+        
         sendRegistrationNotification(team_id, season_id, "Vui lòng hoàn tất thanh toán phí tham dự.");
         res.status(200).json({ status: "success", message: "Đăng ký thành công, vui lòng thanh toán phí tham dự!" });
 

@@ -68,7 +68,8 @@ data class AdminTeamItem(
     val logo: String? = null,
     val description: String? = null,
     @SerializedName("is_active") val isActive: Int? = null,
-    @SerializedName("created_at") val createdAt: String? = null
+    @SerializedName("created_at") val createdAt: String? = null,
+    val groupId: Int? = null
 )
 
 data class AdminTeamResponse(
@@ -238,11 +239,60 @@ data class TournamentItem(
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("updated_at") val updatedAt: String?
 )
-
+data class TournamentUpdateRequest(
+    val name: String? = null,
+    val description: String? = null,
+    val logo: String? = null,
+    val is_active: Int? = null
+)
 data class TournamentResponse(
     val success: Boolean,
     val data: List<TournamentItem>? = null,
     val message: String? = null
+)
+data class SeasonDetailResponse(
+    val season: SeasonAdminItem,
+    val phases: List<PhaseItem>,
+    val teams: List<TeamItem>// Mỗi mùa giải có danh sách các giai đoạn
+)
+data class TeamItem(
+    val id: Int,
+    @SerializedName("team_id") val team_id: Int,
+    val name: String,
+    val status: String,
+    @SerializedName("group_id") val groupId: Int? = null
+)
+data class AddTeamRequestadmin(
+    @SerializedName("teamId") val teamId: Int, // PHẢI KHỚP TÊN VỚI BACKEND
+    @SerializedName("groupId") val groupId: Int? = null
+)
+// 2. Giai đoạn (Phase)
+data class PhaseItem(
+    val id: Int,
+    val name: String,
+    val type: String,
+    val format: String,
+    val matches: List<MatchItem>? = null,
+    val groups: List<GroupItem>? = null // Phải có trường này
+)
+data class GroupItem(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String
+)
+
+// 3. Trận đấu (Match)
+data class MatchItem(
+    val id: Int,
+    val home_team_id: Int,
+    val away_team_id: Int,
+    val scheduled_at: String,
+    val status: String
+)
+// Phải có <T> ngay sau tên class
+data class GenericResponseAdmin<T>(
+    val success: Boolean,
+    val message: String?,
+    val data: T? // T là biến đại diện cho kiểu dữ liệu thực tế
 )
 
 data class SeasonAdminItem(
@@ -316,6 +366,7 @@ data class CreatePhaseRequest(
     @SerializedName("team_ids") val teamIds: List<Int>? = null,
     @SerializedName("autoSchedule") val autoSchedule: Boolean? = true
 )
+
 
 data class ScheduleOptionsRequest(
     @SerializedName("start_date") val startDate: String? = null,
