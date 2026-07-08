@@ -171,6 +171,8 @@
             @Body request: UpdateMatchRequest
         ): Response<GenericAdminResponse>
 
+        @GET("matches/{id}")
+        suspend fun getMatchRawDetail(@Path("id") matchId: Int): Response<MatchDetailResponse>
         @PATCH("matches/{id}/cancel")
         suspend fun cancelMatch(@Path("id") id: Int): Response<GenericAdminResponse>
 

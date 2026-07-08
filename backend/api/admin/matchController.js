@@ -72,9 +72,15 @@ router.get('/matches/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const [matches] = await pool.execute(
-            `SELECT m.id, m.phase_id, m.group_id, m.home_team_id, ht.name AS home_team_name,
-                    m.away_team_id, at.name AS away_team_name, m.scheduled_at, m.played_at,
-                    m.home_score, m.away_score, m.status, m.round, m.leg, m.venue_id,
+            `SELECT m.id, m.phase_id, m.group_id, 
+                    m.home_team_id AS teamAId, 
+                    ht.name AS teamA,
+                    m.away_team_id AS teamBId, 
+                    at.name AS teamB, 
+                    m.scheduled_at, m.played_at,
+                    m.home_score AS scoreA, 
+                    m.away_score AS scoreB, 
+                    m.status, m.round, m.leg, m.venue_id,
                     m.referee, m.season_id, m.is_published, m.created_at, m.updated_at
              FROM matches m
              LEFT JOIN teams ht ON m.home_team_id = ht.id
@@ -87,6 +93,7 @@ router.get('/matches/:id', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu.' });
         }
 
+        // Trả về dữ liệu đã được đổi tên key chuẩn theo FullMatchDetail của Android
         res.json({ success: true, data: matches[0] });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -310,30 +317,80 @@ router.patch('/matches/:id/start', async (req, res) => {
 // Kết thúc trận đấu
 router.patch('/matches/:id/finish', async (req, res) => {
     const { id } = req.params;
+    const connection = await pool.getConnection(); 
+    
     try {
-        const [matches] = await pool.execute(
-            'SELECT status FROM matches WHERE id = ? AND deleted_at IS NULL',
+        await connection.beginTransaction();
+
+        // 1. Lấy TOÀN BỘ thông tin liên quan của trận đấu từ bảng matches
+        const [matchRows] = await connection.execute(
+            `SELECT home_team_id, away_team_id, home_score, away_score, season_id, phase_id, group_id 
+             FROM matches WHERE id = ?`,
             [id]
         );
 
-        if (matches.length === 0) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu hoặc đã bị xóa.' });
+        if (matchRows.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu.' });
         }
 
-        if (matches[0].status === 'finished') {
-            return res.status(400).json({ success: false, message: 'Trận đấu đã kết thúc.' });
-        }
+        const { home_team_id, away_team_id, home_score, away_score, season_id, phase_id, group_id } = matchRows[0];
 
-        await pool.execute(
-            `UPDATE matches
-             SET status = 'finished', updated_at = NOW()
-             WHERE id = ? AND deleted_at IS NULL`,
+        // 2. Cập nhật trạng thái trận đấu thành 'finished' trong bảng matches
+        await connection.execute(
+            `UPDATE matches SET status = 'finished', updated_at = NOW() WHERE id = ?`,
             [id]
         );
 
-        res.json({ success: true, message: 'Đã chuyển trạng thái trận đấu sang finished.' });
+        // 3. Kiểm tra xem trận đấu này đã từng có bản ghi trong match_results chưa
+        const [resultRows] = await connection.execute(
+            `SELECT id FROM match_results WHERE match_id = ?`,
+            [id]
+        );
+
+        if (resultRows.length > 0) {
+            // NẾU ĐÃ CÓ: Chỉ cập nhật tỉ số hiện tại và thời gian (An toàn tuyệt đối, không lo thiếu thuộc tính khác)
+            await connection.execute(
+                `UPDATE match_results 
+                 SET home_score = ?, away_score = ?, updated_at = NOW() 
+                 WHERE match_id = ?`,
+                [home_score, away_score, id]
+            );
+        } else {
+            // NẾU CHƯA CÓ: INSERT mới và đổ đầy đủ các thuộc tính phụ (season_id, phase_id,...) đề phòng ràng buộc NOT NULL
+            // Bạn hãy bổ sung thêm các cột của bảng match_results vào đây nếu có (ví dụ: season_id, phase_id)
+           await connection.execute(
+    `INSERT INTO match_results (
+        match_id, 
+        home_score, 
+        away_score, 
+        home_final_score, 
+        away_final_score, 
+        result_type, 
+        status, 
+        created_at, 
+        updated_at
+    ) VALUES (?, ?, ?, ?, ?, 'full_time', 'official', NOW(), NOW())`,
+    [
+        id,          // match_id
+        home_score,  // home_score
+        away_score,  // away_score
+        home_score,  // home_final_score
+        away_score   // away_final_score
+    ]
+);
+        }
+
+        await connection.commit();
+        res.json({ success: true, message: 'Trận đấu đã kết thúc và đồng bộ bảng kết quả thành công!' });
+
     } catch (error) {
+        await connection.rollback();
+        // In lỗi chi tiết ra màn hình terminal để kiểm tra chính xác tên cột bị thiếu nếu vẫn lỗi
+        console.error("❌ LỖI DATABASE TẠI FINISH-MATCH:", error.message); 
         res.status(500).json({ success: false, message: error.message });
+    } finally {
+        connection.release();
     }
 });
 

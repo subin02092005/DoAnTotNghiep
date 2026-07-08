@@ -502,16 +502,33 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val response = apiService.getMatchDetail(matchId)
-                val body = response.body()
-                if (response.isSuccessful && body != null) {
-                    // Chấp nhận cả status=="success" hoặc success==true
-                    if (body.status == "success" || body.success == true) {
-                        _matchDetail.value = body.data
+                // Bước 1: Gọi API từ bảng matches thô trước để check trạng thái thực tế
+                val rawResponse = apiService.getMatchRawDetail(matchId) // Route: matches/{id}
+
+                if (rawResponse.isSuccessful && rawResponse.body() != null) {
+                    val rawBody = rawResponse.body()
+                    if (rawBody?.success == true && rawBody.data != null) {
+                        val rawMatch = rawBody.data // Đây là data map từ bảng matches
+
+                        // Kiểm tra trạng thái trận đấu đang diễn ra
+                        if (rawMatch.status == "ongoing" || rawMatch.status == "live") {
+                            // Trận đấu đang đá -> Dùng luôn dữ liệu thô từ bảng matches
+                            _matchDetail.value = rawMatch
+                        } else {
+                            // Bước 2: Trận đấu đã kết thúc (hoặc trạng thái khác)
+                            // -> Gọi API chính thống lấy dữ liệu kết quả từ match_result
+                            val detailResponse = apiService.getMatchDetail(matchId) // Route: match/detail
+                            if (detailResponse.isSuccessful && detailResponse.body() != null) {
+                                val detailBody = detailResponse.body()
+                                if (detailBody?.success == true) {
+                                    _matchDetail.value = detailBody.data
+                                }
+                            }
+                        }
                     }
                 }
             } catch (e: Exception) {
-                _message.value = "Lỗi tải chi tiết: ${e.message}"
+                _message.value = "Lỗi tải chi tiết trận đấu: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
@@ -841,25 +858,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
-    fun autoImportTeamsAndSchedule(seasonId: Int, options: ScheduleOptionsRequest = ScheduleOptionsRequest()) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val response = apiService.autoImportTeamsAndSchedule(seasonId, options)
-                if (response.isSuccessful) {
-                    _message.value = "Đã tự động thêm đội và xếp lịch mùa giải thành công!"
-                    fetchMatches()
-                } else {
-                    val errorMsg = response.errorBody()?.string() ?: ""
-                    _message.value = "Lỗi xử lý: $errorMsg"
-                }
-            } catch (e: Exception) {
-                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
+
 
     private val _phasesOfSeason = MutableStateFlow<List<TournamentPhase>>(emptyList())
     val phasesOfSeason: StateFlow<List<TournamentPhase>> = _phasesOfSeason

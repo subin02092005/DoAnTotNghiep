@@ -233,7 +233,7 @@
 
             const [result] = await pool.execute(
                 `INSERT INTO seasons (name, description, status, start_date, end_date, registration_deadline, is_registration_open, is_active, created_at, updated_at, deleted_at, tournament_id, user_id, max_teams, registration_fee)
-                VALUES (?, ?, 'upcoming', ?, ?, ?, ?, 1, NOW(), NOW(), NULL, ?, ?, ?, ?)`,
+                VALUES (?, ?, 'registration_open', ?, ?, ?, ?, 1, NOW(), NOW(), NULL, ?, ?, ?, ?)`,
                 [name, description || null, start_date, end_date, registration_deadline, is_registration_open ? 1 : 0, tournament_id, user_id || null, max_teams, registration_fee || 0.00]
             );
 
