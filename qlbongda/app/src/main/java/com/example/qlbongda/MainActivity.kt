@@ -87,7 +87,6 @@ class MainActivity : ComponentActivity() {
                     when (currentScreen) {
                         "admin" -> {
                             AdminScreen(
-                                matchList = matchList,
                                 onLogout = {
                                     Toast.makeText(this, "Đã đăng xuất!", Toast.LENGTH_SHORT).show()
                                     currentScreen = "login"

@@ -1035,25 +1035,15 @@ fun TeamRegistrationScreen(
                                             // Nút Đăng ký
                                             Button(
                                                 onClick = {
-                                                    val alreadyRegistered =
-                                                        seasons.any { it.is_registered == 1 }
-
-                                                    if (alreadyRegistered) {
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Bạn đã đăng ký một giải khác rồi!",
-                                                            Toast.LENGTH_LONG
-                                                        ).show()
-                                                    } else {
-                                                        scope.launch {
-                                                            try {
-                                                                val response = RetrofitClient.getClient(context)
-                                                                    .registerToSeason(
-                                                                        mapOf(
-                                                                            "team_id" to teamId,
-                                                                            "season_id" to season.id
-                                                                        )
+                                                    scope.launch {
+                                                        try {
+                                                            val response = RetrofitClient.getClient(context)
+                                                                .registerToSeason(
+                                                                    mapOf(
+                                                                        "team_id" to teamId,
+                                                                        "season_id" to season.id
                                                                     )
+                                                                )
 
                                                                 if (response.isSuccessful) {
                                                                     Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
@@ -1071,7 +1061,7 @@ fun TeamRegistrationScreen(
                                                                 android.util.Log.e("REGISTER_EXCEPTION", "Lỗi ngoại lệ: ${e.message}")
                                                                 Toast.makeText(context, "Không thể kết nối tới máy chủ!", Toast.LENGTH_SHORT).show()
                                                             }
-                                                        }
+
                                                     }
                                                 },
                                                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
