@@ -902,36 +902,87 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 _isLoading.value = false
             }
         }
+
+//    fun updateTeamGroup(phaseId: Int, teamId: Int, newGroupId: Int?) {
+//        viewModelScope.launch {
+//            try {
+//                // Cấu trúc request này phải khớp với Backend của bạn
+//                val request = AddTeamRequestadmin(
+//                    teamId = teamId,
+//                    groupId = newGroupId
+//                )
+//                val response = apiService.addTeamToPhase(phaseId, request)
+//
+//                if (response.isSuccessful) {
+//                    _message.value = "Cập nhật bảng đấu thành công!"
+//                    // Chỉ cần gọi làm mới sau khi thành công
+//                    fetchSeasonDetails(currentSeasonId)
+//                } else {
+//                    val errorMsg = response.errorBody()?.string() ?: "Lỗi không xác định"
+//                    _message.value = "Lỗi ${response.code()}: $errorMsg"
+//                }
+//            } catch (e: Exception) {
+//                _message.value = "Kết nối thất bại: ${e.message}"
+//            }
+//        }
+//    }
+//
+//    fun addTeamToPhase(phaseId: Int, teamItem: TeamItem, groupId: Int?) {
+//        viewModelScope.launch {
+//            try {
+//                val request = AddTeamRequestadmin(
+//                    teamId = teamItem.team_id,
+//                    groupId = groupId
+//                )
+//                val response = apiService.addTeamToPhase(phaseId, request)
+//
+//                Log.d("DEBUG_API", "Response code: ${response.code()}")
+//
+//                if (response.isSuccessful) {
+//                    // 1. Cập nhật thông báo thành công
+//                    _message.value = "Thêm đội thành công!"
+//
+//                    // 2. Làm mới lại danh sách dữ liệu mùa giải
+//                    fetchSeasonDetails(currentSeasonId)
+//                } else {
+//                    fetchSeasonDetails(currentSeasonId)
+//                    // Lấy thông báo lỗi cụ thể từ Server (nếu có)
+//                    val errorMsg = response.errorBody()?.string() ?: "Lỗi không xác định"
+//                    _message.value = "Lỗi: ${response.code()} - $errorMsg"
+//                }
+//            } catch (e: Exception) {
+//                _message.value = "Kết nối thất bại: ${e.message}"
+//            }
     }
 
-
-    fun addTeamToPhase(phaseId: Int, teamItem: TeamItem, groupId: Int?) {
+    fun assignTeamToGroup(phaseId: Int, teamId: Int, groupId: Int?) {
         viewModelScope.launch {
             try {
-                val request = AddTeamRequestadmin(
-                    teamId = teamItem.team_id,
-                    groupId = groupId
-                )
+                val request = AddTeamRequestadmin(teamId = teamId, groupId = groupId)
                 val response = apiService.addTeamToPhase(phaseId, request)
 
-                Log.d("DEBUG_API", "Response code: ${response.code()}")
-
                 if (response.isSuccessful) {
-                    // 1. Cập nhật thông báo thành công
-                    _message.value = "Thêm đội thành công!"
+                    val body = response.body()
 
-                    // 2. Làm mới lại danh sách dữ liệu mùa giải
-                    fetchSeasonDetails(currentSeasonId)
+                    // KIỂM TRA CỜ success TỪ SERVER TRẢ VỀ
+                    if (body?.success == true) {
+                        _message.value = "Cập nhật thành công!"
+                        fetchSeasonDetails(currentSeasonId)
+                    } else {
+                        // Server trả về 200 nhưng báo lỗi logic (Đã có trong nhóm rồi)
+                        _message.value = body?.message ?: "Có lỗi xảy ra"
+                    }
                 } else {
-                    fetchSeasonDetails(currentSeasonId)
-                    // Lấy thông báo lỗi cụ thể từ Server (nếu có)
-                    val errorMsg = response.errorBody()?.string() ?: "Lỗi không xác định"
-                    _message.value = "Lỗi: ${response.code()} - $errorMsg"
+                    // Lỗi 4xx hoặc 5xx
+                    val errorMsg = response.errorBody()?.string() ?: "Lỗi server"
+                    _message.value = "Lỗi ${response.code()}: $errorMsg"
                 }
             } catch (e: Exception) {
                 _message.value = "Kết nối thất bại: ${e.message}"
             }
-
         }
     }
 }
+
+
+

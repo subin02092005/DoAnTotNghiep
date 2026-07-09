@@ -220,6 +220,10 @@
         if (!name || !start_date || !end_date || !registration_deadline || !tournament_id || max_teams === undefined) {
             return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên, ngày bắt đầu, ngày kết thúc, hạn đăng ký, tournament_id và max_teams.' });
         }
+// Kiểm tra nếu hạn đăng ký chưa có giờ (độ dài là 10 ký tự: YYYY-MM-DD)
+    start_date = `${start_date} 00:00:00`;
+    end_date = `${end_date} 23:59:59`;
+        registration_deadline = `${registration_deadline} 23:59:59`;
 
         try {
             const [tournamentRows] = await pool.execute(

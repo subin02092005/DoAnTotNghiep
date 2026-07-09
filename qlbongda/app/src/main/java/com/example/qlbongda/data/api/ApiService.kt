@@ -102,6 +102,8 @@
 
         @GET("standings")
         suspend fun getDetailedStandings(): Response<DetailedStandingResponse>
+        @GET("all-data")
+        suspend fun getAllData(): Response<ApiResponses<List<SeasonWithPhases>>>
 
         @GET("seasons/{seasonId}/phases") // Đã sửa theo server.js: /api/seasons/:seasonId/phases
         suspend fun getSeasonPhases(@Path("seasonId") seasonId: Int): Response<SeasonResponse>
@@ -160,7 +162,7 @@
             @Query("teamId") teamId: Int? = null
         ): Response<AdminMatchResponse>
 
-        @POST("matches")
+        @POST("matchesadd")
         suspend fun createMatch(
             @Body request: CreateMatchRequest
         ): Response<GenericAdminResponse>
@@ -271,7 +273,7 @@
         @GET("seasons/{id}")
         suspend fun getSeasonDetails(@Path("id") seasonId: Int): Response<GenericResponseAdmin<SeasonDetailResponse>>
         @POST("seasons/{seasonId}/phases")
-        suspend fun createSeasonPhase(
+        suspend fun     createSeasonPhase(
             @Path("seasonId") seasonId: Int,
             @Body request: CreatePhaseRequest
         ): Response<GenericAdminResponse>
@@ -279,7 +281,7 @@
         suspend fun addTeamToPhase(
             @Path("phaseId") phaseId: Int,
             @Body request: AddTeamRequestadmin
-        ): Response<Any> // Hoặc Response<Unit>
+        ): Response<AddTeamResponse>
         @PUT("tournaments/{tournamentId}/seasons/{seasonId}/rules")
         suspend fun updateSeasonRules(
             @Path("tournamentId") tournamentId: Int,

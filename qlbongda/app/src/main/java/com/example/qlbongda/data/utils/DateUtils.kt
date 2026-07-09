@@ -1,5 +1,6 @@
 package com.example.qlbongda.utils
 
+import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -15,6 +16,21 @@ object DateUtils {
         ZonedDateTime.parse(isoDate).format(timeFormatter)
     } catch (e: Exception) {
         "..."
+    }
+    fun formatDateTime(dateString: String): String {
+        if (dateString.isBlank()) return ""
+        return try {
+            // Định dạng đầu vào từ CSDL (thường là yyyy-MM-dd hoặc yyyy-MM-dd HH:mm)
+            val inputFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val date = inputFormatter.parse(dateString)
+
+            // Định dạng mới: "Ngày 09 tháng 07 - 14:12"
+            val outputFormatter = SimpleDateFormat("'Ngày' dd 'tháng' MM - HH:mm", Locale.getDefault())
+
+            outputFormatter.format(date!!)
+        } catch (e: Exception) {
+            dateString
+        }
     }
 
     fun formatDate(isoDate: String?): String {

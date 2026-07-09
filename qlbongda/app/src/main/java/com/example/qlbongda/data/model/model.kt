@@ -259,7 +259,10 @@ data class ApiResponse(
     val message: String
 )
 
-
+data class ApiResponses<T>(
+    val status: String,
+    val data: T
+)
 
 
 
@@ -287,6 +290,8 @@ data class DetailedStandingResponse(
     val data: List<GroupStanding> // Thay vì List<DetailedStanding>, giờ là danh sách các Bảng
 )
 data class GroupStanding(
+    val phaseId: Int,
+    val groupId: Int,// PHẢI CÓ DÒNG NÀY
     val groupName: String,          // "Bảng A", "Bảng B", "Bảng C"...
     val standings: List<DetailedStanding> // Danh sách các đội thuộc bảng này
 )
@@ -322,6 +327,7 @@ data class FullMatchDetail(
     val mvp: String = "Chưa xác định",
     val isHot: Boolean = false
 )
+
 data class MatchEvent(
     val minute: String,
     val team: String,
@@ -388,4 +394,10 @@ data class Notification(
     @SerializedName("is_read") var is_read: Int,
 
 )
+
 data class NotificationResponse(val status: String, val data: List<Notification>)
+data class SeasonWithPhases(
+    val id: Int,
+    val name: String,
+    val phases: List<TournamentPhase>
+)

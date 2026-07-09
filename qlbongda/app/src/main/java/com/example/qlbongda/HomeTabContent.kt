@@ -69,7 +69,7 @@ fun HotMatchCard(match: FullMatchDetail) {
 fun HomeTabContent(
     viewModel: HomeViewModel, // <--- Truyền trực tiếp ViewModel vào đây
     phaseList: List<TournamentPhase>,
-   // hotMatches: List<FullMatchDetail> = emptyList(), // 🌟 THÊM DÒNG NÀY
+    // hotMatches: List<FullMatchDetail> = emptyList(), // 🌟 THÊM DÒNG NÀY
     standings: List<GroupStanding>,
     selectedTabIndex: Int,          // Nhận từ HomeScreen
     onTabSelected: (Int) -> Unit,   // Nhận từ HomeScreen

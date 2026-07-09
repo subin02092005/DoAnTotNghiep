@@ -266,12 +266,18 @@ data class AddTeamRequestadmin(
     @SerializedName("teamId") val teamId: Int, // PHẢI KHỚP TÊN VỚI BACKEND
     @SerializedName("groupId") val groupId: Int? = null
 )
+
+data class AddTeamResponse(
+    val success: Boolean,
+    val message: String
+)
 // 2. Giai đoạn (Phase)
 data class PhaseItem(
     val id: Int,
     val name: String,
     val type: String,
     val format: String,
+    val teams: List<TeamItem>? ,// THÊM DÒNG NÀY: D
     val matches: List<MatchItem>? = null,
     val groups: List<GroupItem>? = null // Phải có trường này
 )

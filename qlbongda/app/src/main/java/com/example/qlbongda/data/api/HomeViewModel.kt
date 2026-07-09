@@ -1,6 +1,7 @@
 package com.example.qlbongda.data.api
 
 import android.util.Log
+import androidx.compose.runtime.derivedStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.qlbongda.data.model.ChangePasswordRequest
@@ -8,6 +9,7 @@ import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.data.model.GroupStanding
 import com.example.qlbongda.data.model.MyTeamData
 import com.example.qlbongda.data.model.PlayerInfo
+import com.example.qlbongda.data.model.SeasonWithPhases
 import com.example.qlbongda.data.model.StandingItem
 import com.example.qlbongda.data.model.TeamDetailData
 import com.example.qlbongda.data.model.TournamentPhase
@@ -257,6 +259,42 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
         )
     }
 
+    val allStandings = MutableStateFlow<List<GroupStanding>>(emptyList())
 
+    // 2. ID của phase đang được chọn (mặc định null hoặc chọn cái đầu tiên)
+    private val _selectedPhaseId = MutableStateFlow<Int?>(null)
+    val selectedPhaseId = _selectedPhaseId.asStateFlow()
 
+    // 3. Logic lọc tự động (Reactive)
+    val filteredStandings = derivedStateOf {
+        val currentId = _selectedPhaseId.value
+        if (currentId == null) {
+            allStandings.value
+        } else {
+            allStandings.value.filter { it.phaseId == currentId }
+        }
+    }
+
+    fun selectPhase(phaseId: Int) {
+        _selectedPhaseId.value = phaseId
+    }
+    private val _seasonsWithPhases = MutableStateFlow<List<SeasonWithPhases>>(emptyList())
+    val seasonsWithPhases = _seasonsWithPhases.asStateFlow()
+
+    // 2. Hàm gọi dữ liệu từ Backend
+    fun loadSeasons() {
+        viewModelScope.launch {
+            try {
+                // Giả sử bạn có repository để gọi API
+                val response = apiService.getAllData()
+                if (response.body()?.status == "success") {
+                    val myData = response.body()?.data
+
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Lỗi load dữ liệu: ${e.message}")
+            }
+        }
+    }
 }
+

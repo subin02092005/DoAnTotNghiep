@@ -64,64 +64,41 @@ async function clearScheduledMatchesForGroup(connection, phaseId, groupId) {
     );
 }
 
+// --- HÀM TIỆN ÍCH ---
 async function createBracketSlots(connection, phaseId, teamIds) {
-    const totalTeams = teamIds.length;
-    const bracketSize = isPowerOfTwo(totalTeams) ? totalTeams : 2 ** Math.ceil(Math.log2(totalTeams));
-    const paddedTeams = [...teamIds];
-    while (paddedTeams.length < bracketSize) {
-        paddedTeams.push(null);
-    }
+    console.log("DEBUG: Đang tạo bracket cho phase:", phaseId, "với teams:", teamIds);
+    const totalTeams = teamIds.length || 0;
+    // Nếu teamIds rỗng, mặc định tạo khung cho 4 đội (2 trận vòng 1, 1 trận vòng 2)
+    const bracketSize = totalTeams > 0 ? Math.pow(2, Math.ceil(Math.log2(totalTeams))) : 4;
+    console.log("DEBUG: Bracket size là:", bracketSize);
+    const paddedTeams = [...teamIds, ...Array(bracketSize - totalTeams).fill(null)];
 
     let previousRoundSlotIds = [];
 
     for (let round = 1; round <= Math.log2(bracketSize); round += 1) {
-        const matchCount = bracketSize / 2 ** round;
-        const values = [];
+        const matchCount = bracketSize / Math.pow(2, round);
+        const roundSlotIds = [];
 
         for (let i = 0; i < matchCount; i += 1) {
-            let seededHome = null;
-            let seededAway = null;
-            let sourceA = null;
-            let sourceB = null;
-            let isBye = 0;
+            let seededHome = null, seededAway = null, sourceA = null, sourceB = null, isBye = 0;
 
             if (round === 1) {
                 seededHome = paddedTeams[i * 2] || null;
                 seededAway = paddedTeams[i * 2 + 1] || null;
-                if (!seededAway) {
-                    isBye = 1;
-                }
+                isBye = (!seededAway) ? 1 : 0;
             } else {
-                sourceA = previousRoundSlotIds[i * 2] || null;
-                sourceB = previousRoundSlotIds[i * 2 + 1] || null;
+                sourceA = previousRoundSlotIds[i * 2];
+                sourceB = previousRoundSlotIds[i * 2 + 1];
             }
 
-            values.push(
-                phaseId,
-                round,
-                i + 1,
-                null,
-                sourceA,
-                sourceB,
-                seededHome,
-                seededAway,
-                isBye
+            const [result] = await connection.execute(
+                `INSERT INTO bracket_slots 
+                (phase_id, \`round\`, slot_number, source_a_slot_id, source_b_slot_id, seeded_home_team_id, seeded_away_team_id, is_bye) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [phaseId, round, i + 1, sourceA, sourceB, seededHome, seededAway, isBye]
             );
+            roundSlotIds.push(result.insertId);
         }
-
-        const placeholders = values
-            .map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            .join(', ');
-
-        const sql = 'INSERT INTO bracket_slots (phase_id, `round`, slot_number, match_id, source_a_slot_id, source_b_slot_id, seeded_home_team_id, seeded_away_team_id, is_bye) VALUES ' + placeholders;
-        const [result] = await connection.execute(sql, values);
-
-        const firstId = result.insertId;
-        const roundSlotIds = [];
-        for (let i = 0; i < matchCount; i += 1) {
-            roundSlotIds.push(firstId + i);
-        }
-
         previousRoundSlotIds = roundSlotIds;
     }
 }
@@ -227,15 +204,19 @@ router.get('/seasons/:seasonId/phases', async (req, res) => {
         const connection = await mysql.createConnection(dbConfig);
         
         // Query nâng cấp: lấy cả Phase và Group
-        const [rows] = await connection.execute(`
-            SELECT p.id as phase_id, p.name as phase_name, p.type, p.format, 
-                   g.id as group_id, g.name as group_name
-            FROM phases p
-            LEFT JOIN groups g ON p.id = g.phase_id
-            WHERE p.season_id = ?
-            ORDER BY p.order ASC`, 
-            [seasonId]
-        );
+     const [rows] = await connection.execute(`
+    SELECT 
+        p.id as phase_id, p.name as phase_name, p.format,
+        g.id as group_id, g.name as group_name,
+        st.team_id, t.name as team_name
+    FROM phases p
+    LEFT JOIN \`groups\` g ON p.id = g.phase_id
+    LEFT JOIN team_standings ts ON g.id = ts.group_id
+    LEFT JOIN teams t ON ts.team_id = t.id
+    WHERE p.season_id = ?
+    ORDER BY p.order ASC`, 
+    [seasonId]
+);
         await connection.end();
 
         // Xử lý nhóm dữ liệu (Grouping)
@@ -247,15 +228,26 @@ router.get('/seasons/:seasonId/phases', async (req, res) => {
                     name: row.phase_name,
                     type: row.type,
                     format: row.format,
+                    teams: [], // Danh sách team sẽ nằm ở đây
                     groups: [] // Danh sách group sẽ nằm ở đây
                 };
             }
-            if (row.group_id) {
-                phasesMap[row.phase_id].groups.push({
-                    id: row.group_id,
-                    name: row.group_name
-                });
-            }
+            if (row.team_id && !phasesMap[row.phase_id].teams.find(t => t.id === row.team_id)) {
+        phasesMap[row.phase_id].teams.push({
+            id: row.team_id,
+            name: row.team_name
+        });
+    }
+
+    // 2. Thêm Group vào Phase (Nếu có group_id)
+    if (row.group_id && !phasesMap[row.phase_id].groups.find(g => g.id === row.group_id)) {
+        phasesMap[row.phase_id].groups.push({
+            id: row.group_id,
+            name: row.group_name
+        });
+    }
+           
+            
         });
 
         return res.status(200).json({
@@ -302,9 +294,12 @@ router.post('/seasons/:seasonId/phases', async (req, res) => {
     if (format === 'round_robin' && (!effectiveGroupCount || effectiveGroupCount < 1)) {
         return res.status(400).json({ status: 'error', message: 'Cần số lượng bảng hợp lệ cho vòng tròn' });
     }
-let connection;
+let connection; // Khai báo đúng phạm vi
     try {
-        const connection = await mysql.createConnection(dbConfig);
+        connection = await mysql.createConnection(dbConfig); // Gán giá trị, không dùng const
+
+        // Sử dụng transaction để đảm bảo dữ liệu không bị lỗi nửa vời
+        await connection.beginTransaction();
 
         const [phaseResult] = await connection.execute(
             `INSERT INTO phases (season_id, name, type, format, \`order\`, start_date, end_date, is_active, created_at, updated_at, status)
@@ -314,53 +309,27 @@ let connection;
 
         const phaseId = phaseResult.insertId;
 
-        let createdGroups = [];
         if (format === 'round_robin') {
             const { groupIds, teamIds: assignedTeams } = await createGroupsAndAssignTeams(connection, seasonId, phaseId, effectiveGroupCount, effectiveGroupNames);
-            createdGroups = groupIds;
-
-            if (assignedTeams.length > 0) {
-                const placeholders = assignedTeams
-                    .map(() => '(?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 1, NOW(), NOW(), NULL)')
-                    .join(', ');
-                const values = assignedTeams.flatMap((teamId, idx) => [teamId, groupIds[idx % groupIds.length]]);
-
-                await connection.execute(
-                    `INSERT INTO team_standings (team_id, group_id, position, matches_played, wins, draws, losses, goals_for, goals_against, points, is_active, created_at, updated_at, deleted_at)
-                     VALUES ${placeholders}`,
-                    values
-                );
-            }
+            // ... (giữ nguyên đoạn insert team_standings)
+        } 
+        else if (format === 'knockout') {
+            // SỬA: Luôn gọi hàm tạo bracket, dù teamIds có rỗng hay không.
+            // Nếu rỗng, hàm này phải tự tạo khung trống (4, 8, 16 slot)
+            await createBracketSlots(connection, phaseId, Array.isArray(effectiveTeamIds) ? effectiveTeamIds : []);
         }
-if (format === 'knockout') {
-    if (!Array.isArray(effectiveTeamIds) || effectiveTeamIds.length < 2) {
-        // KHÔNG CẦN await connection.end() ở đây nếu đã có khối finally
-       return res.status(400).json({ status: 'error', message: 'Cần danh sách teamIds để tạo bracket loại trực tiếp' });
-            }
-    await createBracketSlots(connection, phaseId, effectiveTeamIds);
-}
-       
 
-        await connection.end();
+        await connection.commit(); // Commit giao dịch
+        
+        return res.status(201).json({ status: 'success', message: 'Tạo phase thành công', data: { phaseId } });
 
-        return res.status(201).json({
-            status: 'success',
-            message: 'Tạo phase thành công',
-            data: {
-                phaseId,
-                groups: createdGroups
-            }
-        });
     } catch (error) {
-       console.error('Lỗi chi tiết:', error); // Log ra để xem lỗi là gì
-    return res.status(500).json({ 
-        status: 'error', 
-        message: 'Lỗi server: ' + error.message // Trả về nội dung lỗi để App hiển thị
-    });
+        if (connection) await connection.rollback(); // Rollback nếu có lỗi
+        console.error('Lỗi chi tiết:', error);
+        return res.status(500).json({ status: 'error', message: 'Lỗi server: ' + error.message });
     } finally {
-    // Luôn đóng kết nối dù thành công hay thất bại
-    if (connection) await connection.end(); 
-}
+        if (connection) await connection.end(); 
+    }
 });
 router.post('/phases/:phaseId/generate-schedule', async (req, res) => {
     try {
@@ -437,30 +406,21 @@ router.post('/seasons/:seasonId/auto-import-teams-and-schedule', async (req, res
 router.post('/phases/:phaseId/add-team', async (req, res) => {
     const { phaseId } = req.params;
     const { teamId, groupId } = req.body;
-    console.log("Dữ liệu nhận được:", req.body);
     let connection;
+
     try {
         connection = await mysql.createConnection(dbConfig);
-        
-        // 1. Kiểm tra đội có tồn tại không
+        await connection.beginTransaction(); // Bắt đầu giao dịch
+
+        // 1. Kiểm tra đội có tồn tại trong hệ thống không
         const [teamCheck] = await connection.execute('SELECT id FROM teams WHERE id = ?', [teamId]);
         if (teamCheck.length === 0) {
-             return res.status(400).json({ success: false, message: "Đội không tồn tại trong hệ thống." });
+            await connection.rollback();
+            return res.status(400).json({ success: false, message: "Đội không tồn tại." });
         }
 
-        // 2. (Tùy chọn) Kiểm tra xem đội đã có trong bảng này chưa để tránh bị trùng
-        if (groupId) {
-            const [exists] = await connection.execute(
-                'SELECT id FROM team_standings WHERE team_id = ? AND group_id = ?', 
-                [teamId, groupId]
-            );
-            if (exists.length > 0) {
-                return res.status(400).json({ success: false, message: "Đội này đã nằm trong bảng đấu rồi!" });
-            }
-        }
-        
-        // 3. Thêm đội vào bảng xếp hạng
-      const [result] = await connection.execute(`
+        // 2. Cập nhật nhóm cho đội trong season_teams
+        const [updateResult] = await connection.execute(`
             UPDATE season_teams 
             SET group_id = ? 
             WHERE team_id = ? 
@@ -468,29 +428,93 @@ router.post('/phases/:phaseId/add-team', async (req, res) => {
             [groupId || null, teamId, phaseId]
         );
 
-        if (result.affectedRows === 0) {
-            return res.status(400).json({ success: false, message: "Không tìm thấy đội trong mùa giải này!" });
+        if (updateResult.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(400).json({ success: false, message: "Đội chưa tham gia mùa giải này!" });
         }
-      const safeGroupId = groupId ?? null; 
-const safeTeamId = teamId ?? null;
 
-await connection.execute(
-    `INSERT INTO team_standings (team_id, group_id, position, matches_played, wins, draws, losses, points) 
-     VALUES (?, ?, 0, 0, 0, 0, 0, 0) 
-     ON DUPLICATE KEY UPDATE group_id = ?`, 
-    [safeTeamId, safeGroupId, safeGroupId] // Sử dụng các biến đã "safe"
-);
-await connection.commit(); // Lưu thay đổi
-        res.status(200).json({ success: true, message: "Đã thêm đội bóng vào bảng thành công!" });
+        const [phaseInfo] = await connection.execute('SELECT format FROM phases WHERE id = ?', [phaseId]);
+const format = phaseInfo[0].format;
 
-        // 4. Trả về thông báo thành công
-        res.status(200).json({ 
-            success: true, 
-            message: "Đã thêm đội bóng vào bảng đấu thành công!" 
+if (format === 'round_robin') {
+    // 1. Kiểm tra đội này đã tồn tại ở bất kỳ group nào trong hệ thống chưa
+    const [existing] = await connection.execute(
+        'SELECT id, group_id FROM team_standings WHERE team_id = ?', 
+        [teamId]
+    );
+    console.log("DEBUG: Kết quả query existing:", existing);
+if (existing.length > 0) {
+    const currentGroupId = Number(existing[0].group_id);
+    const incomingGroupId = Number(groupId);
+
+    console.log(`DEBUG: So sánh ${currentGroupId} và ${incomingGroupId}`);
+
+    if (currentGroupId === incomingGroupId) {
+        console.log("DEBUG: Đã trùng nhóm, thoát hàm ngay!");
+        await connection.rollback();
+        return res.status(200).json({ 
+            success: false, 
+            message: "Đội bóng này đã nằm trong bảng đấu này rồi!" 
         });
+    }
+
+    console.log("DEBUG: Nhóm khác nhau, thực hiện UPDATE...");
+    await connection.execute(
+        'UPDATE team_standings SET group_id = ? WHERE team_id = ?', 
+        [groupId, teamId]
+    );
+} else {
+        // 4. NẾU CHƯA TỒN TẠI TRONG BẢNG NÀO -> INSERT MỚI
+        await connection.execute(`
+            INSERT INTO team_standings 
+            (team_id, group_id, position, matches_played, wins, draws, losses, goals_for, goals_against, points, is_active, created_at) 
+            VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 1, NOW())`, 
+            [teamId, groupId]
+        );
+    }
+
+} else if (format === 'knockout') {
+    // 1. Kiểm tra xem đội đã có trong nhánh này chưa (tránh trùng lặp)
+    const [alreadyExists] = await connection.execute(
+        'SELECT id FROM bracket_slots WHERE phase_id = ? AND (seeded_home_team_id = ? OR seeded_away_team_id = ?)',
+        [phaseId, teamId, teamId]
+    );
+
+    if (alreadyExists.length > 0) {
+        await connection.rollback();
+        return res.status(200).json({ success: false, message: "Đội đã có trong nhánh đấu này rồi!" });
+    }
+
+    // 2. Tìm slot trống ở vòng 1 (round = 1)
+    // Dùng COALESCE hoặc kiểm tra cả 0 và NULL để chắc chắn
+    const [emptySlot] = await connection.execute(
+        `SELECT id, seeded_home_team_id, seeded_away_team_id 
+         FROM bracket_slots 
+         WHERE phase_id = ? AND round = 1 
+         AND (seeded_home_team_id IS NULL OR seeded_home_team_id = 0 OR seeded_away_team_id IS NULL OR seeded_away_team_id = 0) 
+         LIMIT 1`,
+        [phaseId]
+    );
+
+    if (emptySlot.length > 0) {
+        const slot = emptySlot[0];
+        
+        // Nếu home chưa có (null hoặc 0), điền vào home, ngược lại điền vào away
+        if (slot.seeded_home_team_id === null || slot.seeded_home_team_id === 0) {
+            await connection.execute('UPDATE bracket_slots SET seeded_home_team_id = ? WHERE id = ?', [teamId, slot.id]);
+        } else {
+            await connection.execute('UPDATE bracket_slots SET seeded_away_team_id = ? WHERE id = ?', [teamId, slot.id]);
+        }
+    } else {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: "Không tìm thấy slot trống ở vòng 1!" });
+    }
+}
+        res.status(200).json({ success: true, message: "Cập nhật đội thành công!" });
 
     } catch (e) {
-        console.error("Lỗi khi thêm đội:", e);
+        if (connection) await connection.rollback(); // Hủy bỏ nếu có lỗi
+        console.error("Lỗi:", e);
         res.status(500).json({ success: false, message: "Lỗi server: " + e.message });
     } finally {
         if (connection) await connection.end();

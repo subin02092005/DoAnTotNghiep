@@ -46,7 +46,7 @@ fun ScheduleTabContent(
         }
     }
     LaunchedEffect(Unit) {
-        viewModel.loadFeaturedMatches() // Hoặc hàm load dữ liệu của bạn
+        viewModel.loadMatches() // Hoặc hàm load dữ liệu của bạn
     }
     Column(
         modifier = Modifier.fillMaxSize().padding(12.dp),

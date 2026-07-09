@@ -101,7 +101,7 @@ router.get('/matches/:id', async (req, res) => {
 });
 
 // Tạo lịch thi đấu mới
-router.post('/matches', async (req, res) => {
+router.post('/matchesadd', async (req, res) => {
     const {
         phase_id,
         group_id,
