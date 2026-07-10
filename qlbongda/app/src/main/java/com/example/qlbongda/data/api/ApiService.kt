@@ -279,6 +279,11 @@
             @Path("seasonId") seasonId: Int,
             @Body request: CreatePhaseRequest
         ): Response<GenericAdminResponse>
+        @DELETE("phases/{phaseId}/teams/{teamId}")
+        suspend fun removeTeamFromPhase(
+            @Path("phaseId") phaseId: Int,
+            @Path("teamId") teamId: Int
+        ): Response<GenericAdminResponse>
         @POST("phases/{phaseId}/add-team")
         suspend fun addTeamToPhase(
             @Path("phaseId") phaseId: Int,

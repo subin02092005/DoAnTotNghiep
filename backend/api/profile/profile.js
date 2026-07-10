@@ -67,7 +67,7 @@ router.get('/profile/get-info', async (req, res) => {
 // Đường dẫn: POST http://localhost:3000/api/profile/verify-otp
 router.post('/profile/verify-otp', async (req, res) => {
     const email = req.body.email?.trim();
-    const otp = req.body.otp?.trim();
+       const otp = req.body.otp ? String(req.body.otp).trim() : null;
 
     if (!email || !otp) {
         return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ Email và mã OTP!' });

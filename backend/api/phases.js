@@ -402,6 +402,77 @@ router.post('/seasons/:seasonId/auto-import-teams-and-schedule', async (req, res
         return res.status(500).json({ status: 'error', message: error.message || 'Lỗi server khi tự động thêm đội và xếp lịch' });
     }
 });
+// 🌟 API: XÓA ĐỘI BÓNG KHỎI VÒNG ĐẤU (PHASE)
+// Đường dẫn ứng với Retrofit: DELETE http://localhost:3000/api/phases/:phaseId/teams/:teamId
+router.delete('/phases/:phaseId/teams/:teamId', async (req, res) => {
+    const { phaseId, teamId } = req.params;
+    let connection;
+
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        await connection.beginTransaction(); // Bắt đầu giao dịch hóa dữ liệu
+
+        // 1. Kiểm tra vòng đấu (Phase) tồn tại và lấy định dạng giải
+        const [phaseInfo] = await connection.execute('SELECT format, season_id FROM phases WHERE id = ?', [phaseId]);
+        if (phaseInfo.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ success: false, message: "Vòng đấu không tồn tại." });
+        }
+        
+        const { format, season_id } = phaseInfo[0];
+
+        // 2. Cập nhật trạng thái trong bảng season_teams (Bỏ gán nhóm/bảng đấu cho đội này)
+        await connection.execute(
+            `UPDATE season_teams 
+             SET group_id = NULL 
+             WHERE team_id = ? AND season_id = ?`,
+            [teamId, season_id]
+        );
+
+        // 3. Xử lý xóa cấu trúc dữ liệu theo định dạng giải
+        if (format === 'round_robin') {
+            // Lấy danh sách ID nhóm thuộc Phase hiện tại
+            const [groups] = await connection.execute('SELECT id FROM `groups` WHERE phase_id = ?', [phaseId]);
+            const groupIds = groups.map(g => g.id);
+
+            if (groupIds.length > 0) {
+                // Xóa đội khỏi bảng xếp hạng của các nhóm thuộc vòng đấu này
+                const placeholders = groupIds.map(() => '?').join(',');
+                await connection.execute(
+                    `DELETE FROM team_standings 
+                     WHERE team_id = ? AND group_id IN (${placeholders})`,
+                    [teamId, ...groupIds]
+                );
+            }
+        } 
+        else if (format === 'knockout') {
+            // Tìm và xóa đội ra khỏi hạt giống của vòng 1 (đặt về NULL)
+            await connection.execute(
+                `UPDATE bracket_slots 
+                 SET seeded_home_team_id = CASE WHEN seeded_home_team_id = ? THEN NULL ELSE seeded_home_team_id END,
+                     seeded_away_team_id = CASE WHEN seeded_away_team_id = ? THEN NULL ELSE seeded_away_team_id END
+                 WHERE phase_id = ? AND round = 1`,
+                [teamId, teamId, phaseId]
+            );
+        }
+
+        await connection.commit(); // Hoàn tất giao dịch dữ liệu an toàn
+        return res.status(200).json({ 
+            success: true, 
+            message: "Đã xóa đội bóng khỏi vòng đấu thành công!" 
+        });
+
+    } catch (error) {
+        if (connection) await connection.rollback(); // Hoàn tác nếu gặp lỗi hệ thống
+        console.error("Lỗi xóa đội khỏi Phase:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Lỗi server khi xóa đội: " + error.message 
+        });
+    } finally {
+        if (connection) await connection.end(); // Đóng kết nối DB
+    }
+});
 // Trong file phases.js
 router.post('/phases/:phaseId/add-team', async (req, res) => {
     const { phaseId } = req.params;

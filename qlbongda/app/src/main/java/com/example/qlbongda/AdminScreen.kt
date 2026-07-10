@@ -6,10 +6,15 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.ui.text.TextStyle
+
+import com.example.qlbongda.data.model.AdminMatchItem
+import com.example.qlbongda.data.model.MatchDto
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -250,7 +255,7 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
     val matches by viewModel.matches.collectAsStateWithLifecycle()
     val featuredMatches by viewModel.featuredMatches.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    
+
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -309,7 +314,7 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
             }
         } else {
             val displayList = if (selectedTab == 0) matches else featuredMatches
-            
+
             if (displayList.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Không có trận đấu nào", color = Color.Gray)
