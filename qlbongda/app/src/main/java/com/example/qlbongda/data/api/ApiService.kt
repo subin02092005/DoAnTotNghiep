@@ -289,6 +289,13 @@
             @Path("phaseId") phaseId: Int,
             @Body request: AddTeamRequestadmin
         ): Response<AddTeamResponse>
+
+        @DELETE("phases/{phaseId}/teams/{teamId}")
+        suspend fun removeTeamFromPhase(
+            @Path("phaseId") phaseId: Int,
+            @Path("teamId") teamId: Int
+        ): Response<GenericAdminResponse>
+
         @PUT("tournaments/{tournamentId}/seasons/{seasonId}/rules")
         suspend fun updateSeasonRules(
             @Path("tournamentId") tournamentId: Int,

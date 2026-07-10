@@ -1,14 +1,18 @@
 package com.example.qlbongda
 
-import android.content.ClipData
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+<<<<<<< HEAD
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.border
+=======
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+<<<<<<< HEAD
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.ui.text.TextStyle
@@ -21,6 +25,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollable
+=======
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,8 +38,6 @@ import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -46,22 +50,19 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList // 🌟 THÊM IMPORT NÀY ĐỂ QUẢN LÝ DANH SÁCH STATE
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draganddrop.DragAndDropEvent
-import androidx.compose.ui.draganddrop.DragAndDropTarget
-import androidx.compose.ui.draganddrop.DragAndDropTransferData
-import androidx.compose.ui.draganddrop.toAndroidDragEvent
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.ClipData
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.qlbongda.data.model.AdminMatchItem
+import com.example.qlbongda.data.model.MatchDto
 import com.example.qlbongda.data.model.AdminPlayerItem
 import com.example.qlbongda.data.model.AdminTeamItem
 import com.example.qlbongda.data.model.CreateNotificationRequest
@@ -73,15 +74,7 @@ import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.TeamItem
 import com.example.qlbongda.ui.theme.NeonGreen
 import com.example.qlbongda.utils.DateUtils
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 import kotlin.collections.emptyList
-
 
 val NeonBlack = Color(0xFF0A0A0A)      // Đen sâu
 val NeonSurface = Color(0xFF161616)    // Xám rất tối (cho Card & Tab)
@@ -91,7 +84,6 @@ val NeonWhite = Color(0xFFFFFFFF) // <--- THÊM DÒNG NÀY VÀO
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminScreen(
-    matchList: List<FullMatchDetail>, // 🌟 NHẬN DANH SÁCH DÙNG CHUNG TỪ NGOÀI TRUYỀN VÀO
     onLogout: () -> Unit,
     adminViewModel: AdminViewModel // 🌟 THÊM VIEWMODEL VÀO ĐÂY
 ) {
@@ -254,12 +246,12 @@ fun AdminMenuCard(item: AdminMenuItem, onClick: () -> Unit) {
 fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int) -> Unit) {
     val matches by viewModel.matches.collectAsStateWithLifecycle()
     val featuredMatches by viewModel.featuredMatches.collectAsStateWithLifecycle()
+    val publicMatches by viewModel.publicMatches.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    var showAutoScheduleDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         viewModel.fetchMatches()
         viewModel.fetchFeaturedMatches()
@@ -296,16 +288,14 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
                 )
             }
         ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text("Tất cả", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text("Nổi bật", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
-            )
+            val tabTitles = listOf("Tất cả", "Sắp diễn ra", "Đang diễn ra", "Đã kết thúc", "Nổi bật")
+            tabTitles.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                )
+            }
         }
 
         if (isLoading) {
@@ -313,8 +303,40 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
                 CircularProgressIndicator(color = NeonGreen)
             }
         } else {
+<<<<<<< HEAD
             val displayList = if (selectedTab == 0) matches else featuredMatches
 
+=======
+            // Gộp các nguồn lại để hiển thị đầy đủ thông tin
+            val allMatchesCombined = (matches + featuredMatches).distinctBy { it.id }
+                .sortedByDescending { it.scheduledAt }
+
+            val displayList = when (selectedTab) {
+                1 -> allMatchesCombined.filter { it.status != "finished" && it.status != "ongoing" && it.status != "live" && it.status != "cancelled" }
+                2 -> allMatchesCombined.filter { it.status == "ongoing" || it.status == "live" }
+                3 -> publicMatches.filter { it.status == "finished" }.map { dto ->
+                    // Convert MatchDto to AdminMatchItem to show scores from public API
+                    AdminMatchItem(
+                        id = dto.id,
+                        homeTeamName = dto.teamA,
+                        awayTeamName = dto.teamB,
+                        homeScore = dto.home_score,
+                        awayScore = dto.away_score,
+                        status = dto.status,
+                        scheduledAt = dto.scheduled_at ?: "",
+                        isFeatured = dto.is_featured ?: 0,
+                        isPublished = 1,
+                        phaseId = null, groupId = null, homeTeamId = 0, awayTeamId = 0,
+                        homeTeamLogo = null, awayTeamLogo = null, playedAt = null,
+                        round = null, leg = null, venueId = null, referee = null,
+                        seasonId = null, createdAt = null, updatedAt = null
+                    )
+                }
+                4 -> featuredMatches
+                else -> allMatchesCombined
+            }
+            
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
             if (displayList.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Không có trận đấu nào", color = Color.Gray)
@@ -349,44 +371,12 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
             }
         )
     }
-    if (showAutoScheduleDialog) {
-        var inputPhaseId by remember { mutableStateOf("") }
-
-        AlertDialog(
-            onDismissRequest = { showAutoScheduleDialog = false },
-            title = { Text("Tạo lịch thi đấu tự động") },
-            text = {
-                Column {
-                    Text("Hệ thống sẽ tự động tạo cặp đấu vòng tròn cho tất cả các bảng trong Vòng đấu này.", fontSize = 12.sp, color = Color.Gray)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = inputPhaseId,
-                        onValueChange = { inputPhaseId = it },
-                        label = { Text("Nhập ID Vòng đấu (Phase ID)") }
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    inputPhaseId.toIntOrNull()?.let {
-                        viewModel.autoGenerateSchedule(it)
-                    }
-                    showAutoScheduleDialog = false
-                }) {
-                    Text("Chạy tự động")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAutoScheduleDialog = false }) { Text("Hủy") }
-            }
-        )
-    }
 }
 
 
 @Composable
 fun MatchAdminCard(
-    match: com.example.qlbongda.data.model.AdminMatchItem,
+    match: com.example.qlbongda.data.model.AdminMatchItem, 
     onStart: () -> Unit,
     onFinish: () -> Unit,
     onToggleFeatured: () -> Unit,
@@ -408,12 +398,42 @@ fun MatchAdminCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "${match.homeTeamName} VS ${match.awayTeamName}",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = match.homeTeamName,
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        
+                        if (match.status == "finished" || match.status == "ongoing" || match.status == "live") {
+                            Text(
+                                text = " ${match.homeScore ?: 0} : ${match.awayScore ?: 0} ",
+                                color = if (match.status == "finished") NeonWhite else NeonGreen,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                        } else {
+                            Text(
+                                text = " VS ",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+
+                        Text(
+                            text = match.awayTeamName,
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
                     Text(
                         text = "Thời gian: ${match.scheduledAt}",
                         color = Color.Gray,
@@ -432,8 +452,10 @@ fun MatchAdminCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onManage) {
-                        Icon(Icons.Default.Edit, contentDescription = "Manage Events", tint = Color.White)
+                    if (match.status != "finished" && match.status != "cancelled") {
+                        IconButton(onClick = onManage) {
+                            Icon(Icons.Default.Edit, contentDescription = "Manage Events", tint = Color.White)
+                        }
                     }
                     
                     IconButton(onClick = onToggleFeatured) {
@@ -812,7 +834,6 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
     var showAddSeasonDialog by remember { mutableStateOf(false) }
     var selectedTournamentId by remember { mutableIntStateOf(-1) }
     var selectedSeasonIdForPhase by remember { mutableIntStateOf(-1) }
-    var selectedSeasonIdForAutoSchedule by remember { mutableIntStateOf(-1) }
     var selectedSeasonId by remember { mutableIntStateOf(-1) }
     LaunchedEffect(Unit) {
         viewModel.fetchTournaments()
@@ -898,11 +919,6 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
                     items(seasons) { season ->
                         SeasonAdminCard(
                             season = season,
-                            onAddPhase = { selectedSeasonIdForPhase = season.id },
-                            onAutoSchedule = {
-                                viewModel.fetchSeasonPhasesForAdmin(season.id)
-                                selectedSeasonIdForAutoSchedule = season.id
-                            },
                             onToggleRegistration = { open ->
                                 viewModel.toggleRegistration(selectedTournamentId, season.id, open)
                             },
@@ -914,8 +930,6 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
         }
     }
 
-    val phasesOfSeason by viewModel.phasesOfSeason.collectAsStateWithLifecycle()
-
     if (showAddSeasonDialog && selectedTournamentId != -1) {
         AddSeasonDialog(
             onDismiss = { showAddSeasonDialog = false },
@@ -926,7 +940,10 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
         )
     }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
     if (showAddTournamentDialog) {
         AddTournamentDialog(
             onDismiss = { showAddTournamentDialog = false },
@@ -939,7 +956,6 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
 
     if (selectedSeasonIdForPhase != -1) {
         AddPhaseDialog(
-            seasonId = selectedSeasonIdForPhase,
             onDismiss = { selectedSeasonIdForPhase = -1 },
             onConfirm = { request ->
                 viewModel.createPhase(selectedSeasonIdForPhase, request)
@@ -966,13 +982,19 @@ sealed class Screen {
 
 // 2. MÀN HÌNH GỐC (Quản lý việc chuyển đổi giữa Tab và Chi tiết)
 @Composable
+<<<<<<< HEAD
 fun SeasonDetailScreen(seasonId: Int, viewModel: AdminViewModel, onBack: () -> Unit) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.PhaseList) }
 
+=======
+fun SeasonDetailScreen(seasonId: Int, viewModel: AdminViewModel, onBack: () -> Unit)  {
+    // Gọi load dữ liệu mỗi khi màn hình này xuất hiện
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
     LaunchedEffect(seasonId) {
-        viewModel.fetchSeasonDetails(seasonId)
+        viewModel.fetchSeasonDetails(seasonId) // Hàm này sẽ lấy danh sách đội và các vòng đấu của mùa giải
     }
 
+<<<<<<< HEAD
     when (val screen = currentScreen) {
         is Screen.PhaseList -> {
             // Hiển thị giao diện 2 Tabs
@@ -1006,10 +1028,14 @@ fun SeasonDetailContent(
     onBack: () -> Unit,
     onNavigateToPhaseDetail: (Int, String) -> Unit // Callback nhận 2 tham số
 ) {
+=======
+
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Danh sách đội", "Bảng đấu & Vòng đấu")
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF121212))) {
+<<<<<<< HEAD
         // Header
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
@@ -1019,6 +1045,14 @@ fun SeasonDetailContent(
         }
 
         // Tab Row
+=======
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = NeonGreen)
+            }
+            Text("Chi tiết Mùa giải", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
         TabRow(
             selectedTabIndex = selectedTabIndex,
             containerColor = Color.Black,
@@ -1035,6 +1069,7 @@ fun SeasonDetailContent(
 
         // Nội dung Tab
         when (selectedTabIndex) {
+<<<<<<< HEAD
             0 -> SeasonTeamListContent(seasonId, viewModel)
             1 -> SeasonStageContent(
                 seasonId = seasonId,
@@ -1171,8 +1206,15 @@ fun KnockoutContent(phase: PhaseItem) {
         }
     }
 }
+=======
+            0 -> SeasonTeamListContent(viewModel)
+            1 -> SeasonStageContent(seasonId, viewModel)
+        }
+    }
+}
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
 @Composable
-fun SeasonTeamListContent(seasonId: Int, viewModel: AdminViewModel) {
+fun SeasonTeamListContent(viewModel: AdminViewModel) {
     // Lấy toàn bộ detail từ StateFlow
     val seasonDetail by viewModel.seasonDetail.collectAsState()
 
@@ -1211,6 +1253,7 @@ fun SeasonTeamListContent(seasonId: Int, viewModel: AdminViewModel) {
         }
     }
 }
+<<<<<<< HEAD
 // -------------------------------------------------------------
 //
 // -------------------------------------------------------------
@@ -1228,24 +1271,94 @@ fun SeasonStageContent(
     viewModel: AdminViewModel,
     onNavigateToBracket: (Int, String) -> Unit
 ) {
+=======
+@Composable
+fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
     var showDialog by remember { mutableStateOf(false) }
     val seasonDetail by viewModel.seasonDetail.collectAsState()
     val phases = seasonDetail?.phases ?: emptyList()
     val allTeams = seasonDetail?.teams ?: emptyList()
 
+    var selectedTeamToMove by remember { mutableStateOf<TeamItem?>(null) }
+    var sourcePhaseIdForMove by remember { mutableIntStateOf(-1) }
+
     var showAddTeamDialog by remember { mutableStateOf(false) }
     var selectedPhaseForTeam by remember { mutableStateOf<PhaseItem?>(null) }
 
+<<<<<<< HEAD
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         // --- HEADER BUTTONS ---
         HeaderActionButtons(
             onAddPhaseClick = { showDialog = true },
             onAutoScheduleClick = { /* Gọi API Auto Schedule */ }
         )
+=======
+    var showAutoScheduleDialog by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        // --- KHU VỰC ĐỘI BÓNG CHƯA CÓ BẢNG (Dùng để chọn và di chuyển) ---
+        val unassignedTeams = allTeams.filter { it.groupId == null }
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (selectedTeamToMove == null) "ĐỘI CHƯA XẾP BẢNG (${unassignedTeams.size})" else "ĐANG CHỌN: ${selectedTeamToMove?.name?.uppercase()}",
+                color = if (selectedTeamToMove == null) NeonGreen else Color.Yellow,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+            // ... (nút gỡ bỏ nếu đang chọn)
+        }
+        
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .background(Color(0xFF1A1A1A), RoundedCornerShape(8.dp))
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (unassignedTeams.isEmpty()) {
+                item { Text("Tất cả các đội đã được xếp bảng", color = Color.Gray, fontSize = 11.sp) }
+            }
+            items(unassignedTeams) { team ->
+                val isSelected = selectedTeamToMove?.team_id == team.team_id
+                Box(
+                    modifier = Modifier
+                        .background(if (isSelected) Color.Yellow else Color(0xFF333333), RoundedCornerShape(16.dp))
+                        .clickable { 
+                            selectedTeamToMove = if (isSelected) null else team
+                            sourcePhaseIdForMove = -1
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(team.name, color = if (isSelected) Color.Black else Color.White, fontSize = 12.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- HEADER BUTTONS ---
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { showDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)) {
+                Text("Thêm vòng đấu", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                onClick = { showAutoScheduleDialog = true }, 
+                modifier = Modifier.weight(1f), 
+                border = BorderStroke(1.dp, NeonGreen)
+            ) {
+                Text("Auto Xếp Lịch", color = NeonGreen, fontWeight = FontWeight.Bold)
+            }
+        }
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // --- DANH SÁCH CÁC VÒNG ĐẤU ---
+<<<<<<< HEAD
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1262,6 +1375,56 @@ fun SeasonStageContent(
                     },
                     onMoveTeam = { teamId, targetGroupId ->
                         viewModel.assignTeamToGroup(phase.id, teamId, targetGroupId)
+=======
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(phases) { phase ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF252525))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                                Text(text = phase.name, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                                Text(text = "Định dạng: ${if(phase.format == "round_robin") "Vòng tròn" else "Loại trực tiếp"}",
+                                    style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            }
+                            IconButton(onClick = { selectedPhaseForTeam = phase; showAddTeamDialog = true }) {
+                                Icon(Icons.Default.Add, contentDescription = "Thêm đội", tint = NeonGreen)
+                            }
+                        }
+                        val groups = phase.groups ?: emptyList()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(scrollState) // Cho phép cuộn ngang
+                                .padding(vertical = 8.dp)
+                        ) {
+                            groups.forEach { group ->
+                                GroupCard(
+                                    group = group,
+                                    allTeams = allTeams,
+                                    phaseId = phase.id,
+                                    isMoveActive = selectedTeamToMove != null,
+                                    onRemoveTeam = { teamId ->
+                                        viewModel.removeTeamFromPhase(phase.id, teamId)
+                                    },
+                                    onSelectTeam = { team ->
+                                        selectedTeamToMove = team
+                                        sourcePhaseIdForMove = phase.id
+                                    },
+                                    onMoveHere = {
+                                        selectedTeamToMove?.let { team ->
+                                            // Truyền team.id (ID của đội trong mùa giải)
+                                            viewModel.assignTeamToGroup(phase.id, team.id, group.id)
+                                            selectedTeamToMove = null
+                                        }
+                                    }
+                                )
+                            }
+                        }
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
                     }
                 )
             }
@@ -1274,10 +1437,19 @@ fun SeasonStageContent(
             teams = allTeams,
             groups = selectedPhaseForTeam!!.groups ?: emptyList(),
             onDismiss = { showAddTeamDialog = false },
+<<<<<<< HEAD
             onTeamsSelected = { selectedTeams, group ->
                 selectedTeams.forEach { team ->
                     viewModel.assignTeamToGroup(selectedPhaseForTeam!!.id, team.team_id, group?.id)
                 }
+=======
+            onTeamSelected = { team, group ->
+                viewModel.addTeamToPhase(
+                    phaseId = selectedPhaseForTeam!!.id,
+                    teamItem = team,
+                    groupId = group?.id
+                )
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
                 showAddTeamDialog = false
             }
         )
@@ -1286,7 +1458,6 @@ fun SeasonStageContent(
     // --- DIALOG THÊM VÒNG ĐẤU ---
     if (showDialog) {
         AddPhaseDialog(
-            seasonId = seasonId,
             onDismiss = { showDialog = false },
             onConfirm = { request ->
                 viewModel.createPhase(seasonId, request)
@@ -1294,6 +1465,7 @@ fun SeasonStageContent(
             }
         )
     }
+<<<<<<< HEAD
 }
 @Composable
 fun HeaderActionButtons(onAddPhaseClick: () -> Unit, onAutoScheduleClick: () -> Unit) {
@@ -1421,189 +1593,129 @@ fun PhaseKnockoutView(phase: PhaseItem) {
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
 @OptIn(ExperimentalFoundationApi::class)
+=======
+
+    if (showAutoScheduleDialog) {
+        AutoSchedulePhaseSelectorDialog(
+            phases = phases,
+            seasonStartDate = seasonDetail?.season?.startDate,
+            onDismiss = { showAutoScheduleDialog = false },
+            onConfirm = { phaseId, options ->
+                viewModel.autoGenerateSchedule(phaseId, options)
+                showAutoScheduleDialog = false
+            }
+        )
+    }
+}
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
 @Composable
 fun GroupCard(
-    group: GroupItem,
-    coroutineScope: CoroutineScope, // Thêm tham số này
-
-    allTeams: List<TeamItem>,
-    allGroups: List<GroupItem>, // Cần truyền thêm danh sách tất cả các bảng vào đây
-    onMoveTeam: (Int, Int) -> Unit, // Hàm callback để gọi ViewModel
-    modifier: Modifier = Modifier
+    group: GroupItem, 
+    allTeams: List<TeamItem>, 
+    phaseId: Int,
+    isMoveActive: Boolean,
+    onRemoveTeam: (Int) -> Unit,
+    onSelectTeam: (TeamItem) -> Unit,
+    onMoveHere: () -> Unit
 ) {
-    val teamsInGroup by remember(allTeams, group.id) {
-        derivedStateOf { allTeams.filter { it.groupId == group.id } }
-    }
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val teamsInGroup = allTeams.filter { it.groupId == group.id }
 
-    // 1. Trạng thái để quản lý menu
-    var showMenu by remember { mutableStateOf(false) }
-    var selectedTeam by remember { mutableStateOf<TeamItem?>(null) }
-    var isHighlighted by remember { mutableStateOf(false)}
     Column(
-        modifier = modifier.background(if (isHighlighted) Color.Gray.copy(alpha = 0.3f) else Color(0xFF1E1E1E))
+        modifier = Modifier
+            .width(160.dp)
+            .padding(end = 8.dp)
+            .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+            .clickable(enabled = isMoveActive) { onMoveHere() }
+            .border(
+                width = if (isMoveActive) 2.dp else 0.dp,
+                color = if (isMoveActive) NeonGreen else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
             .padding(8.dp)
-            .fillMaxWidth() // Thay vì defaultMinSize, hãy để nó fill chiều rộng
-            .wrapContentHeight()
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .dragAndDropTarget(
-            target = object : DragAndDropTarget {
-                override fun onDrop(event: DragAndDropEvent): Boolean {
-                    // Dùng Reflection hoặc trực tiếp truy cập vào đối tượng gốc của Android
-                    val dragEvent = event.toAndroidDragEvent() // Nếu có hàm này
-                    val clipData = dragEvent.clipData
-
-                    if (clipData != null && clipData.itemCount > 0) {
-                        val teamId = clipData.getItemAt(0).text.toString().toIntOrNull()
-                        teamId?.let {
-                            onMoveTeam(it, group.id)
-                            return true
-                        }
-                    }
-                    return false
-                }
-
-                // Bạn có thể override thêm các hàm này nếu cần
-                override fun onEntered(event: DragAndDropEvent) {
-                    isHighlighted = true
-                    coroutineScope.launch { bringIntoViewRequester.bringIntoView() }
-                }
-                override fun onExited(event: DragAndDropEvent) {isHighlighted = false /* Hiệu ứng khi kéo ra */ }
-            },
-            // Nếu bạn muốn kiểm tra điều kiện, hãy dùng filter hoặc logic trong onStarted/onEntered
-            shouldStartDragAndDrop = { event -> true }
-        )){
-        Text(text = group.name.uppercase(), color = NeonGreen, fontWeight = FontWeight.Bold)
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFF333333))
-
-            if (teamsInGroup.isEmpty()) {
-                Text("Chưa có đội", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-            } else {
-                teamsInGroup.forEach { team ->
-                    key(team.team_id) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .dragAndDropSource(block = {
-                                    detectTapGestures(
-                                        onLongPress = { offset ->
-                                            startTransfer(
-                                                DragAndDropTransferData(
-                                                    clipData = ClipData.newPlainText(
-                                                        "teamId",
-                                                        team.team_id.toString()
-                                                    )
-                                                )
-                                            )
-                                        },
-
-                                        onTap = { // Thay thế .clickable bằng đây
-                                            selectedTeam = team
-                                            showMenu = true
-                                        }
-                                    )
-                                })
-                        ) {
-                            Icon(
-                                Icons.Default.Person,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = Color.Gray
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = team.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White
-                            )
-                        }
-                    }
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(text = group.name.uppercase(), color = NeonGreen, fontWeight = FontWeight.Bold)
+            if (isMoveActive) {
+                Icon(Icons.Default.ArrowDownward, contentDescription = "Thả vào đây", tint = NeonGreen, modifier = Modifier.size(16.dp))
             }
         }
-        // 3. Menu chọn bảng
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false }
-        ) {
-            allGroups.forEach { targetGroup ->
-                DropdownMenuItem(
-                    text = { Text("Chuyển sang ${targetGroup.name}") },
-                    onClick = {
-                        selectedTeam?.let { team ->
-                            onMoveTeam(team.team_id, targetGroup.id)
-                        }
-                        showMenu = false
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFF333333))
+
+        if (teamsInGroup.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
+                Text(if (isMoveActive) "Chạm để thả" else "Chưa có đội", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+        } else {
+            teamsInGroup.forEach { team ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                        .clickable { onSelectTeam(team) },
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = team.name, style = MaterialTheme.typography.bodyMedium, color = Color.White, maxLines = 1)
                     }
-                )
+                    IconButton(
+                        onClick = { onRemoveTeam(team.team_id) },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Xóa đội",
+                            tint = Color.Red,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
             }
         }
     }
 }
-
 @Composable
 fun AddTeamToPhaseDialog(
     teams: List<TeamItem>,
-    groups: List<GroupItem>,
+    groups: List<GroupItem>, // Danh sách nhóm từ phase
     onDismiss: () -> Unit,
-    onTeamsSelected: (List<TeamItem>, GroupItem?) -> Unit // Thay đổi callback
+    onTeamSelected: (TeamItem, GroupItem?) -> Unit
 ) {
-    // Dùng mutableStateListOf để quản lý danh sách đội đã chọn
-    val selectedTeams = remember { mutableStateListOf<TeamItem>() }
+    var selectedTeam by remember { mutableStateOf<TeamItem?>(null) }
     var selectedGroup by remember { mutableStateOf<GroupItem?>(null) }
 
-    val isConfirmEnabled = selectedTeams.isNotEmpty() && (groups.isEmpty() || selectedGroup != null)
+    // Ràng buộc điều kiện:
+    // - Phải chọn Team.
+    // - NẾU có danh sách bảng đấu (groups.isNotEmpty()) thì PHẢI chọn cả bảng đấu.
+    val isConfirmEnabled = selectedTeam != null && (groups.isEmpty() || selectedGroup != null)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Thêm đội vào vòng đấu", color = Color.White) },
         text = {
             Column {
-                // Nút Chọn tất cả
-                TextButton(onClick = {
-                    if (selectedTeams.size == teams.size) selectedTeams.clear()
-                    else {
-                        selectedTeams.clear()
-                        selectedTeams.addAll(teams)
-                    }
-                }) {
-                    Text(
-                        if (selectedTeams.size == teams.size) "Bỏ chọn tất cả" else "Chọn tất cả",
-                        color = NeonGreen
-                    )
-                }
-
-                // 1. Chọn Team (dùng Checkbox)
-                LazyColumn(modifier = Modifier.height(200.dp)) {
+                // 1. Chọn Team
+                Text("Chọn đội:", color = Color.Gray)
+                LazyColumn(modifier = Modifier.height(150.dp)) {
                     items(teams) { team ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                if (selectedTeams.contains(team)) selectedTeams.remove(team)
-                                else selectedTeams.add(team)
-                            }
-                        ) {
-                            Checkbox(
-                                checked = selectedTeams.contains(team),
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked) selectedTeams.add(team) else selectedTeams.remove(team)
-                                },
-                                colors = CheckboxDefaults.colors(checkedColor = NeonGreen)
-                            )
-                            Text(team.name, color = Color.White)
+                        TextButton(onClick = { selectedTeam = team }) {
+                            Text(team.name, color = if (selectedTeam == team) NeonGreen else Color.White)
                         }
                     }
                 }
 
-                // 2. Chọn Group (Giữ nguyên)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. Chọn Group (Chỉ hiện nếu có danh sách nhóm)
                 if (groups.isNotEmpty()) {
-                    Text("Chọn bảng đấu:", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+                    Text("Chọn bảng đấu:", color = Color.Gray)
                     LazyRow {
                         items(groups) { group ->
                             TextButton(
                                 onClick = { selectedGroup = group },
+                                // Thêm background để dễ nhận diện đang chọn bảng nào
                                 colors = ButtonDefaults.textButtonColors(
                                     containerColor = if (selectedGroup == group) Color.DarkGray else Color.Transparent
                                 )
@@ -1619,24 +1731,25 @@ fun AddTeamToPhaseDialog(
             TextButton(
                 onClick = {
                     if (isConfirmEnabled) {
-                        onTeamsSelected(selectedTeams, selectedGroup)
+                        onTeamSelected(selectedTeam!!, selectedGroup)
                         onDismiss()
                     }
                 },
-                enabled = isConfirmEnabled
+                enabled = isConfirmEnabled // Nút chỉ sáng khi chọn đủ điều kiện
             ) {
                 Text("Xác nhận", color = if (isConfirmEnabled) NeonGreen else Color.Gray)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Hủy", color = Color.White) }
+            TextButton(onClick = onDismiss) {
+                Text("Hủy", color = Color.White)
+            }
         },
         containerColor = Color(0xFF1E1E1E)
     )
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSeasonDialog(onDismiss: () -> Unit, onConfirm: (com.example.qlbongda.data.model.CreateSeasonRequest) -> Unit) {
     var name by remember { mutableStateOf("") }
@@ -1647,41 +1760,7 @@ fun AddSeasonDialog(onDismiss: () -> Unit, onConfirm: (com.example.qlbongda.data
     var maxTeams by remember { mutableStateOf("16") }
     var fee by remember { mutableStateOf("0") }
     var isRegOpen by remember { mutableStateOf(true) }
-    fun stringToMillis(date: String): Long {
-        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        return formatter.parse(date)?.time ?: 0L
-    }
-    val isEndDateInvalid = stringToMillis(endDate) < stringToMillis(startDate)
-    val isDeadlineInvalid = stringToMillis(deadline) < stringToMillis(startDate) ||
-            stringToMillis(deadline) > stringToMillis(endDate)
 
-// Trong AddSeasonDialog:
-    val today = remember {
-        Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-
-// 1. Ngày bắt đầu: >= hôm nay
-    val startDateRange = object : SelectableDates {
-        override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis >= (today - 86400000)
-    }
-
-// 2. Ngày kết thúc: > ngày bắt đầu
-    val endDateRange = object : SelectableDates {
-        override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis > stringToMillis(startDate)
-    }
-
-// 3. Hạn đăng ký: <= ngày kết thúc
-    val deadlineRange = object : SelectableDates {
-        override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-            val startMillis = stringToMillis(startDate)
-            val endMillis = stringToMillis(endDate)
-            // Hạn đăng ký phải từ ngày bắt đầu đến ngày kết thúc
-            return utcTimeMillis >= startMillis && utcTimeMillis <= endMillis
-        }
-    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Thêm Mùa giải mới") },
@@ -1692,34 +1771,12 @@ fun AddSeasonDialog(onDismiss: () -> Unit, onConfirm: (com.example.qlbongda.data
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Tên mùa giải (VD: Mùa Xuân 2025)") })
                 OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Mô tả ngắn") })
-
-                // Thay thế các ô nhập ngày thủ công bằng DatePicker
-                DatePickerField(
-                    label = "Ngày bắt đầu",
-                    selectedDate = startDate,
-                    onDateSelected = { startDate = it },
-                    selectableDates = startDateRange
-                )
-
-                DatePickerField(
-                    label = "Ngày kết thúc",
-                    selectedDate = endDate,
-                    onDateSelected = { endDate = it },
-                    selectableDates = endDateRange, // Chỉ cho chọn sau ngày bắt đầu,
-                    errorMessage = if (isEndDateInvalid) "Ngày kết thúc phải sau ngày bắt đầu" else null
-
-                )
-
-                DatePickerField(
-                    label = "Hạn đăng ký",
-                    selectedDate = deadline,
-                    onDateSelected = { deadline = it },
-                    selectableDates = deadlineRange,
-                    errorMessage = if (isDeadlineInvalid) "Hạn đăng ký phải nằm trong khoảng ngày bắt đầu và kết thúc" else null// Chỉ cho chọn trước ngày kết thúc
-                )
+                OutlinedTextField(value = startDate, onValueChange = { startDate = it }, label = { Text("Ngày bắt đầu (YYYY-MM-DD)") })
+                OutlinedTextField(value = endDate, onValueChange = { endDate = it }, label = { Text("Ngày kết thúc (YYYY-MM-DD)") })
+                OutlinedTextField(value = deadline, onValueChange = { deadline = it }, label = { Text("Hạn đăng ký (YYYY-MM-DD)") })
                 OutlinedTextField(value = maxTeams, onValueChange = { maxTeams = it }, label = { Text("Số đội tối đa") })
                 OutlinedTextField(value = fee, onValueChange = { fee = it }, label = { Text("Lệ phí đăng ký (VNĐ)") })
-
+                
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = isRegOpen, onCheckedChange = { isRegOpen = it })
                     Text("Mở cổng đăng ký ngay")
@@ -1744,66 +1801,19 @@ fun AddSeasonDialog(onDismiss: () -> Unit, onConfirm: (com.example.qlbongda.data
                     }
                 },
                 enabled = name.isNotBlank()
-            ) { Text("Tạo") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
-    )
-}
-
-// Helper Composable để xử lý DatePicker
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DatePickerField(
-    label: String,
-    selectedDate: String,
-    onDateSelected: (String) -> Unit,
-
-    // Thêm tham số này để tùy chỉnh giới hạn ngày
-    selectableDates: SelectableDates = DatePickerDefaults.AllDates,
-    errorMessage: String? = null // Thêm tham số thông báo lỗi
-) {
-    var showDialog by remember { mutableStateOf(false) }
-    // Truyền selectableDates vào state
-    val datePickerState = rememberDatePickerState(selectableDates = selectableDates)
-
-    OutlinedTextField(
-        value = selectedDate,
-        onValueChange = {},
-        label = { Text(label) },
-        readOnly = true,
-        trailingIcon = {
-            IconButton(onClick = { showDialog = true }) {
-                Icon(Icons.Default.DateRange, contentDescription = null)
+            ) {
+                Text("Tạo")
             }
         },
-        modifier = Modifier.fillMaxWidth().clickable { showDialog = true }
-    )
-    if (errorMessage != null) {
-        Text(text = errorMessage, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-    }
-    if (showDialog) {
-        DatePickerDialog(
-            onDismissRequest = { showDialog = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        onDateSelected(formatter.format(Date(millis)))
-                    }
-                    showDialog = false
-                }) { Text("Chọn") }
-            }
-        ) {
-            DatePicker(state = datePickerState)
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
         }
-    }
+    )
 }
 
 @Composable
 fun SeasonAdminCard(
-    season: com.example.qlbongda.data.model.SeasonAdminItem,
-    onAddPhase: () -> Unit, 
-    onAutoSchedule: () -> Unit,
+    season: com.example.qlbongda.data.model.SeasonAdminItem, 
     onToggleRegistration: (Boolean) -> Unit,
     onClick: () -> Unit //
 ) {
@@ -1830,22 +1840,10 @@ fun SeasonAdminCard(
             }
 
             Text(
-                text = "Hạn đăng ký: ${DateUtils.formatDateTime(season.registrationDeadline ?: "")}",
+                text = "Hạn đăng ký: ${DateUtils.formatTime(season.registrationDeadline ?: "")}",
                 color = Color.Gray,
                 fontSize = 12.sp
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onAutoSchedule,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text("Auto Xếp Lịch", fontSize = 11.sp, color = Color.Black)
-                }
-            }
         }
     }
 }
@@ -1853,7 +1851,6 @@ fun SeasonAdminCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPhaseDialog(
-    seasonId: Int,
     onDismiss: () -> Unit,
     onConfirm: (com.example.qlbongda.data.model.CreatePhaseRequest) -> Unit,
 
@@ -1950,8 +1947,7 @@ fun AddPhaseDialog(
                     type = phaseMapping[selectedName] ?: "group_stage",
                     format = selectedFormat,
                     order = order.toIntOrNull() ?: 1,
-                    groupCount = if (selectedFormat == "round_robin") groupCount.toIntOrNull() else null,
-                    teamIds = emptyList() // THÊM DÒNG NÀY: Gửi danh sách rỗng nếu chưa gán đội
+                    groupCount = if (selectedFormat == "round_robin") groupCount.toIntOrNull() else null
                 ))
             }) { Text("Tạo") }
         },
@@ -1959,8 +1955,143 @@ fun AddPhaseDialog(
     )
 }
 @Composable
+<<<<<<< HEAD
+=======
+fun AutoSchedulePhaseSelectorDialog(
+    phases: List<com.example.qlbongda.data.model.PhaseItem>,
+    seasonStartDate: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, com.example.qlbongda.data.model.ScheduleOptionsRequest) -> Unit
+) {
+    var selectedPhaseId by remember { mutableIntStateOf(-1) }
+    var isAutoDate by remember { mutableStateOf(true) }
+    var isAutoTime by remember { mutableStateOf(true) }
+    
+    // Format YYYY-MM-DD
+    var startDate by remember(seasonStartDate) { 
+        mutableStateOf(seasonStartDate?.split("T")?.get(0) ?: "2025-06-01") 
+    }
+    var startTime by remember { mutableStateOf("18:00") }
+    var intervalHours by remember { mutableIntStateOf(2) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1E1E1E),
+        title = { Text("Cấu hình xếp lịch tự động", color = Color.White) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("1. Chọn Vòng đấu:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NeonGreen)
+                if (phases.isEmpty()) {
+                    Text("Không có vòng đấu nào. Hãy thêm vòng đấu trước.", color = Color.Red)
+                } else {
+                    phases.forEach { phase ->
+                        val isScheduled = !phase.matches.isNullOrEmpty()
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable(enabled = !isScheduled) { selectedPhaseId = phase.id }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(
+                                selected = selectedPhaseId == phase.id, 
+                                onClick = { if (!isScheduled) selectedPhaseId = phase.id },
+                                enabled = !isScheduled,
+                                colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
+                            )
+                            Column {
+                                Text(phase.name, fontSize = 14.sp, color = if (isScheduled) Color.Gray else Color.White)
+                                if (isScheduled) {
+                                    Text("(Đã có lịch đấu)", fontSize = 10.sp, color = Color.Red)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("2. Tùy chọn thời gian:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NeonGreen)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = isAutoDate, onCheckedChange = { isAutoDate = it }, colors = CheckboxDefaults.colors(checkedColor = NeonGreen))
+                    Text("Tự động chọn ngày (Bắt đầu từ ngày mùa giải)", color = Color.White, fontSize = 12.sp)
+                }
+                if (!isAutoDate) {
+                    OutlinedTextField(
+                        value = startDate, 
+                        onValueChange = { startDate = it }, 
+                        label = { Text("Ngày bắt đầu (YYYY-MM-DD)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = TextStyle(color = Color.White)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = isAutoTime, onCheckedChange = { isAutoTime = it }, colors = CheckboxDefaults.colors(checkedColor = NeonGreen))
+                    Text("Tự động chọn giờ (Mặc định 18:00)", color = Color.White, fontSize = 12.sp)
+                }
+                if (!isAutoTime) {
+                    OutlinedTextField(
+                        value = startTime, 
+                        onValueChange = { startTime = it }, 
+                        label = { Text("Giờ bắt đầu (HH:MM)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = TextStyle(color = Color.White)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("3. Khoảng cách giữa các trận (giờ):", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NeonGreen)
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    (1..10).forEach { hour ->
+                        FilterChip(
+                            selected = intervalHours == hour,
+                            onClick = { intervalHours = hour },
+                            label = { Text(hour.toString()) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = NeonGreen,
+                                labelColor = Color.White,
+                                selectedLabelColor = Color.Black
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm(
+                        selectedPhaseId,
+                        com.example.qlbongda.data.model.ScheduleOptionsRequest(
+                            startDate = if (isAutoDate) null else startDate.ifBlank { null },
+                            startTime = if (isAutoTime) null else startTime.ifBlank { null },
+                            intervalHours = intervalHours
+                        )
+                    )
+                },
+                enabled = selectedPhaseId != -1,
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            ) {
+                Text("Chạy tự động", color = Color.Black)
+            }
+        },
+        dismissButton = { 
+            TextButton(onClick = onDismiss) { 
+                Text("Hủy", color = Color.Gray) 
+            } 
+        }
+    )
+}
+
+@Composable
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
 fun TournamentAdminCard(
-    tournament: com.example.qlbongda.data.model.TournamentItem,
+    tournament: com.example.qlbongda.data.model.TournamentItem, 
     onToggleStatus: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -2079,8 +2210,7 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
     if (showAddDialog) {
         AddNotificationDialog(
             onDismiss = { viewModel.setShowAddDialog(false) },
-            // Cập nhật ở đây để nhận đủ 6 tham số
-            onConfirm = { title, content, type, source, teamId, userId ->
+            onConfirm = { title, content, type, teamId, userId ->
                 viewModel.createNotification(title, content, type, teamId, userId)
                 viewModel.setShowAddDialog(false)
             }
@@ -2189,7 +2319,7 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
 @Composable
 fun AddNotificationDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, String, String, String, Int?, Int?) -> Unit
+    onConfirm: (String, String, String, Int?, Int?) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
@@ -2239,7 +2369,7 @@ fun AddNotificationDialog(
                     type == "player_approved" && recipientUserId.isBlank() -> errorMessage = "Vui lòng nhập ID Người nhận"
                     else -> {
                         // Nếu mọi thứ đều ổn
-                        onConfirm(title, content, type, "admin_panel", targetTeamId.toIntOrNull(), recipientUserId.toIntOrNull())
+                        onConfirm(title, content, type, targetTeamId.toIntOrNull(), recipientUserId.toIntOrNull())
                     }
                 }
             }) {

@@ -1103,6 +1103,7 @@ fun TeamRegistrationScreen(
                                             // Nút Đăng ký
                                             Button(
                                                 onClick = {
+<<<<<<< HEAD
                                                     val alreadyRegistered =
                                                         seasons.any { it.is_registered == 1 }
 
@@ -1123,6 +1124,17 @@ fun TeamRegistrationScreen(
                                                                                 "season_id" to season.id
                                                                             )
                                                                         )
+=======
+                                                    scope.launch {
+                                                        try {
+                                                            val response = RetrofitClient.getClient(context)
+                                                                .registerToSeason(
+                                                                    mapOf(
+                                                                        "team_id" to teamId,
+                                                                        "season_id" to season.id
+                                                                    )
+                                                                )
+>>>>>>> 43d5a9cebcb60ec5d8bc6dbd01ae01a3fadbacfd
 
                                                                 if (response.isSuccessful) {
                                                                     Toast.makeText(
@@ -1161,7 +1173,7 @@ fun TeamRegistrationScreen(
                                                                     Toast.LENGTH_SHORT
                                                                 ).show()
                                                             }
-                                                        }
+
                                                     }
                                                 },
                                                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
