@@ -34,7 +34,10 @@ END AS isHot
             JOIN teams t2 ON m.away_team_id = t2.id
             LEFT JOIN match_results mr ON m.id = mr.match_id
             LEFT JOIN phases ph ON m.phase_id = ph.id
-            WHERE m.is_active = 1 AND m.scheduled_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            WHERE m.is_active = 1 
+           /* AND m.scheduled_at BETWEEN DATE_SUB(NOW(), INTERVAL 7 DAY) 
+                                   AND DATE_ADD(NOW(), INTERVAL 7 DAY) 
+            */
             ORDER BY m.scheduled_at ASC
         `;
         

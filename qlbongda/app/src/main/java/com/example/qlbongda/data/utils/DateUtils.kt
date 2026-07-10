@@ -76,12 +76,27 @@ object DateUtils {
             // 2. Logic tính toán phút hiển thị
             when {
                 minutes < 0 -> "0"
-                minutes in 45..59 -> "HT" // Nghỉ giải lao
-                minutes > 59 -> (minutes - 15).toString() // Trừ 15p nghỉ để ra phút thực
-                else -> minutes.toString()
+                minutes in 0..45 -> minutes.toString() // Hiệp 1: 0 -> 45
+                minutes in 46..60 -> "HT"             // Nghỉ giải lao (15 phút)
+                minutes in 61..105 -> (minutes - 15).toString() // Hiệp 2: 46 -> 90
+                else -> "FT"                           // Sau 105 phút: Kết thúc
             }
         } catch (e: Exception) {
-            "LIVE"
+            ""
+        }
+
+    }
+    fun isDeadlinePassed(deadline: String): Boolean {
+        return try {
+            // Giả sử định dạng ngày từ API là ISO (ví dụ: 2026-07-15T23:59:59.000)
+            val formatter = DateTimeFormatter.ISO_DATE_TIME
+            val deadlineDate = LocalDateTime.parse(deadline, formatter)
+
+            // So sánh với thời gian hiện tại
+            LocalDateTime.now().isAfter(deadlineDate)
+        } catch (e: Exception) {
+            // Nếu định dạng lỗi, trả về false (không coi là đã quá hạn)
+            false
         }
     }
 }

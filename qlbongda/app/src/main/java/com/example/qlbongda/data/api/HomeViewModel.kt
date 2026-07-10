@@ -13,6 +13,7 @@ import com.example.qlbongda.data.model.SeasonWithPhases
 import com.example.qlbongda.data.model.StandingItem
 import com.example.qlbongda.data.model.TeamDetailData
 import com.example.qlbongda.data.model.TournamentPhase
+import com.example.qlbongda.data.model.TournamentRules
 import com.example.qlbongda.data.model.UpdateProfileRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
         loadMatches()
         loadFeaturedMatches()
         loadStandings()
+        loadGlobalRules()
     }
 
     // --- CÁC HÀM GỌI API ---
@@ -58,6 +60,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
+
     fun loadMatches() {
 
         viewModelScope.launch {
@@ -93,7 +96,25 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
+    // Trong HomeViewModel.kt
+    private val _tournamentRules = MutableStateFlow<TournamentRules?>(null)
+    val tournamentRules: StateFlow<TournamentRules?> = _tournamentRules.asStateFlow()
 
+    // Hàm gọi API lấy luật chung
+    fun loadGlobalRules() {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getGlobalRules()
+                if (response.isSuccessful && response.body()?.status == "success") {
+                    _tournamentRules.value = response.body()?.data
+                } else {
+                    Log.e("HomeViewModel", "Không lấy được luật: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Lỗi Exception: ${e.message}")
+            }
+        }
+    }
     fun loadFeaturedMatches() {
         viewModelScope.launch {
             try {

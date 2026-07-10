@@ -214,167 +214,189 @@
     });
 
     // Tạo mùa giải (season) cho một giải đấu
-    router.post('/seasons', async (req, res) => {
-        const { name, description, start_date, end_date, registration_deadline, tournament_id, is_registration_open, user_id, max_teams, registration_fee } = req.body;
+        router.post('/seasons', async (req, res) => {
+            const { name, description, start_date, end_date, registration_deadline, tournament_id, is_registration_open, user_id, max_teams, registration_fee } = req.body;
 
-        if (!name || !start_date || !end_date || !registration_deadline || !tournament_id || max_teams === undefined) {
-            return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên, ngày bắt đầu, ngày kết thúc, hạn đăng ký, tournament_id và max_teams.' });
-        }
-// Kiểm tra nếu hạn đăng ký chưa có giờ (độ dài là 10 ký tự: YYYY-MM-DD)
-    start_date = `${start_date} 00:00:00`;
-    end_date = `${end_date} 23:59:59`;
-        registration_deadline = `${registration_deadline} 23:59:59`;
-
-        try {
-            const [tournamentRows] = await pool.execute(
-                'SELECT id FROM tournaments WHERE id = ? AND deleted_at IS NULL',
-                [tournament_id]
-            );
-
-            if (tournamentRows.length === 0) {
-                return res.status(404).json({ success: false, message: 'Giải đấu không tồn tại.' });
+            if (!name || !start_date || !end_date || !registration_deadline || !tournament_id || max_teams === undefined) {
+                return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên, ngày bắt đầu, ngày kết thúc, hạn đăng ký, tournament_id và max_teams.' });
             }
+    // Kiểm tra nếu hạn đăng ký chưa có giờ (độ dài là 10 ký tự: YYYY-MM-DD)
+        start_date = `${start_date} 00:00:00`;
+        end_date = `${end_date} 23:59:59`;
+            registration_deadline = `${registration_deadline} 23:59:59`;
 
-            const [result] = await pool.execute(
-                `INSERT INTO seasons (name, description, status, start_date, end_date, registration_deadline, is_registration_open, is_active, created_at, updated_at, deleted_at, tournament_id, user_id, max_teams, registration_fee)
-                VALUES (?, ?, 'registration_open', ?, ?, ?, ?, 1, NOW(), NOW(), NULL, ?, ?, ?, ?)`,
-                [name, description || null, start_date, end_date, registration_deadline, is_registration_open ? 1 : 0, tournament_id, user_id || null, max_teams, registration_fee || 0.00]
-            );
+            try {
+                const [tournamentRows] = await pool.execute(
+                    'SELECT id FROM tournaments WHERE id = ? AND deleted_at IS NULL',
+                    [tournament_id]
+                );
 
-            const seasonId = result.insertId;
+                if (tournamentRows.length === 0) {
+                    return res.status(404).json({ success: false, message: 'Giải đấu không tồn tại.' });
+                }
 
-            // If caller provided phases to create immediately, forward them to the phases API
-            const createdPhases = [];
-            if (Array.isArray(req.body.phases) && req.body.phases.length > 0) {
-                const phasesModule = require('../phases');
+                const [result] = await pool.execute(
+                    `INSERT INTO seasons (name, description, status, start_date, end_date, registration_deadline, is_registration_open, is_active, created_at, updated_at, deleted_at, tournament_id, user_id, max_teams, registration_fee)
+                    VALUES (?, ?, 'registration_open', ?, ?, ?, ?, 1, NOW(), NOW(), NULL, ?, ?, ?, ?)`,
+                    [name, description || null, start_date, end_date, registration_deadline, is_registration_open ? 1 : 0, tournament_id, user_id || null, max_teams, registration_fee || 0.00]
+                );
 
-                for (const phaseData of req.body.phases) {
-                    const connection = await pool.getConnection();
-                    try {
-                        const {
-                            name: pName,
-                            type: pType,
-                            format: pFormat,
-                            order: pOrder,
-                            start_date: pStartDate,
-                            end_date: pEndDate,
-                            group_count: pGroupCount,
-                            groupCount: pGroupCountAlt,
-                            group_names: pGroupNames,
-                            groupNames: pGroupNamesAlt,
-                            team_ids: pTeamIds,
-                            teamIds: pTeamIdsAlt
-                        } = phaseData;
+                const seasonId = result.insertId;
 
-                        const effectiveGroupCount = pGroupCount || pGroupCountAlt;
-                        const effectiveGroupNames = pGroupNames || pGroupNamesAlt;
-                        const effectiveTeamIds = pTeamIds || pTeamIdsAlt;
+                // If caller provided phases to create immediately, forward them to the phases API
+                const createdPhases = [];
+                if (Array.isArray(req.body.phases) && req.body.phases.length > 0) {
+                    const phasesModule = require('../phases');
 
-                        const [phaseResult] = await connection.execute(
-                            `INSERT INTO phases (season_id, name, type, format, \`order\`, start_date, end_date, is_active, created_at, updated_at, status)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW(), 'draft')`,
-                            [seasonId, pName, pType, pFormat, pOrder, pStartDate || null, pEndDate || null]
-                        );
+                    for (const phaseData of req.body.phases) {
+                        const connection = await pool.getConnection();
+                        try {
+                            const {
+                                name: pName,
+                                type: pType,
+                                format: pFormat,
+                                order: pOrder,
+                                start_date: pStartDate,
+                                end_date: pEndDate,
+                                group_count: pGroupCount,
+                                groupCount: pGroupCountAlt,
+                                group_names: pGroupNames,
+                                groupNames: pGroupNamesAlt,
+                                team_ids: pTeamIds,
+                                teamIds: pTeamIdsAlt
+                            } = phaseData;
 
-                        const createdPhaseId = phaseResult.insertId;
-                        const created = { input: phaseData, phaseId: createdPhaseId };
+                            const effectiveGroupCount = pGroupCount || pGroupCountAlt;
+                            const effectiveGroupNames = pGroupNames || pGroupNamesAlt;
+                            const effectiveTeamIds = pTeamIds || pTeamIdsAlt;
 
-                        if (pFormat === 'round_robin') {
-                            const { groupIds, teamIds: assignedTeams } = await phasesModule.createGroupsAndAssignTeams(connection, seasonId, createdPhaseId, effectiveGroupCount, effectiveGroupNames);
-                            created.groups = groupIds;
+                            const [phaseResult] = await connection.execute(
+                                `INSERT INTO phases (season_id, name, type, format, \`order\`, start_date, end_date, is_active, created_at, updated_at, status)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW(), 'draft')`,
+                                [seasonId, pName, pType, pFormat, pOrder, pStartDate || null, pEndDate || null]
+                            );
 
-                            if (assignedTeams && assignedTeams.length > 0) {
-                                const placeholders = assignedTeams
-                                    .map(() => '(?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 1, NOW(), NOW(), NULL)')
-                                    .join(', ');
-                                const values = assignedTeams.flatMap((teamId, idx) => [teamId, groupIds[idx % groupIds.length]]);
+                            const createdPhaseId = phaseResult.insertId;
+                            const created = { input: phaseData, phaseId: createdPhaseId };
 
-                                await connection.execute(
-                                    `INSERT INTO team_standings (team_id, group_id, position, matches_played, wins, draws, losses, goals_for, goals_against, points, is_active, created_at, updated_at, deleted_at)
-                                    VALUES ${placeholders}`,
-                                    values
-                                );
+                            if (pFormat === 'round_robin') {
+                                const { groupIds, teamIds: assignedTeams } = await phasesModule.createGroupsAndAssignTeams(connection, seasonId, createdPhaseId, effectiveGroupCount, effectiveGroupNames);
+                                created.groups = groupIds;
+
+                                if (assignedTeams && assignedTeams.length > 0) {
+                                    const placeholders = assignedTeams
+                                        .map(() => '(?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 1, NOW(), NOW(), NULL)')
+                                        .join(', ');
+                                    const values = assignedTeams.flatMap((teamId, idx) => [teamId, groupIds[idx % groupIds.length]]);
+
+                                    await connection.execute(
+                                        `INSERT INTO team_standings (team_id, group_id, position, matches_played, wins, draws, losses, goals_for, goals_against, points, is_active, created_at, updated_at, deleted_at)
+                                        VALUES ${placeholders}`,
+                                        values
+                                    );
+                                }
                             }
-                        }
 
-                        if (pFormat === 'knockout') {
-                            const teamIdsList = Array.isArray(effectiveTeamIds) ? effectiveTeamIds : [];
-                            if (teamIdsList.length >= 2) {
-                                await phasesModule.createBracketSlots(connection, createdPhaseId, teamIdsList);
+                            if (pFormat === 'knockout') {
+                                const teamIdsList = Array.isArray(effectiveTeamIds) ? effectiveTeamIds : [];
+                                if (teamIdsList.length >= 2) {
+                                    await phasesModule.createBracketSlots(connection, createdPhaseId, teamIdsList);
+                                }
                             }
-                        }
 
-                        // Optionally auto-schedule this phase now
-                        if (phaseData.autoSchedule && typeof phasesModule.generateScheduleForPhase === 'function') {
-                            try {
-                                await phasesModule.generateScheduleForPhase(createdPhaseId, phaseData.scheduleOptions || {});
-                            } catch (schedErr) {
-                                created.scheduleError = String(schedErr.message || schedErr);
+                            // Optionally auto-schedule this phase now
+                            if (phaseData.autoSchedule && typeof phasesModule.generateScheduleForPhase === 'function') {
+                                try {
+                                    await phasesModule.generateScheduleForPhase(createdPhaseId, phaseData.scheduleOptions || {});
+                                } catch (schedErr) {
+                                    created.scheduleError = String(schedErr.message || schedErr);
+                                }
                             }
-                        }
 
-                        createdPhases.push(created);
-                        
-                    } catch (e) {
-                        createdPhases.push({ input: phaseData, error: e.message || String(e) });
-                    } finally {
-                        try { connection.release(); } catch (_) {}
+                            createdPhases.push(created);
+                            
+                        } catch (e) {
+                            createdPhases.push({ input: phaseData, error: e.message || String(e) });
+                        } finally {
+                            try { connection.release(); } catch (_) {}
+                        }
                     }
                 }
-            }
-    try {
-        const title = "Giải đấu mới!";
-        const body = `Mùa giải ${name} đã sẵn sàng đón nhận đăng ký.`;
-        
-        // Gọi hàm sendToAll bạn đã tạo
-        await sendToAll(title, body);
-    } catch (fcmErr) {
-        console.error("Lỗi gửi thông báo FCM sau khi tạo mùa:", fcmErr.message);
-    }
-            res.status(201).json({ success: true, message: 'Tạo mùa giải thành công.', seasonId, phases: createdPhases });
-        } catch (error) {
-            res.status(500).json({ success: false, message: error.message });
+        try {
+            const title = "Giải đấu mới!";
+            const body = `Mùa giải ${name} đã sẵn sàng đón nhận đăng ký.`;
+            
+            // Gọi hàm sendToAll bạn đã tạo
+            await sendToAll(title, body);
+        } catch (fcmErr) {
+            console.error("Lỗi gửi thông báo FCM sau khi tạo mùa:", fcmErr.message);
         }
-    });
+                res.status(201).json({ success: true, message: 'Tạo mùa giải thành công.', seasonId, phases: createdPhases });
+            } catch (error) {
+                res.status(500).json({ success: false, message: error.message });
+            }
+        });
     ///////////////////////////
-   router.get('/seasons/:id', async (req, res) => {
+  router.get('/seasons/:id', async (req, res) => {
     const { id } = req.params;
     try {
         // 1. Lấy thông tin mùa giải
         const [seasons] = await pool.execute('SELECT * FROM seasons WHERE id = ? AND deleted_at IS NULL', [id]);
         
-        // 2. Lấy danh sách các vòng đấu (phases) thuộc mùa giải này
+        // 2. Lấy danh sách các vòng đấu (phases)
         const [phases] = await pool.execute('SELECT * FROM phases WHERE season_id = ?', [id]);
 
-        // Lặp qua từng vòng đấu để lấy danh sách bảng đấu (groups) của vòng đó
+        // 3. Lặp qua từng vòng đấu để gắn groups và teams
         for (let phase of phases) {
-            // LƯU Ý QUAN TRỌNG: Phải có dấu ` bọc quanh chữ groups
-            const [groups] = await pool.execute('SELECT id, name FROM `groups` WHERE phase_id = ?', [phase.id]);
-            
-            // Gắn mảng groups vào phase để trả về cho Android
-            phase.groups = groups; 
-        }
+            if (phase.format === 'round_robin') {
+                // Lấy groups
+                const [groups] = await pool.execute('SELECT id, name FROM `groups` WHERE phase_id = ?', [phase.id]);
+                phase.groups = groups || []; 
+                
+                // Lấy đội qua bảng groups
+                const [teamsInPhase] = await pool.execute(`
+                    SELECT st.id, st.team_id, t.name, st.status, st.group_id 
+                    FROM season_teams st
+                    JOIN teams t ON st.team_id = t.id
+                    JOIN \`groups\` g ON st.group_id = g.id
+                    WHERE g.phase_id = ?`, [phase.id]);
+                phase.teams = teamsInPhase || [];
+            } else {
+                // Lấy đội cho vòng knockout qua bảng bracket_slots
+                const [teamsInPhase] = await pool.execute(`
+                    SELECT DISTINCT t.id as team_id, t.name, 'active' as status
+                    FROM bracket_slots bs
+                    JOIN teams t ON (bs.seeded_home_team_id = t.id OR bs.seeded_away_team_id = t.id)
+                    WHERE bs.phase_id = ?`, [phase.id]);
+                phase.teams = teamsInPhase || [];
+            }
+        } // <--- ĐÓNG VÒNG LẶP FOR Ở ĐÂY
 
-        // 3. Lấy danh sách đội
-       const [teams] = await pool.execute(`
-    SELECT st.id, st.team_id, t.name, st.status, st.group_id 
-    FROM season_teams st
-    JOIN teams t ON st.team_id = t.id
-    WHERE st.season_id = ? AND st.deleted_at IS NULL`, [id]);
+        // 4. Lấy danh sách TẤT CẢ đội của mùa giải
+        const [allTeams] = await pool.execute(`
+            SELECT st.id, st.team_id, t.name, st.status, st.group_id 
+            FROM season_teams st
+            JOIN teams t ON st.team_id = t.id
+            WHERE st.season_id = ? AND st.deleted_at IS NULL`, [id]);
 
-        // TRẢ VỀ DỮ LIỆU CÓ THÊM PHASES VÀ GROUPS
+        console.log("--- DEBUG DỮ LIỆU ---");
+        phases.forEach(p => {
+            console.log(`Phase: ${p.name}, Format: ${p.format}, Số lượng đội: ${p.teams ? p.teams.length : 0}`);
+        });
+
+        // 5. TRẢ VỀ DỮ LIỆU (Nằm ngoài vòng lặp for)
         res.json({ 
             success: true, 
             data: { 
-                season: seasons[0], 
-                phases: phases || [], 
-                teams 
+                season: seasons[0] || null, 
+                phases: phases, 
+                teams: allTeams 
             } 
         });
+
     } catch (error) {
-        console.error("--- LỖI SERVER ---");
-        console.error(error); 
-        res.status(500).json({ success: false, message: error.stack });
+        console.error("--- LỖI SERVER ---", error); 
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

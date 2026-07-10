@@ -71,7 +71,9 @@
          // Đảm bảo khớp với route trong server
          @GET("open_seasons")
          suspend fun getOpenSeasons(@Query("teamId") teamId: Int): Response<List<SeasonInfo>>
-        @POST("unregister_season") // Đảm bảo URL này khớp với route bên Node.js
+        @GET("rules/global")
+        suspend fun getGlobalRules(): Response<TournamentRulesResponse>
+         @POST("unregister_season") // Đảm bảo URL này khớp với route bên Node.js
         suspend fun unregisterFromSeason(
             @Body request: Map<String, String>
         ): Response<ApiResponse>
@@ -108,8 +110,8 @@
         @GET("seasons/{seasonId}/phases") // Đã sửa theo server.js: /api/seasons/:seasonId/phases
         suspend fun getSeasonPhases(@Path("seasonId") seasonId: Int): Response<SeasonResponse>
 
-        @GET("notifications")
-        suspend fun getNotifications(): Response<NotificationResponse>
+//        @GET("notifications")
+//        suspend fun getNotifications(): Response<NotificationResponse>
 
         @GET("matches")
         suspend fun getMatches(): Response<MatchResponse>

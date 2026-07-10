@@ -271,6 +271,7 @@ data class AddTeamResponse(
     val success: Boolean,
     val message: String
 )
+
 // 2. Giai đoạn (Phase)
 data class PhaseItem(
     val id: Int,
@@ -283,7 +284,7 @@ data class PhaseItem(
 )
 data class GroupItem(
     @SerializedName("id") val id: Int,
-    @SerializedName("name") val name: String
+    @SerializedName("name") val name: String,
 )
 
 // 3. Trận đấu (Match)

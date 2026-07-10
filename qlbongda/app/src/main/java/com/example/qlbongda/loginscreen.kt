@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -77,7 +78,24 @@ fun LoginScreen(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
-    ) {
+    ) {Text(
+        text = "NEONBALL PRO",
+        color = NeonGreen,
+        fontWeight = FontWeight.Black,
+        fontSize = 35.sp
+    )
+        Spacer(modifier = Modifier.width(12.dp)) // Khoảng cách giữa logo và c
+        Icon(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = "Logo",
+            tint = NeonGreen,
+            modifier = Modifier.size(150.dp) // Tăng size logo một chút cho đẹp
+                .padding(top = 20.dp) //
+        )
+
+        Spacer(modifier = Modifier.height(40.dp))// Khoảng cách giữa logo và chữ
+
+
         // Tiêu đề
         Text(
             text = "Đăng nhập tài khoản",

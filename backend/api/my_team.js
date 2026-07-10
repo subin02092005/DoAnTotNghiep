@@ -553,5 +553,32 @@ router.post('/confirm_payment', async (req, res) => {
         connection.release();
     }
 });
+router.get('/rules/global', async (req, res) => {
+    try {
+        const query = `
+            SELECT * FROM tournament_rules 
+            WHERE is_active = 1 AND deleted_at IS NULL 
+            ORDER BY id DESC LIMIT 1
+        `; // Thêm ORDER BY id DESC để chắc chắn lấy luật mới nhất
+        
+        const [rows] = await pool.query(query);
 
+        if (rows.length > 0) {
+            return res.status(200).json({ 
+                status: "success", 
+                data: rows[0] 
+            });
+        } 
+        
+        // Thay vì 404, có thể trả về 200 với data: null để tránh App crash
+        return res.status(200).json({ 
+            status: "success", 
+            data: null,
+            message: "Chưa có luật nào"
+        });
+    } catch (error) {
+        console.error("Lỗi lấy luật:", error);
+        return res.status(500).json({ status: "error", message: "Lỗi server" });
+    }
+});
 module.exports = router;

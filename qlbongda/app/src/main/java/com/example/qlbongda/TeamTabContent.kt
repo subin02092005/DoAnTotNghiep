@@ -27,8 +27,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontStyle
 import androidx.core.view.DragAndDropPermissionsCompat.request
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavController
 import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.AddCoachRequest
@@ -38,11 +41,16 @@ import com.example.qlbongda.data.model.PlayerInfo
 import com.example.qlbongda.data.model.RegisterTeamRequest
 import com.example.qlbongda.data.model.RemovePlayerRequest
 import com.example.qlbongda.data.model.SeasonInfo
-
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.qlbongda.data.api.HomeViewModel
 import com.example.qlbongda.data.model.UpdatePlayerRequest
 import com.example.qlbongda.ui.theme.NeonGreen
 import com.example.qlbongda.utils.DateUtils
+import com.example.qlbongda.utils.DateUtils.isDeadlinePassed
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +81,15 @@ fun TeamTabContent(
     var selectedSeasonForPayment by remember { mutableStateOf<SeasonInfo?>(null) }
     val scope = rememberCoroutineScope()
     val seasons = remember { mutableStateListOf<SeasonInfo>() }
+    val apiService = remember { RetrofitClient.getClient(context) }
+    val viewModel: HomeViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return HomeViewModel(apiService) as T
+            }
+        }
+    )
     val fetchSeasons = remember {
         {
             scope.launch {
@@ -183,7 +200,8 @@ fun TeamTabContent(
                 selectedSeasonForPayment = season
                 isPaymentMode = true // Cập nhật đúng State ở đây
             },
-            onBack = { showRegistrationScreen = false } // Khi quay lại thì tắt
+            onBack = { showRegistrationScreen = false },viewModel=viewModel
+            // Khi quay lại thì tắt
         )
     } else {
     if (!hasTeam) {
@@ -851,13 +869,14 @@ fun TeamRegistrationScreen(
     fun SeasonRegistrationScreen(
         teamId: Int,
         onNavigateToPayment: (SeasonInfo) -> Unit,
-        onBack: () -> Unit // Dùng callback thay cho NavController
+        onBack: () -> Unit,viewModel: HomeViewModel = viewModel() // Dùng callback thay cho NavController
     ) {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         val seasons = remember { mutableStateListOf<SeasonInfo>() }
         var isLoading by remember { mutableStateOf(true) }
-
+        var showRulesDialog by remember { mutableStateOf(false) }
+        val rules by viewModel.tournamentRules.collectAsState()
         var showDialog by remember { mutableStateOf(false) }
     // Để lưu lại giải nào đang được chọn để hủy
         var selectedSeason by remember { mutableStateOf<SeasonInfo?>(null) }
@@ -920,7 +939,10 @@ fun TeamRegistrationScreen(
 
                     LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
                         items(seasons) { season ->
-                            android.util.Log.d("DEBUG_STATUS", "Season: ${season.name}, Status: ${season.payment_status}")
+                            android.util.Log.d(
+                                "DEBUG_STATUS",
+                                "Season: ${season.name}, Status: ${season.payment_status}"
+                            )
                             Card(
                                 modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
@@ -954,7 +976,14 @@ fun TeamRegistrationScreen(
                                         modifier = Modifier.padding(vertical = 12.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        StatusIndicator(season.status)
+                                        StatusIndicator(
+                                            status = season.status,
+                                            registrationDeadline = season.registration_deadline, // Truyền ngày vào
+                                            onStatusClick = {
+                                                viewModel.loadGlobalRules() // Gọi hàm tải dữ liệu trước
+                                                showRulesDialog = true      // Sau đó mới bật Dialog
+                                            }
+                                        )
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Row(
@@ -991,47 +1020,86 @@ fun TeamRegistrationScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         if (season.is_registered == 1) {
-                                                // 1. Nút HỦY THAM GIA (Luôn hiện nếu đã đăng ký và giải đang mở)
-                                                if (season.status == "registration_open") {
-                                                    Button(
-                                                        onClick = { selectedSeason = season; showDialog = true },
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                                                        modifier = Modifier.weight(1f).height(48.dp)
-                                                    ) {
-                                                        Text("HỦY", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                    }
-                                                } else {
-                                                    // Trường hợp giải đã bắt đầu không cho hủy
-                                                    Box(modifier = Modifier.weight(1f).height(48.dp), contentAlignment = Alignment.Center) {
-                                                        Text("Đã bắt đầu", color = Color.Gray, fontSize = 10.sp)
-                                                    }
+                                            // 1. Nút HỦY THAM GIA (Luôn hiện nếu đã đăng ký và giải đang mở)
+                                            if (season.status == "registration_open") {
+                                                Button(
+                                                    onClick = {
+                                                        selectedSeason = season; showDialog = true
+                                                    },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = Color(0xFFD32F2F)
+                                                    ),
+                                                    modifier = Modifier.weight(1f).height(48.dp)
+                                                ) {
+                                                    Text(
+                                                        "HỦY",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 12.sp
+                                                    )
                                                 }
+                                            } else {
+                                                // Trường hợp giải đã bắt đầu không cho hủy
+                                                Box(
+                                                    modifier = Modifier.weight(1f).height(48.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        "Đã bắt đầu",
+                                                        color = Color.Gray,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                            }
 
-                                                // 2. Nút THANH TOÁN hoặc Trạng thái (Luôn hiện bên cạnh nút Hủy)
-                                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                            // 2. Nút THANH TOÁN hoặc Trạng thái (Luôn hiện bên cạnh nút Hủy)
+                                            Box(
+                                                modifier = Modifier.weight(1f),
+                                                contentAlignment = Alignment.Center
+                                            ) {
                                                 // Thêm Log để debug xem status thực tế là gì
-                                                android.util.Log.d("DEBUG_PAYMENT", "Season: ${season.name}, Status: ${season.payment_status}")
+                                                android.util.Log.d(
+                                                    "DEBUG_PAYMENT",
+                                                    "Season: ${season.name}, Status: ${season.payment_status}"
+                                                )
 
                                                 when (season.payment_status?.trim()?.lowercase()) {
                                                     "confirmed" -> {
-                                                        Text("✅ Đã thanh toán", color = Color.Green, fontWeight = FontWeight.Bold)
+                                                        Text(
+                                                            "✅ Đã thanh toán",
+                                                            color = Color.Green,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
                                                     }
+
                                                     "pending" -> {
                                                         Button(
                                                             onClick = { onNavigateToPayment(season) },
-                                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow),
-                                                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                                                            colors = ButtonDefaults.buttonColors(
+                                                                containerColor = Color.Yellow
+                                                            ),
+                                                            modifier = Modifier.fillMaxWidth()
+                                                                .height(48.dp)
                                                         ) {
-                                                            Text("THANH TOÁN", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                            Text(
+                                                                "THANH TOÁN",
+                                                                color = Color.Black,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 12.sp
+                                                            )
                                                         }
                                                     }
+
                                                     else -> {
-                                                        Text("Chưa thanh toán", color = Color.Gray, fontSize = 12.sp)
+                                                        Text(
+                                                            "Chưa thanh toán",
+                                                            color = Color.Gray,
+                                                            fontSize = 12.sp
+                                                        )
                                                     }
                                                 }
                                             }
-                                            } else {
+                                        } else {
                                             // Nút Đăng ký
                                             Button(
                                                 onClick = {
@@ -1047,29 +1115,51 @@ fun TeamRegistrationScreen(
                                                     } else {
                                                         scope.launch {
                                                             try {
-                                                                val response = RetrofitClient.getClient(context)
-                                                                    .registerToSeason(
-                                                                        mapOf(
-                                                                            "team_id" to teamId,
-                                                                            "season_id" to season.id
+                                                                val response =
+                                                                    RetrofitClient.getClient(context)
+                                                                        .registerToSeason(
+                                                                            mapOf(
+                                                                                "team_id" to teamId,
+                                                                                "season_id" to season.id
+                                                                            )
                                                                         )
-                                                                    )
 
                                                                 if (response.isSuccessful) {
-                                                                    Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
+                                                                    Toast.makeText(
+                                                                        context,
+                                                                        "Đăng ký thành công!",
+                                                                        Toast.LENGTH_SHORT
+                                                                    ).show()
                                                                     fetchSeasons() // Load lại danh sách mới
                                                                 } else {
                                                                     // 🌟 Nơi quan trọng nhất để biết lỗi là gì
-                                                                    val errorMsg = response.errorBody()?.string() ?: "Lỗi không xác định"
-                                                                    android.util.Log.e("REGISTER_ERROR", "Server trả về: $errorMsg")
+                                                                    val errorMsg =
+                                                                        response.errorBody()
+                                                                            ?.string()
+                                                                            ?: "Lỗi không xác định"
+                                                                    android.util.Log.e(
+                                                                        "REGISTER_ERROR",
+                                                                        "Server trả về: $errorMsg"
+                                                                    )
 
                                                                     // Hiện thông báo lỗi cụ thể cho người dùng
-                                                                    Toast.makeText(context, "Thất bại: $errorMsg", Toast.LENGTH_LONG).show()
+                                                                    Toast.makeText(
+                                                                        context,
+                                                                        "Thất bại: $errorMsg",
+                                                                        Toast.LENGTH_LONG
+                                                                    ).show()
                                                                 }
                                                             } catch (e: Exception) {
                                                                 // 🌟 Bắt lỗi mất mạng hoặc lỗi kết nối
-                                                                android.util.Log.e("REGISTER_EXCEPTION", "Lỗi ngoại lệ: ${e.message}")
-                                                                Toast.makeText(context, "Không thể kết nối tới máy chủ!", Toast.LENGTH_SHORT).show()
+                                                                android.util.Log.e(
+                                                                    "REGISTER_EXCEPTION",
+                                                                    "Lỗi ngoại lệ: ${e.message}"
+                                                                )
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    "Không thể kết nối tới máy chủ!",
+                                                                    Toast.LENGTH_SHORT
+                                                                ).show()
                                                             }
                                                         }
                                                     }
@@ -1084,6 +1174,7 @@ fun TeamRegistrationScreen(
                                 }
                             }
                         }
+
                     }
                 }
                 if (showDialog && selectedSeason != null) {
@@ -1108,17 +1199,26 @@ fun TeamRegistrationScreen(
                         confirmButton = {
                             TextButton(onClick = {
                                 scope.launch {
-                                    val response = RetrofitClient.getClient(context).unregisterFromSeason(
-                                        mapOf(
-                                            "team_id" to teamId.toString(),
-                                            "season_id" to selectedSeason!!.id.toString()
+                                    val response =
+                                        RetrofitClient.getClient(context).unregisterFromSeason(
+                                            mapOf(
+                                                "team_id" to teamId.toString(),
+                                                "season_id" to selectedSeason!!.id.toString()
+                                            )
                                         )
-                                    )
                                     if (response.isSuccessful) {
-                                        Toast.makeText(context, "Đã hủy giải thành công!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "Đã hủy giải thành công!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                         fetchSeasons() // Load lại danh sách để cập nhật trạng thái UI
                                     } else {
-                                        Toast.makeText(context, "Lỗi khi hủy: ${response.message()}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "Lỗi khi hủy: ${response.message()}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 }
                                 showDialog = false
@@ -1136,31 +1236,86 @@ fun TeamRegistrationScreen(
                         textContentColor = Color.LightGray
                     )
                 }
-
+                if (showRulesDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showRulesDialog = false },
+                        title = {
+                            Text("Luật thi đấu", fontWeight = FontWeight.Bold, color = Color.White)
+                        },
+                        text = {
+                            Box(
+                                modifier = Modifier.heightIn(max = 300.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                if (rules != null) {
+                                    Column {
+                                        Text(
+                                            "Điểm thắng: ${rules!!.pointsPerWin}",
+                                            color = Color.LightGray
+                                        )
+                                        Text(
+                                            "Điểm hòa: ${rules!!.pointsPerDraw}",
+                                            color = Color.LightGray
+                                        )
+                                        Text(
+                                            "Điểm thua: ${rules!!.pointsPerLoss}",
+                                            color = Color.LightGray
+                                        )
+                                        Text(
+                                            "Số thẻ vàng để ra sân: ${rules!!.yellowCardsSuspension}",
+                                            color = Color.LightGray
+                                        )
+                                        Text(
+                                            "Cách tính nếu bằng điểm: ${rules!!.tiebreaker_order} ",
+                                            color = Color.LightGray
+                                        )
+                                    }
+                                } else {
+                                    Text("Đang tải luật...", color = Color.Gray)
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showRulesDialog = false }) {
+                                Text("Đóng", color = NeonGreen)
+                            }
+                        },
+                        containerColor = Color(0xFF161616)
+                    )
+                }
+            }
         }
-    }
-@Composable
-fun StatusIndicator(status: String) {
-    val (color, text) = when (status) {
-        "upcoming" -> Color.Blue to "Sắp tới"
-        "registration_open" -> Color.Green to "Đang mở đăng ký"
-        "ongoing" -> Color.Yellow to "Đang diễn ra"
-        "finished" -> Color.Gray to "Đã kết thúc"
-        "cancelled" -> Color.Red to "Đã hủy"
+
+@Composable // Phải thêm cái này
+fun StatusIndicator(
+    status: String,
+    registrationDeadline: String?, // Thêm deadline
+    onStatusClick: () -> Unit             // Thêm hành động khi click
+) {
+    // Logic so sánh ngày tháng (giả sử dùng LocalDateTime)
+    val isExpired = registrationDeadline != null && isDeadlinePassed(registrationDeadline) && status == "registration_open"
+    val (color, text) = when {
+        isExpired -> Color.Red to "Đã hết hạn"
+        status == "upcoming" -> Color.Blue to "Sắp tới"
+        status == "registration_open" -> Color.Green to "Đang mở đăng ký"
+        status == "ongoing" -> Color.Yellow to "Đang diễn ra"
+        status == "finished" -> Color.Gray to "Đã kết thúc"
+        status == "cancelled" -> Color.Red to "Đã hủy"
         else -> Color.Gray to status.replaceFirstChar { it.uppercase() }
     }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onStatusClick() } // Gắn sự kiện bấm vào đây
+            .padding(4.dp)
     ) {
-        // Chấm tròn
         Canvas(modifier = Modifier.size(8.dp)) {
             drawCircle(color = color)
         }
         Spacer(modifier = Modifier.width(6.dp))
-        // Văn bản
         Text(
             text = text,
             color = color,
@@ -1169,4 +1324,3 @@ fun StatusIndicator(status: String) {
         )
     }
 }
-

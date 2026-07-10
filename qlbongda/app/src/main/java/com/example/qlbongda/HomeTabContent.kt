@@ -112,7 +112,7 @@ fun HomeTabContent(
             // 2. Tên và mô tả nằm bên phải logo
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "FOOTBALL MANAGER",
+                    text = "NEONBALL PRO",
                     color = Color.White,
                     fontWeight = FontWeight.Black,
                     fontSize = 18.sp

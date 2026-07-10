@@ -184,7 +184,28 @@ data class TeamDetailData(
     val players: List<PlayerInfo>
 )
 
+data class TournamentRulesResponse(
+    @SerializedName("status") val status: String,
+    @SerializedName("data") val data: TournamentRules,
+    val message: String,
+)
 
+data class TournamentRules(
+    val name:String,
+    @SerializedName("id") val id: Int,
+    @SerializedName("tournament_id") val tournamentId: Int,
+    @SerializedName("points_per_win") val pointsPerWin: Int,
+    @SerializedName("points_per_draw") val pointsPerDraw: Int,
+    @SerializedName("points_per_loss") val pointsPerLoss: Int,
+    @SerializedName("forfeit_score") val forfeitScore: Int,
+    @SerializedName("yellow_cards_suspension") val yellowCardsSuspension: Int,
+    @SerializedName("max_players_per_team") val maxPlayersPerTeam: Int,
+    @SerializedName("min_players_per_team") val minPlayersPerTeam: Int,
+    val description:String,
+   // @SerializedName("teams_advance_per_group") val teamsAdvancePerGroup: Int,
+    @SerializedName("tiebreaker_order")
+    val tiebreaker_order: List<String> // MySQL JSON trả về String hoặc JsonElement
+)
 data class MyTeamResponse(
     val status: String,
     val hasTeam: Boolean,
@@ -241,6 +262,7 @@ data class SeasonInfo(
     val max_teams: Int,        // Thêm trường số đội tối đa
     val start_date: String?,   // Dùng String hoặc Date
     val end_date: String?,     // Dùng String hoặc Date
+    val registration_deadline:String?,
     @SerializedName("registration_fee")
     val registrationFee: Long,
     val is_registered: Int,

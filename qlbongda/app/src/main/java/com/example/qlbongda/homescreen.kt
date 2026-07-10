@@ -118,7 +118,7 @@ fun HomeScreen(
                     )
                     1 -> ScheduleTabContent(
                         viewModel = homeViewModel,
-                        matchList = matchList,
+                       // matchList = matchList,
                         onMatchClick = { clickedMatch -> // 🌟 Khai báo biến 'clickedMatch' ở đây
                             onNavigateToMatchDetail(clickedMatch)
                         }
