@@ -13,10 +13,12 @@ const pool = mysql.createPool({
 
 router.get('/standings', async (req, res) => {
     try {
-        const query = `
+        const { seasonId } = req.query;
+        let query = `
             SELECT 
                 s.team_id,
-                s.matches_played AS played, 
+                s.group_id,
+                s.matches_played AS played,
                 s.wins AS won, 
                 s.draws AS drawn, 
                 s.losses AS lost, 
@@ -25,20 +27,29 @@ router.get('/standings', async (req, res) => {
                 (s.goals_for - s.goals_against) AS goal_difference, 
                 s.points,
                 t.name AS team_name, 
-                g.name AS group_name
+                g.name AS group_name,
+                p.id AS phase_id
             FROM team_standings s
             JOIN teams t ON s.team_id = t.id
             JOIN \`groups\` g ON s.group_id = g.id
+            JOIN phases p ON g.phase_id = p.id
             WHERE s.is_active = 1
-            ORDER BY g.name ASC, s.points DESC, goal_difference DESC
         `;
         
-        const [rows] = await pool.query(query);
+        const params = [];
+        if (seasonId) {
+            query += ` AND p.season_id = ? `;
+            params.push(seasonId);
+        }
+
+        query += ` ORDER BY p.id ASC, g.name ASC, s.points DESC, goal_difference DESC`;
+
+        const [rows] = await pool.query(query, params);
         const formattedData = [];
-        const groups = {};
+        const groupsMap = {};
 
         for (const row of rows) {
-            // Lấy 5 trận gần nhất đã kết thúc
+            // Lấy 5 trận gần nhất đã kết thúc cho đội này
             const [recentMatches] = await pool.query(
                 `SELECT home_team_id, away_team_id, home_score, away_score 
                  FROM matches 
@@ -59,14 +70,19 @@ router.get('/standings', async (req, res) => {
                 return 'D';
             });
 
-            if (!groups[row.group_name]) {
-                groups[row.group_name] = { groupName: row.group_name, standings: [] };
-                formattedData.push(groups[row.group_name]);
+            if (!groupsMap[row.group_name]) {
+                groupsMap[row.group_name] = {
+                    phaseId: row.phase_id,
+                    groupId: row.group_id, // Cần lấy thêm group_id
+                    groupName: row.group_name,
+                    standings: []
+                };
+                formattedData.push(groupsMap[row.group_name]);
             }
 
-            groups[row.group_name].standings.push({
+            groupsMap[row.group_name].standings.push({
                 id: row.team_id,
-                rank: groups[row.group_name].standings.length + 1,
+                rank: groupsMap[row.group_name].standings.length + 1,
                 teamName: row.team_name,
                 played: row.played,
                 won: row.won,
@@ -76,7 +92,7 @@ router.get('/standings', async (req, res) => {
                 goalsAgainst: row.goals_against,
                 goalDifference: row.goal_difference.toString(),
                 points: row.points,
-                form: formArray // Dữ liệu phong độ đã chuẩn
+                form: formArray
             });
         }
 

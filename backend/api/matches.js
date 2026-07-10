@@ -15,7 +15,7 @@ router.get('/matches', async (req, res) => {
     try {
         const query = `
             SELECT m.id, m.scheduled_at, m.home_team_id, m.away_team_id, 
-                   t1.name AS teamA, 
+                   t1.name AS teamA,
                    t2.name AS teamB,
                    IFNULL(mr.home_final_score, 0) AS home_final_score,
                    IFNULL(mr.away_final_score, 0) AS away_final_score,

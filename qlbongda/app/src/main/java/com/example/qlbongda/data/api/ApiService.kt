@@ -103,7 +103,7 @@
         suspend fun getTeamDetail(@Path("teamId") teamId: Int): Response<TeamDetailResponse>
 
         @GET("standings")
-        suspend fun getDetailedStandings(): Response<DetailedStandingResponse>
+        suspend fun getDetailedStandings(@Query("seasonId") seasonId: Int? = null): Response<DetailedStandingResponse>
         @GET("all-data")
         suspend fun getAllData(): Response<ApiResponses<List<SeasonWithPhases>>>
 
@@ -279,11 +279,6 @@
             @Path("seasonId") seasonId: Int,
             @Body request: CreatePhaseRequest
         ): Response<GenericAdminResponse>
-        @DELETE("phases/{phaseId}/teams/{teamId}")
-        suspend fun removeTeamFromPhase(
-            @Path("phaseId") phaseId: Int,
-            @Path("teamId") teamId: Int
-        ): Response<GenericAdminResponse>
         @POST("phases/{phaseId}/add-team")
         suspend fun addTeamToPhase(
             @Path("phaseId") phaseId: Int,
@@ -293,7 +288,8 @@
         @DELETE("phases/{phaseId}/teams/{teamId}")
         suspend fun removeTeamFromPhase(
             @Path("phaseId") phaseId: Int,
-            @Path("teamId") teamId: Int
+            @Path("teamId") teamId: Int,
+            @Query("season_id") seasonId: Int
         ): Response<GenericAdminResponse>
 
         @PUT("tournaments/{tournamentId}/seasons/{seasonId}/rules")

@@ -37,7 +37,7 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
         loadTournamentPhases(seasonId = 1)
         loadMatches()
         loadFeaturedMatches()
-        loadStandings()
+        loadStandings(seasonId = 1)
         loadGlobalRules()
     }
 
@@ -210,14 +210,16 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
-    fun loadStandings() {
+    fun loadStandings(seasonId: Int? = 1) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 // Đảm bảo ApiService đã có hàm getDetailedStandings()
-                val response = apiService.getDetailedStandings()
+                val response = apiService.getDetailedStandings(seasonId)
                 if (response.isSuccessful) {
-                    standingList.value = response.body()?.data ?: emptyList()
+                    val data = response.body()?.data ?: emptyList()
+                    allStandings.value = data
+                    standingList.value = data
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -298,6 +300,11 @@ class HomeViewModel(private val apiService: ApiService) : ViewModel() {
 
     fun selectPhase(phaseId: Int) {
         _selectedPhaseId.value = phaseId
+        standingList.value = if (phaseId == -1) {
+            allStandings.value
+        } else {
+            allStandings.value.filter { it.phaseId == phaseId }
+        }
     }
     private val _seasonsWithPhases = MutableStateFlow<List<SeasonWithPhases>>(emptyList())
     val seasonsWithPhases = _seasonsWithPhases.asStateFlow()

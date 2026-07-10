@@ -141,6 +141,7 @@ data class UpdateMatchRequest(
     val status: String? = null,
     @SerializedName("home_score") val homeScore: Int? = null,
     @SerializedName("away_score") val awayScore: Int? = null,
+    @SerializedName("winner_team_id") val winnerTeamId: Int? = null,
     @SerializedName("scheduled_at") val scheduledAt: String? = null,
     @SerializedName("phase_id") val phaseId: Int? = null,
     @SerializedName("group_id") val groupId: Int? = null,
@@ -263,8 +264,8 @@ data class TeamItem(
     @SerializedName("group_id") val groupId: Int? = null
 )
 data class AddTeamRequestadmin(
-    @SerializedName("teamId") val teamId: Int, // PHẢI KHỚP TÊN VỚI BACKEND
-    @SerializedName("groupId") val groupId: Int? = null
+    @SerializedName("teamId", alternate = ["team_id"]) val teamId: Int, // Chấp nhận cả teamId và team_id
+    @SerializedName("groupId", alternate = ["group_id"]) val groupId: Int? = null
 )
 
 data class AddTeamResponse(

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
+const { updateGroupStandings } = require('./standingsHelper');
 
 // Cấu hình kết nối Database
 const dbConfig = {
@@ -25,34 +26,76 @@ router.put('/match-events/:matchId/score', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Vui lòng cung cấp home_score và away_score.' });
     }
 
+    const connection = await pool.getConnection();
     try {
-        // Cập nhật bảng matches
-        const [matchResult] = await pool.execute(
+        await connection.beginTransaction();
+
+        // 1. Lấy thông tin cơ bản của trận đấu
+        const [matchRows] = await connection.execute(
+            'SELECT home_team_id, away_team_id, group_id FROM matches WHERE id = ?',
+            [matchId]
+        );
+
+        if (matchRows.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu.' });
+        }
+
+        const { home_team_id, away_team_id, group_id } = matchRows[0];
+
+        // 2. Xác định winner_team_id
+        let winner_team_id = null;
+        if (home_score > away_score) {
+            winner_team_id = home_team_id;
+        } else if (away_score > home_score) {
+            winner_team_id = away_team_id;
+        }
+
+        // 3. Cập nhật bảng matches
+        await connection.execute(
             `UPDATE matches 
              SET home_score = ?, away_score = ?, status = ?, updated_at = NOW() 
              WHERE id = ?`,
             [home_score, away_score, status || 'ongoing', matchId]
         );
 
-        if (matchResult.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu.' });
-        }
-
-        // Cập nhật bảng match_results
-        await pool.execute(
-            `UPDATE match_results 
-             SET home_final_score = ?, away_final_score = ?, updated_at = NOW() 
-             WHERE match_id = ?`,
-            [home_score, away_score, matchId]
+        // 4. Kiểm tra xem đã có bản ghi trong match_results chưa
+        const [resultRows] = await connection.execute(
+            'SELECT id FROM match_results WHERE match_id = ?',
+            [matchId]
         );
 
-        res.json({ 
+        if (resultRows.length > 0) {
+            await connection.execute(
+                `UPDATE match_results
+                 SET home_score = ?, away_score = ?, home_final_score = ?, away_final_score = ?, winner_team_id = ?, updated_at = NOW()
+                 WHERE match_id = ?`,
+                [home_score, away_score, home_score, away_score, winner_team_id, matchId]
+            );
+        } else {
+            await connection.execute(
+                `INSERT INTO match_results (match_id, home_score, away_score, home_final_score, away_final_score, winner_team_id, result_type, status, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 'full_time', 'official', NOW(), NOW())`,
+                [matchId, home_score, away_score, home_score, away_score, winner_team_id]
+            );
+        }
+
+        // 5. Nếu kết thúc trận đấu, cập nhật bảng xếp hạng
+        if (status === 'finished' && group_id) {
+            await updateGroupStandings(connection, group_id);
+        }
+
+        await connection.commit();
+        res.json({
             success: true, 
-            message: 'Cập nhật tỉ số thành công.',
-            data: { matchId, home_score, away_score, status }
+            message: 'Cập nhật tỉ số và bảng xếp hạng thành công.',
+            data: { matchId, home_score, away_score, status, winner_team_id }
         });
     } catch (error) {
+        await connection.rollback();
         res.status(500).json({ success: false, message: error.message });
+    } finally {
+        connection.release();
     }
 });
 

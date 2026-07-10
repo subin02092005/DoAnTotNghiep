@@ -84,6 +84,7 @@ fun HomeTabContent(
         viewModel.loadMatches()
     }
     LaunchedEffect(selectedPhase) {
+        selectedPhase?.let { viewModel.selectPhase(it.id) }
         onTabSelected(0)
     }
 
