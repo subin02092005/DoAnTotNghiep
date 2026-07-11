@@ -116,9 +116,36 @@ fun ScheduleTabContent(
                                         }
                                         match.status == "ongoing" -> {
                                             val timeDisplay = getMinuteElapsed(match.time)
-                                            val displayTime = if (timeDisplay == "HT" || timeDisplay == "FT") timeDisplay else "$timeDisplay'"
-                                            Text("LIVE $displayTime", color = Color.Red, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                            Text("${match.scoreA} - ${match.scoreB}", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Black)
+
+                                            // Tách làm 2 dòng để hiển thị trên/dưới
+                                            val (statusLabel, timeLabel) = when (timeDisplay) {
+                                                "HT" -> "LIVE" to "HT"
+                                                "FT" -> "FT" to "Đang cập nhật tỉ số" // Trận đấu quá thời gian, ẩn chữ LIVE hiện chữ FT
+                                                else -> "LIVE" to "$timeDisplay'" // Đang đá bình thường
+                                            }
+
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                // Dòng 1: LIVE hoặc FT
+                                                Text(
+                                                    text = statusLabel,
+                                                    color = Color.Red,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+
+                                                Spacer(modifier = Modifier.height(2.dp)) // Khoảng cách nhỏ giữa 2 dòng
+
+                                                // Dòng 2: Số phút (ví dụ: 45') hoặc trạng thái (HT / Đang cập nhật)
+                                                Text(
+                                                    text = timeLabel,
+                                                    color = if (timeDisplay == "FT") Color.LightGray else Color.Red, // Nếu đang cập nhật thì cho màu xám dịu xuống
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
                                         }
                                         else -> {
                                             Text(DateUtils.formatTime(match.time), color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)

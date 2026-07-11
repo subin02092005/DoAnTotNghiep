@@ -70,6 +70,14 @@ router.put('/update_notification/:id', async (req, res) => {
     const { title, content, type, is_active } = req.body;
 
     try {
+        // 1. Lấy ID người nhận trước khi update để gửi thông báo
+        const [rows] = await pool.query("SELECT recipient_user_id FROM notifications WHERE id = ?", [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ status: "error", message: "Không tìm thấy thông báo" });
+        }
+        const recipientId = rows[0].recipient_user_id;
+
+        // 2. Thực hiện Update
         const query = `
             UPDATE notifications 
             SET title = ?, content = ?, type = ?, is_active = ?, updated_at = NOW() 
@@ -77,10 +85,25 @@ router.put('/update_notification/:id', async (req, res) => {
         `;
         const [result] = await pool.query(query, [title, content, type, is_active, id]);
         
-        if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Không tìm thấy" });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ status: "error", message: "Không có thay đổi nào được thực hiện" });
+        }
+
+        // 3. Nếu update thành công, lấy FCM token và gửi thông báo mới
+        if (recipientId) {
+            const [users] = await pool.query("SELECT fcm_token FROM users WHERE id = ? AND fcm_token IS NOT NULL", [recipientId]);
+            
+            if (users.length > 0) {
+                const token = users[0].fcm_token;
+                // Gửi thông báo cho user biết là thông báo đã được cập nhật
+                await sendFCMNotification(token, "Thông báo cập nhật", title);
+                console.log(`Đã gửi thông báo update cho user ${recipientId}`);
+            }
+        }
         
-        res.status(200).json({ status: "success", message: "Đã cập nhật thông báo" });
+        res.status(200).json({ status: "success", message: "Đã cập nhật và gửi thông báo cho người dùng" });
     } catch (error) {
+        console.error("Lỗi update notification:", error.message);
         res.status(500).json({ status: "error", message: error.message });
     }
 });
@@ -108,6 +131,74 @@ router.post('/cleanup_notifications', async (req, res) => {
             message: `Đã ẩn ${result.affectedRows} thông báo cũ.` 
         });
     } catch (error) {
+        res.status(500).json({ status: "error", message: error.message });
+    }
+});
+router.post('/create_rules', async (req, res) => {
+    console.log("Dữ liệu nhận từ Android:", req.body);
+    const { 
+        season_id, min_players, max_players, 
+        points_win, points_draw, points_loss, forfeit_score, description 
+    } = req.body;
+
+    try {
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        try {
+            // 1. TÌM TOURNAMENT_ID TỪ SEASON_ID
+          const [seasonRows] = await connection.query("SELECT tournament_id FROM seasons WHERE id = ?", [season_id]);
+if (seasonRows.length === 0) throw new Error("Không tìm thấy giải đấu!");
+const tournament_id = seasonRows[0].tournament_id;
+
+// 2. THAY VÌ INSERT, TA SẼ UPDATE DÒNG ĐÃ TỒN TẠI
+// Cấu trúc: Nếu tồn tại tournament_id này thì Update, không thì Insert
+const updateQuery = `
+    INSERT INTO tournament_rules 
+    (tournament_id, min_players_per_team, max_players_per_team, points_per_win, points_per_draw, points_per_loss, forfeit_score, tiebreaker_order, description, is_active) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, '["goal_difference", "head_to_head"]', ?, 1)
+    ON DUPLICATE KEY UPDATE 
+    min_players_per_team = VALUES(min_players_per_team),
+    max_players_per_team = VALUES(max_players_per_team),
+    points_per_win = VALUES(points_per_win),
+    points_per_draw = VALUES(points_per_draw),
+    points_per_loss = VALUES(points_per_loss),
+    forfeit_score = VALUES(forfeit_score),
+    description = VALUES(description),
+    is_active = 1
+`;
+
+await connection.query(updateQuery, [
+    tournament_id, min_players, max_players, points_win, points_draw, points_loss, forfeit_score, description
+]);
+
+await connection.commit();
+            connection.release();
+
+            // 4. Gửi thông báo (Giữ nguyên logic dùng season_id)
+            const notifyTitle = "Cập nhật luật giải đấu mới";
+            const notifyContent = `Giải đấu đã cập nhật luật: Tối thiểu ${min_players}, Tối đa ${max_players} cầu thủ. Kiểm tra ngay!`;
+
+            const [users] = await pool.query(`
+                SELECT DISTINCT u.fcm_token 
+                FROM users u
+                JOIN team_players tp ON u.id = tp.user_id
+                JOIN season_teams ts ON tp.team_id = ts.team_id
+                WHERE ts.season_id = ? AND u.fcm_token IS NOT NULL
+            `, [season_id]);
+
+            const sendPromises = users.map(u => sendFCMNotification(u.fcm_token, notifyTitle, notifyContent));
+            await Promise.all(sendPromises);
+
+            res.status(200).json({ status: "success", message: "Đã áp dụng luật và thông báo cho người chơi" });
+
+        } catch (dbError) {
+            await connection.rollback();
+            connection.release();
+            throw dbError;
+        }
+    } catch (error) {
+        console.error("Lỗi tạo luật:", error.message);
         res.status(500).json({ status: "error", message: error.message });
     }
 });

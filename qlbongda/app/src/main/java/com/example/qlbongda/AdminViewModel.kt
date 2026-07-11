@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.qlbongda.data.api.ApiService
+import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -62,12 +63,22 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
-    fun createNotification(title: String, content: String, type: String, target_team_id: Int?, recipient_user_id: Int?) {
+    fun createNotification(
+        title: String,
+        content: String,
+        type: String,
+        target_team_id: Int?,
+        recipient_user_id: Int?
+    ) {
         viewModelScope.launch {
             try {
                 val request = CreateNotificationRequest(
-                    title = title, content = content, type = type,
-                    target_team_id = target_team_id, recipient_user_id = recipient_user_id, source = "admin_panel"
+                    title = title,
+                    content = content,
+                    type = type,
+                    target_team_id = target_team_id,
+                    recipient_user_id = recipient_user_id,
+                    source = "admin_panel"
                 )
                 val response = apiService.createNotification(request)
                 if (response.isSuccessful) {
@@ -132,15 +143,21 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     private val _selectedNotification = MutableStateFlow<NotificationItem?>(null)
     val selectedNotification = _selectedNotification.asStateFlow()
 
-    fun setSelectedNotification(notification: NotificationItem?) { _selectedNotification.value = notification }
+    fun setSelectedNotification(notification: NotificationItem?) {
+        _selectedNotification.value = notification
+    }
 
     private val _showCleanupDialog = MutableStateFlow(false)
     val showCleanupDialog = _showCleanupDialog.asStateFlow()
-    fun setShowCleanupDialog(show: Boolean) { _showCleanupDialog.value = show }
+    fun setShowCleanupDialog(show: Boolean) {
+        _showCleanupDialog.value = show
+    }
 
     private val _showAddDialog = MutableStateFlow(false)
     val showAddDialog = _showAddDialog.asStateFlow()
-    fun setShowAddDialog(show: Boolean) { _showAddDialog.value = show }
+    fun setShowAddDialog(show: Boolean) {
+        _showAddDialog.value = show
+    }
 
     fun fetchPlayers(name: String? = null) {
         viewModelScope.launch {
@@ -237,8 +254,10 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
-    
-    fun clearMessage() { _message.value = null }
+
+    fun clearMessage() {
+        _message.value = null
+    }
 
     fun fetchTeams(name: String? = null) {
         viewModelScope.launch {
@@ -399,7 +418,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
 
                 val hScore = match.homeScore ?: 0
                 val aScore = match.awayScore ?: 0
-                
+
                 // 2. Xác định Winner ID (null nếu hòa)
                 val winnerId = when {
                     hScore > aScore -> match.homeTeamId
@@ -415,14 +434,14 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     awayScore = aScore,
                     winnerTeamId = winnerId
                 )
-                
+
                 val response = apiService.updateMatch(id, updateReq)
-                
+
                 if (response.isSuccessful) {
                     _message.value = "Đã kết thúc trận đấu và xác nhận đội thắng!"
                     fetchMatches()
                     fetchMatchDetail(id)
-                    
+
                     // Làm mới BXH
                     val seasonId = match.seasonId ?: currentSeasonId
                     if (seasonId != -1) {
@@ -443,7 +462,10 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val response = apiService.rescheduleMatch(id, RescheduleMatchRequest(scheduledAt = scheduledAt))
+                val response = apiService.rescheduleMatch(
+                    id,
+                    RescheduleMatchRequest(scheduledAt = scheduledAt)
+                )
                 if (response.isSuccessful && response.body()?.success == true) {
                     _message.value = "Đã dời lịch thi đấu"
                     fetchMatchDetail(id)
@@ -559,12 +581,14 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 }
 
                 // Gửi yêu cầu cập nhật bao gồm winner_team_id
-                val response = apiService.updateMatch(matchId, UpdateMatchRequest(
-                    status = status,
-                    homeScore = homeScore,
-                    awayScore = awayScore,
-                    winnerTeamId = winnerId
-                ))
+                val response = apiService.updateMatch(
+                    matchId, UpdateMatchRequest(
+                        status = status,
+                        homeScore = homeScore,
+                        awayScore = awayScore,
+                        winnerTeamId = winnerId
+                    )
+                )
 
                 if (response.isSuccessful) {
                     _message.value = "Cập nhật tỉ số và đội thắng thành công"
@@ -588,11 +612,21 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
-    fun addSubstitution(matchId: Int, teamId: Int, playerInId: Int, playerOutId: Int, minute: Int, period: String) {
+    fun addSubstitution(
+        matchId: Int,
+        teamId: Int,
+        playerInId: Int,
+        playerOutId: Int,
+        minute: Int,
+        period: String
+    ) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val response = apiService.addSubstitution(matchId, SubstitutionRequest(teamId, playerInId, playerOutId, minute, period))
+                val response = apiService.addSubstitution(
+                    matchId,
+                    SubstitutionRequest(teamId, playerInId, playerOutId, minute, period)
+                )
                 if (response.isSuccessful && response.body()?.success == true) {
                     _message.value = "Thay người thành công"
                     fetchMatchEvents(matchId); fetchMatchDetail(matchId); fetchMatches()
@@ -607,14 +641,27 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
-    fun addCard(matchId: Int, teamId: Int, playerId: Int, minute: Int, period: String, isRed: Boolean, note: String? = null) {
+    fun addCard(
+        matchId: Int,
+        teamId: Int,
+        playerId: Int,
+        minute: Int,
+        period: String,
+        isRed: Boolean,
+        note: String? = null
+    ) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 val request = CardRequest(teamId, playerId, minute, period, note)
-                val response = if (isRed) apiService.addRedCard(matchId, request) else apiService.addYellowCard(matchId, request)
+                val response = if (isRed) apiService.addRedCard(
+                    matchId,
+                    request
+                ) else apiService.addYellowCard(matchId, request)
                 if (response.isSuccessful && response.body()?.success == true) {
-                    _message.value = "Đã thêm thẻ"; fetchMatchEvents(matchId); fetchMatchDetail(matchId); fetchMatches()
+                    _message.value = "Đã thêm thẻ"; fetchMatchEvents(matchId); fetchMatchDetail(
+                        matchId
+                    ); fetchMatches()
                 } else {
                     _message.value = response.body()?.message ?: "Lỗi thêm thẻ"
                 }
@@ -687,7 +734,14 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     fun createTournament(name: String, description: String?, maxPlayers: Int, minPlayers: Int) {
         viewModelScope.launch {
             try {
-                val request = CreateTournamentRequest(name = name, description = description, logo = "", maxPlayers = maxPlayers, minPlayers = minPlayers, userId = _currentUserId.value)
+                val request = CreateTournamentRequest(
+                    name = name,
+                    description = description,
+                    logo = "",
+                    maxPlayers = maxPlayers,
+                    minPlayers = minPlayers,
+                    userId = _currentUserId.value
+                )
                 val response = apiService.createTournament(request)
                 if (response.isSuccessful && response.body()?.success == true) {
                     _message.value = "Tạo giải đấu thành công"; fetchTournaments()
@@ -703,7 +757,8 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     fun createSeason(tournamentId: Int, request: CreateSeasonRequest) {
         viewModelScope.launch {
             try {
-                val response = apiService.createSeasonDirect(request.copy(tournamentId = tournamentId))
+                val response =
+                    apiService.createSeasonDirect(request.copy(tournamentId = tournamentId))
                 if (response.isSuccessful) {
                     _message.value = "Tạo mùa giải thành công"; fetchTournamentDetail(tournamentId)
                 } else {
@@ -718,7 +773,10 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     fun toggleRegistration(tournamentId: Int, seasonId: Int, open: Boolean) {
         viewModelScope.launch {
             try {
-                val response = if (open) apiService.openRegistration(tournamentId, seasonId) else apiService.closeRegistration(tournamentId, seasonId)
+                val response = if (open) apiService.openRegistration(
+                    tournamentId,
+                    seasonId
+                ) else apiService.closeRegistration(tournamentId, seasonId)
                 if (response.isSuccessful && response.body()?.success == true) {
                     _message.value = if (open) "Đã mở cổng đăng ký" else "Đã đóng cổng đăng ký"
                     fetchTournamentDetail(tournamentId)
@@ -734,7 +792,10 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     fun updateTournamentStatus(id: Int, isChecked: Boolean) {
         viewModelScope.launch {
             try {
-                val response = apiService.updateTournament(id, TournamentUpdateRequest(is_active = if (isChecked) 1 else 0))
+                val response = apiService.updateTournament(
+                    id,
+                    TournamentUpdateRequest(is_active = if (isChecked) 1 else 0)
+                )
                 if (response.isSuccessful) {
                     _message.value = "Đã cập nhật trạng thái"; fetchTournaments()
                 } else {
@@ -746,7 +807,9 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
-    fun updateMessage(msg: String) { _message.value = msg }
+    fun updateMessage(msg: String) {
+        _message.value = msg
+    }
 
     fun updateSeasonRules(tournamentId: Int, seasonId: Int, rules: SeasonRulesRequest) {
         viewModelScope.launch {
@@ -778,7 +841,10 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
-    fun autoGenerateSchedule(phaseId: Int, options: ScheduleOptionsRequest = ScheduleOptionsRequest()) {
+    fun autoGenerateSchedule(
+        phaseId: Int,
+        options: ScheduleOptionsRequest = ScheduleOptionsRequest()
+    ) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
@@ -807,7 +873,9 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 if (response.isSuccessful && response.body()?.status == "success") {
                     _phasesOfSeason.value = response.body()?.data?.phases ?: emptyList()
                 }
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -855,13 +923,16 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 // 2. Lấy top 2 mỗi bảng và thêm vào vòng tiếp theo
                 var successCount = 0
                 var totalAdvancing = 0
-                
+
                 phaseStandings.forEach { group ->
                     val topTwo = group.standings.take(2)
                     totalAdvancing += topTwo.size
                     topTwo.forEach { team ->
                         // Gọi API add team vào phase Knockout
-                        val addResponse = apiService.addTeamToPhase(targetPhaseId, AddTeamRequestadmin(teamId = team.id))
+                        val addResponse = apiService.addTeamToPhase(
+                            targetPhaseId,
+                            AddTeamRequestadmin(teamId = team.id)
+                        )
                         if (addResponse.isSuccessful && addResponse.body()?.success == true) {
                             successCount++
                         }
@@ -869,7 +940,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 }
 
                 _message.value = "Đã chuyển $successCount/$totalAdvancing đội vào vòng đấu mới!"
-                
+
                 // 3. Sau khi chuyển xong, Admin có thể nhấn "Auto Xếp Lịch" ở vòng Knockout 
                 // để hệ thống tự động random cặp đấu (bao gồm cả logic 3 đội).
                 fetchSeasonDetails(seasonId)
@@ -903,13 +974,20 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     fun updateTeamGroup(phaseId: Int, teamId: Int, newGroupId: Int?) {
         viewModelScope.launch {
             try {
-                val response = apiService.addTeamToPhase(phaseId, AddTeamRequestadmin(teamId = teamId, groupId = newGroupId))
+                val response = apiService.addTeamToPhase(
+                    phaseId,
+                    AddTeamRequestadmin(teamId = teamId, groupId = newGroupId)
+                )
                 if (response.isSuccessful) {
-                    _message.value = "Cập nhật bảng đấu thành công!"; fetchSeasonDetails(currentSeasonId)
+                    _message.value = "Cập nhật bảng đấu thành công!"; fetchSeasonDetails(
+                        currentSeasonId
+                    )
                 } else {
                     _message.value = "Lỗi ${response.code()}"
                 }
-            } catch (e: Exception) { _message.value = "Kết nối thất bại: ${e.message}" }
+            } catch (e: Exception) {
+                _message.value = "Kết nối thất bại: ${e.message}"
+            }
         }
     }
 
@@ -917,10 +995,10 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
-                
+
                 // Gửi teamItem.team_id (Global ID) để khớp với logic Backend mới
                 val request = AddTeamRequestadmin(
-                    teamId = teamItem.team_id, 
+                    teamId = teamItem.team_id,
                     groupId = groupId
                 )
                 val response = apiService.addTeamToPhase(phaseId, request)
@@ -947,13 +1025,14 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 _isLoading.value = true
                 val response = apiService.removeTeamFromPhase(phaseId, teamId, seasonId)
                 val body = response.body()
-                
+
                 if (response.isSuccessful && body?.success == true) {
                     _message.value = "Đã xóa đội khỏi vòng đấu"
                     fetchSeasonDetails(currentSeasonId)
                 } else {
                     // Đọc message từ body hoặc errorBody nếu thất bại
-                    val errorMsg = body?.message ?: response.errorBody()?.string() ?: "Lỗi không xác định"
+                    val errorMsg =
+                        body?.message ?: response.errorBody()?.string() ?: "Lỗi không xác định"
                     _message.value = "Thất bại: $errorMsg"
                 }
             } catch (e: Exception) {
@@ -968,7 +1047,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
-                
+
                 // Gửi Global Team ID
                 val request = AddTeamRequestadmin(teamId = globalTeamId, groupId = groupId)
                 val response = apiService.addTeamToPhase(phaseId, request)
@@ -988,4 +1067,34 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
+
+    private val _showAddRuleDialog = MutableStateFlow(false)
+    val showAddRuleDialog = _showAddRuleDialog.asStateFlow()
+
+    fun setShowAddRuleDialog(show: Boolean) {
+        _showAddRuleDialog.value = show
+    }
+
+    fun createRules(request: CreateRuleRequest) {
+        Log.d("DEBUG_REQUEST", "Đang gửi: $request")
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                // Gọi trực tiếp apiService, không cần context
+                val response = apiService.createRules(request)
+
+                if (response.isSuccessful) {
+                    _message.value = "Đã áp dụng luật mới cho giải đấu!"
+                } else {
+                    _message.value = "Lỗi từ server: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+
+    }
 }
+

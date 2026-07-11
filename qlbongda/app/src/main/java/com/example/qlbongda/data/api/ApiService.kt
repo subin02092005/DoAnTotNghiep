@@ -343,4 +343,6 @@
             @Path("seasonId") seasonId: Int,
             @Body options: ScheduleOptionsRequest
         ): Response<BaseResponse>
+        @POST("create_rules")
+        suspend fun createRules(@Body request: CreateRuleRequest): Response<Void>
     }

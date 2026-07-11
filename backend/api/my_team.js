@@ -435,19 +435,34 @@ router.post('/register_to_season', async (req, res) => {
         }
 
         // 5. Bắt đầu Transaction để tạo đồng thời season_team và record payment
+       // 5. Bắt đầu Transaction
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // Insert vào bảng season_teams
-        const [insertResult] = await connection.query(
-            "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at) VALUES (?, ?, 'pending', 1, NOW())",
-            [season_id, team_id]
-        );
+        let season_team_id;
+
+        if (existing.length > 0 && existing[0].is_active === 0) {
+            // Đội đã từng đăng ký rồi hủy -> Cập nhật lại bản ghi cũ thành active
+            season_team_id = existing[0].id;
+            await connection.query(
+                `UPDATE season_teams 
+                 SET status = 'active', is_active = 1, deleted_at = NULL, updated_at = NOW() 
+                 WHERE id = ?`,
+                [season_team_id]
+            );
+        } else {
+            // Đội chưa từng đăng ký giải này -> Thêm mới hoàn toàn
+            const [insertResult] = await connection.query(
+                "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at) VALUES (?, ?, 'active', 1, NOW())",
+                [season_id, team_id]
+            );
+            season_team_id = insertResult.insertId; 
+        }
         
-        const season_team_id = insertResult.insertId; 
-        const fee = season[0].registrationFee || 0; 
+        const fee = season[0].registration_fee || 0; 
         
-        // Insert vào bảng payments để chuẩn bị cho thanh toán
+        // Cẩn thận: Nếu đội đăng ký lại, họ có thể cần tạo phiếu thanh toán mới 
+        // hoặc cập nhật phiếu cũ. Ở đây mình tạo phiếu thanh toán mới cho an toàn.
         await connection.query(
             "INSERT INTO payments (season_team_id, amount, status, is_active, created_at) VALUES (?, ?, 'pending', 1, NOW())",
             [season_team_id, fee]
@@ -457,7 +472,6 @@ router.post('/register_to_season', async (req, res) => {
         
         sendRegistrationNotification(team_id, season_id, "Vui lòng hoàn tất thanh toán phí tham dự.");
         res.status(200).json({ status: "success", message: "Đăng ký thành công, vui lòng thanh toán phí tham dự!" });
-
     } catch (error) {
         if (connection) await connection.rollback();
         console.error("Lỗi đăng ký:", error);
@@ -517,11 +531,39 @@ router.get('/open_seasons', async (req, res) => {
 router.post('/unregister_season', async (req, res) => {
     const { team_id, season_id } = req.body;
     try {
-        // Xóa bản ghi trong bảng season_teams
-        await pool.query('DELETE FROM season_teams WHERE team_id = ? AND season_id = ?', [team_id, season_id]);
+        // 1. Kiểm tra xem đội này đã được xếp vào bảng xếp hạng (team_standings) chưa
+        // Dựa vào cấu trúc ảnh: bảng có cột team_id và group_id
+        const [standingCheck] = await pool.query(
+    "SELECT id FROM team_standings WHERE team_id = ? AND is_active = 1 LIMIT 1",
+    [team_id]
+);
+
+// NẾU ĐOẠN NÀY ĐANG CHẠY, NÓ SẼ TRẢ VỀ LỖI 400
+if (standingCheck.length > 0) {
+    console.log("DEBUG: Đội đang trong bảng xếp hạng, chặn hủy!");
+    return res.status(400).json({ 
+        status: "error", 
+        message: "Đội của bạn đã được xếp lịch thi đấu hoặc phân bảng. Không thể tự hủy!" 
+    });
+}
+
+        // 2. Nếu chưa được xếp bảng (chưa có trong team_standings) -> Tiến hành xóa mềm bình thường
+       // 2. Tiến hành xóa mềm và cập nhật status sang 'withdrawn'
+const [result] = await pool.query(
+    `UPDATE season_teams 
+     SET is_active = 0, deleted_at = NOW(), status = 'withdrawn' 
+     WHERE team_id = ? AND season_id = ? AND is_active = 1`, 
+    [team_id, season_id]
+);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ status: "error", message: "Không tìm thấy thông tin đăng ký hợp lệ!" });
+        }
+
         res.status(200).json({ status: "success", message: "Đã hủy giải thành công" });
     } catch (error) {
-        res.status(500).json({ status: "error", message: "Lỗi server" });
+        console.error("Lỗi hủy giải:", error);
+        res.status(500).json({ status: "error", message: "Lỗi hệ thống khi hủy giải" });
     }
 });
 router.post('/confirm_payment', async (req, res) => {

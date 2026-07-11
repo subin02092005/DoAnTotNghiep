@@ -161,7 +161,8 @@ fun TagDiEnBien(match: FullMatchDetail) {
         }
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(match.events) { event ->
+            // SỬA Ở ĐÂY: dùng ?: emptyList() để an toàn
+            items(match.events ?: emptyList()) { event ->
                 Row(
                     modifier = Modifier.fillMaxWidth().background(Color(0xFF0F0F0F), RoundedCornerShape(8.dp)).padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -175,10 +176,7 @@ fun TagDiEnBien(match: FullMatchDetail) {
             }
         }
     }
-}
-
-// ======================= THÀNH PHẦN CON CHO TAG 2 =======================
-@Composable
+}@Composable
 fun TagDoiHinh(match: FullMatchDetail) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("ĐỘI HÌNH RA SÂN CHÍNH THỨC", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
@@ -188,14 +186,16 @@ fun TagDoiHinh(match: FullMatchDetail) {
                 // Đội hình chính Đội A
                 Column(modifier = Modifier.weight(1f)) {
                     Text(match.teamA, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    match.lineupA.forEach { player ->
+                    // SỬA Ở ĐÂY
+                    (match.lineupA ?: emptyList()).forEach { player ->
                         Text("${player.number}. ${player.name} (${player.position})", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp))
                     }
                 }
                 // Đội hình chính Đội B
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                     Text(match.teamB, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    match.lineupB.forEach { player ->
+                    // SỬA Ở ĐÂY
+                    (match.lineupB ?: emptyList()).forEach { player ->
                         Text("${player.name} .${player.number} (${player.position})", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp), textAlign = TextAlign.End)
                     }
                 }
@@ -209,13 +209,15 @@ fun TagDoiHinh(match: FullMatchDetail) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 // Dự bị Đội A
                 Column(modifier = Modifier.weight(1f)) {
-                    match.subsA.forEach { player ->
+                    // SỬA Ở ĐÂY
+                    (match.subsA ?: emptyList()).forEach { player ->
                         Text("${player.number}. ${player.name}", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp))
                     }
                 }
                 // Dự bị Đội B
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    match.subsB.forEach { player ->
+                    // SỬA Ở ĐÂY
+                    (match.subsB ?: emptyList()).forEach { player ->
                         Text("${player.name} .${player.number}", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp), textAlign = TextAlign.End)
                     }
                 }
@@ -223,7 +225,6 @@ fun TagDoiHinh(match: FullMatchDetail) {
         }
     }
 }
-
 // ======================= THÀNH PHẦN CON CHO TAG 3 =======================
 @Composable
 fun TagThongKe(match: FullMatchDetail) {

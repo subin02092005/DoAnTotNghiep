@@ -3,10 +3,13 @@ package com.example.qlbongda.services
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.qlbongda.MainActivity
 import com.example.qlbongda.R
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -33,28 +36,34 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     private fun showNotification(title: String?, body: String?) {
         val channelId = "football_notifications_channel"
 
-        // 1. Tạo NotificationManager
+        // Tạo Intent để mở App khi bấm vào thông báo
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+
+        // FLAG_IMMUTABLE là bắt buộc trên Android 12+
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent, PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // 2. Tạo Channel (BẮT BUỘC cho Android 8+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                channelId,
-                "Thông báo bóng đá",
-                NotificationManager.IMPORTANCE_HIGH
+                channelId, "Thông báo bóng đá", NotificationManager.IMPORTANCE_HIGH
             )
             manager.createNotificationChannel(channel)
         }
 
-        // 3. Tạo Builder với Icon đầy đủ
         val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher) // Đảm bảo icon này tồn tại
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title ?: "Thông báo mới")
             .setContentText(body ?: "Nội dung thông báo")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_HIGH) // Bắt buộc phải là HIGH hoặc MAX
+            .setDefaults(NotificationCompat.DEFAULT_ALL)   // <--- THÊM DÒNG NÀY VÀO ĐÂY
             .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
 
-        // 4. Hiển thị
         manager.notify(System.currentTimeMillis().toInt(), builder.build())
     }
 }

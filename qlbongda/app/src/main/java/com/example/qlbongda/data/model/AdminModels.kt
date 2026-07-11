@@ -1,6 +1,17 @@
 package com.example.qlbongda.data.model
 
 import com.google.gson.annotations.SerializedName
+
+data class CreateRuleRequest(
+    val season_id: Int,
+    val min_players: Int,
+    val max_players: Int,
+    val points_win: Int,
+    val points_draw: Int,
+    val points_loss: Int,
+    val forfeit_score: Int,
+    val description :String
+)
 data class NotificationItem(
     val id: Int,
     val title: String,

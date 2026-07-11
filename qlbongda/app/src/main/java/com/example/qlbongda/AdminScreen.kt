@@ -1,7 +1,9 @@
 package com.example.qlbongda
 
+import android.content.ClipData
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,6 +41,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.qlbongda.data.model.*
 import com.example.qlbongda.ui.theme.NeonGreen
 import com.example.qlbongda.utils.DateUtils
+import androidx.compose.foundation.draganddrop.dragAndDropSource
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.DragAndDropTransferData
+import androidx.compose.ui.draganddrop.toAndroidDragEvent
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 
 val NeonBlack = Color(0xFF0A0A0A)      // Đen sâu
 val NeonSurface = Color(0xFF161616)    // Xám rất tối (cho Card & Tab)
@@ -927,7 +940,9 @@ fun AdminStandingContent(seasonId: Int, viewModel: AdminViewModel) {
     val seasonDetail by viewModel.seasonDetail.collectAsState()
     val phases = seasonDetail?.phases ?: emptyList()
     val isLoading by viewModel.isLoading.collectAsState()
-
+    LaunchedEffect(seasonId) {
+        viewModel.fetchStandings(seasonId)
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -1075,6 +1090,7 @@ fun SeasonTeamListContent(viewModel: AdminViewModel) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
     var showDialog by remember { mutableStateOf(false) }
@@ -1128,14 +1144,44 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
                 item { Text("Tất cả các đội đã được xếp bảng", color = Color.Gray, fontSize = 11.sp) }
             }
             items(unassignedTeams) { team ->
-                val isSelected = selectedTeamToMove?.team_id == team.team_id
+                // THÊM DÒNG NÀY Ở ĐÂY:
+                val isSelected = (team == selectedTeamToMove)
+
                 Box(
-                    modifier = Modifier.background(if (isSelected) Color.Yellow else Color(0xFF333333), RoundedCornerShape(16.dp)).clickable { 
-                        selectedTeamToMove = if (isSelected) null else team
-                        sourcePhaseIdForMove = -1
-                    }.padding(horizontal = 12.dp, vertical = 6.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                        // Màu nền thay đổi dựa trên trạng thái chọn
+                        .background(if (isSelected) Color.DarkGray else Color.Transparent, RoundedCornerShape(8.dp))
+                        .pointerInput(team) {
+                            detectTapGestures(
+                                onTap = {
+                                    // Giờ biến isSelected đã được định nghĩa ở trên, code sẽ chạy đúng
+                                    selectedTeamToMove = if (isSelected) null else team
+                                    sourcePhaseIdForMove = -1
+                                }
+                            )
+                        }
+                        .dragAndDropSource(
+                            block = {
+                                detectDragGestures(
+                                    onDragStart = { offset: Offset ->
+                                        startTransfer(
+                                            DragAndDropTransferData(
+                                                clipData = ClipData.newPlainText("team_id", team.team_id.toString())
+                                            )
+                                        )
+                                    },
+                                    // THÊM DÒNG NÀY VÀO ĐỂ HẾT LỖI
+                                    onDrag = { change, dragAmount ->
+                                        // Không cần làm gì ở đây, nhưng bắt buộc phải có để thỏa mãn cú pháp
+                                    }
+                                )
+                            }
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text(team.name, color = if (isSelected) Color.Black else Color.White, fontSize = 12.sp)
+                    Text(team.name, color = if (isSelected) NeonGreen else Color.White, fontSize = 12.sp)
                 }
             }
         }
@@ -1197,7 +1243,28 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
                                             viewModel.assignTeamToGroup(phase.id, team.team_id, group.id)
                                             selectedTeamToMove = null
                                         }
+                                    },
+                                modifier = Modifier.dragAndDropTarget(
+                                        shouldStartDragAndDrop = { event ->
+                                            // Kiểm tra xem dữ liệu kéo có phải là team_id không
+                                            event.toAndroidDragEvent().clipDescription?.hasMimeType("text/plain") == true
+                                        },
+                                target = object : DragAndDropTarget {
+                                    override fun onDrop(event: DragAndDropEvent): Boolean {
+                                        // Lấy teamId từ dữ liệu kéo
+                                        val clipData = event.toAndroidDragEvent().clipData
+                                        val teamIdString = clipData.getItemAt(0).text.toString()
+                                        val teamId = teamIdString.toIntOrNull()
+
+                                        if (teamId != null) {
+                                            // GỌI HÀM XẾP ĐỘI VÀO BẢNG
+                                            viewModel.assignTeamToGroup(phase.id, teamId, group.id)
+                                            return true
+                                        }
+                                        return false
                                     }
+                                }
+                                )
                                 )
                             }
                         }
@@ -1244,17 +1311,18 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
 
 @Composable
 fun GroupCard(
-    group: GroupItem, 
-    allTeams: List<TeamItem>, 
+    group: GroupItem,
+    allTeams: List<TeamItem>,
     isMoveActive: Boolean,
     onRemoveTeam: (Int) -> Unit,
     onSelectTeam: (TeamItem) -> Unit,
-    onMoveHere: () -> Unit
+    onMoveHere: () -> Unit,
+    modifier: Modifier = Modifier // THÊM THAM SỐ N
 ) {
     val teamsInGroup = allTeams.filter { it.groupId == group.id }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .width(160.dp)
             .padding(end = 8.dp)
             .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
@@ -1600,13 +1668,32 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
     val generalList by viewModel.generalNotifications.collectAsStateWithLifecycle()
     val teamList by viewModel.teamNotifications.collectAsStateWithLifecycle()
     val personalList by viewModel.personalNotifications.collectAsStateWithLifecycle()
-
+    val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.fetchNotifications() }
 
     val displayList = remember(selectedTab, generalList, teamList, personalList) {
         when (selectedTab) { 0 -> generalList; 1 -> teamList; else -> personalList }
     }
-
+    if (showAddRuleDialog) {
+        AddRuleDialog(
+            onDismiss = { viewModel.setShowAddRuleDialog(false) },
+            onConfirm = { sId, min, max, win, draw, loss, forfeit, desc ->
+                // Tạo request với trường mới
+                val request = CreateRuleRequest(
+                    season_id = sId,
+                    min_players = min,
+                    max_players = max,
+                    points_win = win,
+                    points_draw = draw,
+                    points_loss = loss,
+                    forfeit_score = forfeit,
+                    description = desc // Đảm bảo Data Class CreateRuleRequest của bạn đã thêm trường này
+                )
+                viewModel.createRules(request)
+                viewModel.setShowAddRuleDialog(false)
+            }
+        )
+    }
     if (showAddDialog) {
         AddNotificationDialog(onDismiss = { viewModel.setShowAddDialog(false) }, onConfirm = { title, content, type, teamId, userId -> viewModel.createNotification(title, content, type, teamId, userId); viewModel.setShowAddDialog(false) })
     }
@@ -1622,6 +1709,11 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
         floatingActionButton = {
             Column {
                 FloatingActionButton(onClick = { viewModel.setShowCleanupDialog(true) }, containerColor = NeonRed, contentColor = Color.Black) { Icon(Icons.Default.Delete, contentDescription = "Dọn dẹp") }
+                Spacer(modifier = Modifier.height(16.dp))
+                // Nút Thêm Luật
+                FloatingActionButton(onClick = { viewModel.setShowAddRuleDialog(true) }, containerColor = Color.Yellow) {
+                    Icon(Icons.Default.Settings, contentDescription = "Luật")
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 FloatingActionButton(onClick = { viewModel.setShowAddDialog(true) }, containerColor = NeonGreen, contentColor = Color.Black) { Icon(Icons.Default.Add, contentDescription = "Thêm") }
             }
@@ -1681,6 +1773,76 @@ fun AddNotificationDialog(onDismiss: () -> Unit, onConfirm: (String, String, Str
     )
 }
 
+@Composable
+fun AddRuleDialog(onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, Int, Int, Int, String) -> Unit) {
+    var seasonId by remember { mutableStateOf("") }
+    var minPlayers by remember { mutableStateOf("7") }
+    var maxPlayers by remember { mutableStateOf("11") }
+    var ptsWin by remember { mutableStateOf("3") }
+    var ptsDraw by remember { mutableStateOf("1") }
+    var ptsLoss by remember { mutableStateOf("0") }
+    var forfeitScore by remember { mutableStateOf("3") }
+    var description by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NeonSurface,
+        title = { Text("Thêm Luật Giải Đấu", color = NeonWhite) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                val fields = listOf(
+                    "ID Mùa giải" to seasonId, "Tối thiểu cầu thủ" to minPlayers,
+                    "Tối đa cầu thủ" to maxPlayers, "Điểm thắng" to ptsWin,
+                    "Điểm hòa" to ptsDraw, "Điểm thua" to ptsLoss, "Điểm xử thua" to forfeitScore,
+                    "Mô tả" to description // Thêm vào danh sách
+                )
+
+                fields.forEach { (label, value) ->
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = {
+                            when(label) {
+                                "ID Mùa giải" -> seasonId = it
+                                "Tối thiểu cầu thủ" -> minPlayers = it
+                                "Tối đa cầu thủ" -> maxPlayers = it
+                                "Điểm thắng" -> ptsWin = it
+                                "Điểm hòa" -> ptsDraw = it
+                                "Điểm thua" -> ptsLoss = it
+                                "Điểm xử thua" -> forfeitScore = it
+                                "Mô tả" -> description = it // Thêm vào xử lý
+                            }
+                        },
+                        label = { Text(label, color = NeonGray) },
+                        // Nếu là mô tả thì dùng text, còn lại dùng số
+                        keyboardOptions = KeyboardOptions(keyboardType = if (label == "Mô tả") KeyboardType.Text else KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm(
+                    seasonId.toIntOrNull() ?: 0,
+                    minPlayers.toIntOrNull() ?: 7,
+                    maxPlayers.toIntOrNull() ?: 11,
+                    ptsWin.toIntOrNull() ?: 3,
+                    ptsDraw.toIntOrNull() ?: 1,
+                    ptsLoss.toIntOrNull() ?: 0,
+                    forfeitScore.toIntOrNull() ?: 3,
+                    description // Truyền giá trị vào đây
+                )
+            }) {
+                Text("Lưu Luật", color = NeonGreen)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy", color = NeonGray)
+            }
+        }
+    )
+}
 @Composable
 fun CleanupConfirmationDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
