@@ -147,50 +147,57 @@ router.post('/create_rules', async (req, res) => {
 
         try {
             // 1. TÌM TOURNAMENT_ID TỪ SEASON_ID
-          const [seasonRows] = await connection.query("SELECT tournament_id FROM seasons WHERE id = ?", [season_id]);
-if (seasonRows.length === 0) throw new Error("Không tìm thấy giải đấu!");
-const tournament_id = seasonRows[0].tournament_id;
+            const [seasonRows] = await connection.query("SELECT tournament_id FROM seasons WHERE id = ?", [season_id]);
+            if (seasonRows.length === 0) throw new Error("Không tìm thấy giải đấu!");
+            const tournament_id = seasonRows[0].tournament_id;
 
-// 2. THAY VÌ INSERT, TA SẼ UPDATE DÒNG ĐÃ TỒN TẠI
-// Cấu trúc: Nếu tồn tại tournament_id này thì Update, không thì Insert
-const updateQuery = `
-    INSERT INTO tournament_rules 
-    (tournament_id, min_players_per_team, max_players_per_team, points_per_win, points_per_draw, points_per_loss, forfeit_score, tiebreaker_order, description, is_active) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, '["goal_difference", "head_to_head"]', ?, 1)
-    ON DUPLICATE KEY UPDATE 
-    min_players_per_team = VALUES(min_players_per_team),
-    max_players_per_team = VALUES(max_players_per_team),
-    points_per_win = VALUES(points_per_win),
-    points_per_draw = VALUES(points_per_draw),
-    points_per_loss = VALUES(points_per_loss),
-    forfeit_score = VALUES(forfeit_score),
-    description = VALUES(description),
-    is_active = 1
-`;
+            // 2. CẬP NHẬT LUẬT (ON DUPLICATE KEY UPDATE)
+            const updateQuery = `
+                INSERT INTO tournament_rules 
+                (tournament_id, min_players_per_team, max_players_per_team, points_per_win, points_per_draw, points_per_loss, forfeit_score, tiebreaker_order, description, is_active) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, '["goal_difference", "head_to_head"]', ?, 1)
+                ON DUPLICATE KEY UPDATE 
+                min_players_per_team = VALUES(min_players_per_team),
+                max_players_per_team = VALUES(max_players_per_team),
+                points_per_win = VALUES(points_per_win),
+                points_per_draw = VALUES(points_per_draw),
+                points_per_loss = VALUES(points_per_loss),
+                forfeit_score = VALUES(forfeit_score),
+                description = VALUES(description),
+                is_active = 1
+            `;
 
-await connection.query(updateQuery, [
-    tournament_id, min_players, max_players, points_win, points_draw, points_loss, forfeit_score, description
-]);
+            await connection.query(updateQuery, [
+                tournament_id, min_players, max_players, points_win, points_draw, points_loss, forfeit_score, description
+            ]);
 
-await connection.commit();
-            connection.release();
-
-            // 4. Gửi thông báo (Giữ nguyên logic dùng season_id)
-            const notifyTitle = "Cập nhật luật giải đấu mới";
-            const notifyContent = `Giải đấu đã cập nhật luật: Tối thiểu ${min_players}, Tối đa ${max_players} cầu thủ. Kiểm tra ngay!`;
-
+            // 3. LẤY DANH SÁCH USERS VÀ FCM_TOKEN
             const [users] = await pool.query(`
-                SELECT DISTINCT u.fcm_token 
+                SELECT DISTINCT u.id as user_id, u.fcm_token 
                 FROM users u
                 JOIN team_players tp ON u.id = tp.user_id
                 JOIN season_teams ts ON tp.team_id = ts.team_id
                 WHERE ts.season_id = ? AND u.fcm_token IS NOT NULL
             `, [season_id]);
 
-            const sendPromises = users.map(u => sendFCMNotification(u.fcm_token, notifyTitle, notifyContent));
-            await Promise.all(sendPromises);
+           // 4. LƯU VÀO DB 1 LẦN VÀ GỬI FCM CHO TỪNG NGƯỜI
+const notifyTitle = "Cập nhật luật giải đấu mới";
+const notifyContent = `Luật mới: ${min_players}-${max_players} cầu thủ. Điểm: T(${points_win}) H(${points_draw}) B(${points_loss}). ${description ? 'Ghi chú: ' + description : ''}`;
 
-            res.status(200).json({ status: "success", message: "Đã áp dụng luật và thông báo cho người chơi" });
+// BƯỚC A: Lưu 1 dòng duy nhất vào DB với type = 'general'
+await connection.query(
+    "INSERT INTO notifications (title, content, type) VALUES (?, ?, 'general')",
+    [notifyTitle, notifyContent]
+);
+
+// BƯỚC B: Chỉ thực hiện gửi FCM trong vòng lặp (Không insert DB ở đây nữa)
+const sendPromises = users.map(u => sendFCMNotification(u.fcm_token, notifyTitle, notifyContent));
+await Promise.all(sendPromises);
+
+await connection.commit();
+connection.release();
+
+res.status(200).json({ status: "success", message: "Đã áp dụng luật và thông báo cho người chơi" });
 
         } catch (dbError) {
             await connection.rollback();

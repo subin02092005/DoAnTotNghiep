@@ -10,14 +10,32 @@ const pool = mysql.createPool({
 });
 
 router.get('/my_notifications', async (req, res) => {
-    const { userId, teamId } = req.query;
-    if (!userId) return res.status(400).json({ status: "error", message: "Thiếu userId" });
+    let { userId, teamId } = req.query;
+    
+    // Khởi tạo câu query cơ bản
+    let query = `SELECT * FROM notifications WHERE is_active = 1 AND (type = 'general'`;
+    const params = [];
+
+    // Chỉ thêm điều kiện nếu userId tồn tại
+    if (userId) {
+        query += ` OR recipient_user_id = ?`;
+        params.push(userId);
+    }
+
+    // Chỉ thêm điều kiện nếu teamId tồn tại
+    if (teamId) {
+        query += ` OR target_team_id = ?`;
+        params.push(teamId);
+    }
+
+    // Đóng ngoặc và sắp xếp
+    query += `) ORDER BY created_at DESC`;
 
     try {
-        const query = `SELECT * FROM notifications WHERE is_active = 1 AND (type = 'general' OR recipient_user_id = ? OR target_team_id = ?) ORDER BY created_at DESC`;
-        const [notifications] = await pool.query(query, [userId, teamId || null]);
+        const [notifications] = await pool.query(query, params);
         res.status(200).json({ status: "success", data: notifications });
     } catch (error) {
+        console.error("Lỗi lấy thông báo:", error);
         res.status(500).json({ status: "error", message: "Lỗi Server" });
     }
 });

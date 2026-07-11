@@ -115,4 +115,3 @@ async function createAndSendNotification(teamId, recipientUserId, title, content
 
 module.exports = { sendFCMNotification, createAndSendNotification, sendRegistrationNotification, sendToAll };
 
-module.exports = { sendFCMNotification, createAndSendNotification, sendRegistrationNotification,sendToAll };

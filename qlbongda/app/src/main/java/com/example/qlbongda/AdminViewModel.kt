@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.qlbongda.data.api.ApiService
 import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.*
+import com.example.qlbongda.services.NotificationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.String
 
 class AdminViewModel(private val apiService: ApiService) : ViewModel() {
 
@@ -53,8 +55,35 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             try {
                 val response = apiService.getAllNotifications()
+
                 if (response.isSuccessful) {
-                    _notifications.value = response.body()?.data ?: emptyList()
+                    // 1. Lấy dữ liệu thô từ API (List<Notification>)
+                    val apiList = response.body()?.data ?: emptyList()
+
+                    // 2. Chuyển đổi sang kiểu dữ liệu mà UI cần (List<NotificationItem>)
+                    // Đây chính là chỗ tạo ra biến uiData mà bạn đang thiếu
+                    val uiData = apiList.map { item ->
+                        NotificationItem(
+                            id = item.id,
+                            title = item.title,
+                            content = item.content,
+                            type = "general",            // Gán giá trị trực tiếp
+                            source = "manual",           // Gán giá trị trực tiếp
+                            target_team_id = item.target_team_id ?.toString()?.toIntOrNull(), // Dùng toán tử ?: để tránh null
+                            recipient_user_id = item.recipient_user_id?.toString()?.toIntOrNull(), // Nếu null thì gán 0
+
+                            is_active = if (item.is_active == 1) 1 else 0,// Nếu null thì gán true
+                            created_at = item.created_at ?: "" // Nếu null thì gán chuỗi rỗng
+                        )
+                    }
+
+
+                    // 3. Cập nhật vào Repository
+                    NotificationRepository.updateNotifications(uiData)
+
+                    // Lưu ý: Nếu bạn dùng Repo thì không cần dùng _notifications.value nữa
+                } else {
+                    _message.value = "Lỗi: ${response.code()}"
                 }
             } catch (e: Exception) {
                 Log.e("API_ERROR", "Chi tiết lỗi: ", e)
@@ -62,7 +91,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
     }
-
     fun createNotification(
         title: String,
         content: String,
@@ -152,6 +180,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     fun setShowCleanupDialog(show: Boolean) {
         _showCleanupDialog.value = show
     }
+
 
     private val _showAddDialog = MutableStateFlow(false)
     val showAddDialog = _showAddDialog.asStateFlow()
