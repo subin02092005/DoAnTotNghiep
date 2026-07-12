@@ -44,6 +44,7 @@ import com.example.qlbongda.utils.DateUtils
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
@@ -903,7 +904,7 @@ fun SeasonDetailScreen(seasonId: Int, viewModel: AdminViewModel, onBack: () -> U
     }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Danh sách đội", "Bảng đấu & Vòng đấu", "Bảng xếp hạng")
+    val tabs = listOf("Danh sách đội", "Bảng đấu & Vòng đấu", "Bảng xếp hạng", "Cây nhánh đấu")
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF121212))) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -921,7 +922,7 @@ fun SeasonDetailScreen(seasonId: Int, viewModel: AdminViewModel, onBack: () -> U
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = { selectedTabIndex = index },
-                    text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
                 )
             }
         }
@@ -930,6 +931,7 @@ fun SeasonDetailScreen(seasonId: Int, viewModel: AdminViewModel, onBack: () -> U
             0 -> SeasonTeamListContent(viewModel)
             1 -> SeasonStageContent(seasonId, viewModel)
             2 -> AdminStandingContent(seasonId, viewModel)
+            3 -> KnockoutBracketScreen(seasonId, viewModel)
         }
     }
 }
@@ -949,7 +951,57 @@ fun AdminStandingContent(seasonId: Int, viewModel: AdminViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("BẢNG XẾP HẠNG MÙA GIẢI", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("BẢNG XẾP HẠNG MÙA GIẢI", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                if (standings.isNotEmpty()) {
+                    Text("Số bảng: ${standings.size}", color = Color.Gray, fontSize = 10.sp)
+                }
+            }
+
+            // Nút tạo Vòng Knockout tự động cho toàn bộ giải đấu
+            if (standings.isNotEmpty() && phases.any { it.format == "knockout" }) {
+                var showGlobalPhaseMenu by remember { mutableStateOf(false) }
+                val currentPhaseId = standings.firstOrNull()?.phaseId ?: -1
+                val targetPhases = phases.filter { it.format == "knockout" }
+
+                if (currentPhaseId != -1 && targetPhases.isNotEmpty()) {
+                    Box {
+                        Button(
+                            onClick = { showGlobalPhaseMenu = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            modifier = Modifier.height(32.dp).padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoFixHigh,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color.Black
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Tạo Knockout", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        DropdownMenu(
+                            expanded = showGlobalPhaseMenu,
+                            onDismissRequest = { showGlobalPhaseMenu = false },
+                            modifier = Modifier.background(Color(0xFF252525))
+                        ) {
+                            Text("Đưa Nhất/Nhì các bảng vào:", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(8.dp))
+                            targetPhases.forEach { target ->
+                                DropdownMenuItem(
+                                    text = { Text(target.name, color = Color.White) },
+                                    onClick = {
+                                        viewModel.advanceTopTeamsToPhase(currentPhaseId, target.id, seasonId)
+                                        showGlobalPhaseMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             IconButton(onClick = { viewModel.fetchStandings(seasonId) }) {
                 Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = NeonGreen)
             }
@@ -993,43 +1045,8 @@ fun AdminStandingContent(seasonId: Int, viewModel: AdminViewModel) {
                                     }
                                 }
                                 
-                                val currentPhase = phases.find { it.id == groupStanding.phaseId }
-                                // Nếu là vòng bảng (hoặc bất kỳ vòng nào tính điểm) thì hiện nút chuyển
-                                if (currentPhase?.format == "round_robin") {
-                                    // Tìm tất cả các vòng đấu khác (thường là các vòng knockout phía sau)
-                                    val otherPhases = phases.filter { it.id != currentPhase.id }
-                                    
-                                    if (otherPhases.isNotEmpty()) {
-                                        var showPhaseMenu by remember { mutableStateOf(false) }
-                                        
-                                        Box {
-                                            Button(
-                                                onClick = { showPhaseMenu = true },
-                                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                                modifier = Modifier.height(28.dp)
-                                            ) {
-                                                Text("Tiến vào vòng sau", color = Color.Black, fontSize = 10.sp)
-                                            }
-                                            
-                                            DropdownMenu(
-                                                expanded = showPhaseMenu,
-                                                onDismissRequest = { showPhaseMenu = false },
-                                                modifier = Modifier.background(Color(0xFF252525))
-                                            ) {
-                                                Text("Chọn vòng đấu đích:", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(8.dp))
-                                                otherPhases.forEach { targetPhase ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(targetPhase.name, color = Color.White) },
-                                                        onClick = {
-                                                            viewModel.advanceTopTeamsToPhase(groupStanding.phaseId, targetPhase.id, seasonId)
-                                                            showPhaseMenu = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
+                                IconButton(onClick = { viewModel.fetchStandings(seasonId) }) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.Gray, modifier = Modifier.size(16.dp))
                                 }
                             }
                             
@@ -1130,12 +1147,6 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
                 .background(Color(0xFF1A1A1A), RoundedCornerShape(8.dp))
-                .clickable { 
-                    if (selectedTeamToMove != null && sourcePhaseIdForMove != -1) {
-                        viewModel.removeTeamFromPhase(sourcePhaseIdForMove, selectedTeamToMove!!.team_id, seasonId)
-                    }
-                    selectedTeamToMove = null 
-                }
                 .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -1143,20 +1154,17 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
             if (unassignedTeams.isEmpty()) {
                 item { Text("Tất cả các đội đã được xếp bảng", color = Color.Gray, fontSize = 11.sp) }
             }
-            items(unassignedTeams) { team ->
-                // THÊM DÒNG NÀY Ở ĐÂY:
+            items(unassignedTeams, key = { it.team_id }) { team ->
                 val isSelected = (team == selectedTeamToMove)
 
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .width(120.dp)
                         .padding(vertical = 2.dp)
-                        // Màu nền thay đổi dựa trên trạng thái chọn
                         .background(if (isSelected) Color.DarkGray else Color.Transparent, RoundedCornerShape(8.dp))
-                        .pointerInput(team) {
+                        .pointerInput(team, selectedTeamToMove) { 
                             detectTapGestures(
                                 onTap = {
-                                    // Giờ biến isSelected đã được định nghĩa ở trên, code sẽ chạy đúng
                                     selectedTeamToMove = if (isSelected) null else team
                                     sourcePhaseIdForMove = -1
                                 }
@@ -1164,17 +1172,16 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
                         }
                         .dragAndDropSource(
                             block = {
-                                detectDragGestures(
-                                    onDragStart = { offset: Offset ->
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { _ ->
                                         startTransfer(
                                             DragAndDropTransferData(
                                                 clipData = ClipData.newPlainText("team_id", team.team_id.toString())
                                             )
                                         )
                                     },
-                                    // THÊM DÒNG NÀY VÀO ĐỂ HẾT LỖI
-                                    onDrag = { change, dragAmount ->
-                                        // Không cần làm gì ở đây, nhưng bắt buộc phải có để thỏa mãn cú pháp
+                                    onDrag = { change, _ ->
+                                        change.consume()
                                     }
                                 )
                             }
@@ -1203,35 +1210,47 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(phases) { phase ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF252525))
-                ) {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(phases, key = { it.id }) { phase ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF252525))
+                                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(text = phase.name, style = MaterialTheme.typography.titleMedium, color = Color.White)
                                 Text(text = "Định dạng: ${if(phase.format == "round_robin") "Vòng tròn" else "Loại trực tiếp"}",
                                     style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                             }
-                            IconButton(onClick = { selectedPhaseForTeam = phase; showAddTeamDialog = true }) {
-                                Icon(Icons.Default.Add, contentDescription = "Thêm đội", tint = NeonGreen)
+                            Row {
+                                IconButton(onClick = { 
+                                    // Thêm hộp thoại xác nhận nếu cần, ở đây gọi trực tiếp
+                                    viewModel.deletePhase(seasonId, phase.id)
+                                }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Xóa vòng đấu", tint = Color.Red.copy(alpha = 0.7f))
+                                }
+                                IconButton(onClick = { selectedPhaseForTeam = phase; showAddTeamDialog = true }) {
+                                    Icon(Icons.Default.Add, contentDescription = "Thêm đội", tint = NeonGreen)
+                                }
                             }
                         }
                         val groups = phase.groups ?: emptyList()
+                        // Lấy danh sách đội riêng của Phase này từ Backend
+                        val phaseTeams = phase.teams ?: emptyList()
+
                         Row(
                             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 8.dp)
                         ) {
                             groups.forEach { group ->
                                 GroupCard(
                                     group = group,
-                                    allTeams = allTeams,
+                                    // LUÔN ưu tiên sử dụng danh sách đội đã được lọc theo Phase từ Backend
+                                    allTeams = if (!phase.teams.isNullOrEmpty()) phase.teams!! else allTeams,
                                     isMoveActive = selectedTeamToMove != null,
                                     onRemoveTeam = { teamId ->
-                                        viewModel.removeTeamFromPhase(phase.id, teamId,seasonId)
+                                        viewModel.removeTeamFromPhase(phase.id, teamId, seasonId)
                                     },
                                     onSelectTeam = { team ->
                                         selectedTeamToMove = team
@@ -1239,32 +1258,28 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
                                     },
                                     onMoveHere = {
                                         selectedTeamToMove?.let { team ->
-                                            // Sử dụng team.team_id (Global ID) để khớp Backend
                                             viewModel.assignTeamToGroup(phase.id, team.team_id, group.id)
                                             selectedTeamToMove = null
                                         }
                                     },
-                                modifier = Modifier.dragAndDropTarget(
+                                    modifier = Modifier.dragAndDropTarget(
                                         shouldStartDragAndDrop = { event ->
-                                            // Kiểm tra xem dữ liệu kéo có phải là team_id không
                                             event.toAndroidDragEvent().clipDescription?.hasMimeType("text/plain") == true
                                         },
-                                target = object : DragAndDropTarget {
-                                    override fun onDrop(event: DragAndDropEvent): Boolean {
-                                        // Lấy teamId từ dữ liệu kéo
-                                        val clipData = event.toAndroidDragEvent().clipData
-                                        val teamIdString = clipData.getItemAt(0).text.toString()
-                                        val teamId = teamIdString.toIntOrNull()
+                                        target = object : DragAndDropTarget {
+                                            override fun onDrop(event: DragAndDropEvent): Boolean {
+                                                val clipData = event.toAndroidDragEvent().clipData
+                                                val teamIdString = clipData?.getItemAt(0)?.text?.toString()
+                                                val teamId = teamIdString?.toIntOrNull()
 
-                                        if (teamId != null) {
-                                            // GỌI HÀM XẾP ĐỘI VÀO BẢNG
-                                            viewModel.assignTeamToGroup(phase.id, teamId, group.id)
-                                            return true
+                                                if (teamId != null) {
+                                                    viewModel.assignTeamToGroup(phase.id, teamId, group.id)
+                                                    return true
+                                                }
+                                                return false
+                                            }
                                         }
-                                        return false
-                                    }
-                                }
-                                )
+                                    )
                                 )
                             }
                         }
@@ -1317,8 +1332,9 @@ fun GroupCard(
     onRemoveTeam: (Int) -> Unit,
     onSelectTeam: (TeamItem) -> Unit,
     onMoveHere: () -> Unit,
-    modifier: Modifier = Modifier // THÊM THAM SỐ N
+    modifier: Modifier = Modifier
 ) {
+    // SỬA LỖI: Chỉ lọc đúng đội thuộc về bảng này (group.id)
     val teamsInGroup = allTeams.filter { it.groupId == group.id }
 
     Column(
@@ -1335,7 +1351,12 @@ fun GroupCard(
             .padding(8.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(text = group.name.uppercase(), color = NeonGreen, fontWeight = FontWeight.Bold)
+            Text(
+                text = "${group.name.uppercase()} (${teamsInGroup.size})", 
+                color = NeonGreen, 
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
             if (isMoveActive) {
                 Icon(Icons.Default.ArrowDownward, contentDescription = "Thả vào đây", tint = NeonGreen, modifier = Modifier.size(16.dp))
             }
@@ -1512,10 +1533,18 @@ fun SeasonAdminCard(season: SeasonAdminItem, onToggleRegistration: (Boolean) -> 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPhaseDialog(onDismiss: () -> Unit, onConfirm: (CreatePhaseRequest) -> Unit) {
-    val phaseMapping = mapOf("Vòng Bảng" to "group_stage", "Vòng 1/16" to "round_of_16", "Tứ Kết" to "quarter_final", "Bán Kết" to "semi_final", "Chung Kết" to "final")
+    val phaseMapping = mapOf(
+        "Vòng Bảng" to "group_stage",
+        "Vòng 1/16" to "round_of_16",
+        "Tứ Kết" to "quarter_final",
+        "Bán Kết" to "semi_final",
+        "Chung Kết" to "final"
+    )
     val formatMap = mapOf("round_robin" to "Vòng tròn tính điểm", "knockout" to "Loại trực tiếp")
+    
     var selectedName by remember { mutableStateOf("Vòng Bảng") }
     var selectedFormat by remember { mutableStateOf("round_robin") }
+    var customType by remember { mutableStateOf("group_stage") }
     var order by remember { mutableStateOf("1") }
     var groupCount by remember { mutableStateOf("1") }
     var expandedName by remember { mutableStateOf(false) }
@@ -1525,23 +1554,101 @@ fun AddPhaseDialog(onDismiss: () -> Unit, onConfirm: (CreatePhaseRequest) -> Uni
         onDismissRequest = onDismiss,
         title = { Text("Thêm Vòng đấu") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ExposedDropdownMenuBox(expanded = expandedName, onExpandedChange = { expandedName = !expandedName }) {
-                    OutlinedTextField(value = selectedName, onValueChange = {}, readOnly = true, label = { Text("Tên vòng đấu") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedName) }, modifier = Modifier.menuAnchor().fillMaxWidth())
-                    ExposedDropdownMenu(expanded = expandedName, onDismissRequest = { expandedName = false }) {
-                        phaseMapping.keys.forEach { name -> DropdownMenuItem(text = { Text(name) }, onClick = { selectedName = name; expandedName = false }) }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // Tên vòng đấu
+                ExposedDropdownMenuBox(
+                    expanded = expandedName,
+                    onExpandedChange = { expandedName = !expandedName }
+                ) {
+                    OutlinedTextField(
+                        value = selectedName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Tên vòng đấu") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedName) },
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedName,
+                        onDismissRequest = { expandedName = false }
+                    ) {
+                        phaseMapping.keys.forEach { name ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                onClick = {
+                                    selectedName = name
+                                    // Tự động chuyển định dạng dựa trên tên vòng đấu
+                                    selectedFormat = if (name == "Vòng Bảng") "round_robin" else "knockout"
+                                    customType = phaseMapping[name] ?: "group_stage"
+                                    // Tự động gán order gợi ý
+                                    order = when(name) {
+                                        "Vòng Bảng" -> "1"
+                                        "Vòng 1/16" -> "2"
+                                        "Tứ Kết" -> "3"
+                                        "Bán Kết" -> "4"
+                                        "Chung Kết" -> "5"
+                                        else -> "1"
+                                    }
+                                    expandedName = false
+                                }
+                            )
+                        }
                     }
                 }
-                OutlinedTextField(value = phaseMapping[selectedName] ?: "", onValueChange = {}, enabled = false, label = { Text("Kiểu vòng (Auto)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = order, onValueChange = { order = it }, label = { Text("Thứ tự (Order)") })
-                ExposedDropdownMenuBox(expanded = expandedFormat, onExpandedChange = { expandedFormat = !expandedFormat }) {
-                    OutlinedTextField(value = formatMap[selectedFormat] ?: selectedFormat, onValueChange = {}, readOnly = true, label = { Text("Định dạng") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormat) }, modifier = Modifier.menuAnchor().fillMaxWidth())
-                    ExposedDropdownMenu(expanded = expandedFormat, onDismissRequest = { expandedFormat = false }) {
-                        formatMap.forEach { (key, label) -> DropdownMenuItem(text = { Text(label) }, onClick = { selectedFormat = key; expandedFormat = false }) }
+
+                // Mã loại (Type) - Cho phép Admin thấy hoặc chỉnh nếu cần
+                OutlinedTextField(
+                    value = customType,
+                    onValueChange = { customType = it },
+                    label = { Text("Mã loại (Type)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Định dạng
+                ExposedDropdownMenuBox(
+                    expanded = expandedFormat,
+                    onExpandedChange = { expandedFormat = !expandedFormat }
+                ) {
+                    OutlinedTextField(
+                        value = formatMap[selectedFormat] ?: selectedFormat,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Định dạng") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormat) },
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedFormat,
+                        onDismissRequest = { expandedFormat = false }
+                    ) {
+                        formatMap.forEach { (key, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    selectedFormat = key
+                                    expandedFormat = false
+                                }
+                            )
+                        }
                     }
                 }
+
+                OutlinedTextField(
+                    value = order,
+                    onValueChange = { order = it },
+                    label = { Text("Thứ tự (Order)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 if (selectedFormat == "round_robin") {
-                    OutlinedTextField(value = groupCount, onValueChange = { groupCount = it }, label = { Text("Số lượng bảng") })
+                    OutlinedTextField(
+                        value = groupCount,
+                        onValueChange = { groupCount = it },
+                        label = { Text("Số lượng bảng") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         },
@@ -1549,10 +1656,11 @@ fun AddPhaseDialog(onDismiss: () -> Unit, onConfirm: (CreatePhaseRequest) -> Uni
             Button(onClick = {
                 onConfirm(CreatePhaseRequest(
                     name = selectedName,
-                    type = phaseMapping[selectedName] ?: "group_stage",
+                    type = customType, // Sử dụng giá trị từ TextField để Admin có thể chỉnh sửa
                     format = selectedFormat,
                     order = order.toIntOrNull() ?: 1,
-                    groupCount = if (selectedFormat == "round_robin") groupCount.toIntOrNull() else null
+                    // Đối với knockout, thử gửi 1 thay vì 0 hoặc null nếu 0 bị lỗi
+                    groupCount = if (selectedFormat == "round_robin") groupCount.toIntOrNull() else 1
                 ))
             }) { Text("Tạo") }
         },

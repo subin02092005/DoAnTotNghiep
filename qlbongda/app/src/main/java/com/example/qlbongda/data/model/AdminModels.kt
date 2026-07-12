@@ -405,9 +405,28 @@ data class AutoImportAndScheduleRequest(
     val interval_minutes: Int? = null
 )
 
-// Class hứng phản hồi từ API (nếu bạn muốn lấy data từ result của server)
-data class AutoImportAndScheduleResponse(
-    val status: String,
-    val message: String,
+// --- BRACKET MODELS ---
+data class BracketSlot(
+    val id: Int,
+    val round: Int,
+    @SerializedName("slot_number") val slotNumber: Int,
+    @SerializedName("is_bye") val isBye: Int,
+    @SerializedName("match_id") val matchId: Int?,
+    @SerializedName("home_score") val homeScore: Int?,
+    @SerializedName("away_score") val awayScore: Int?,
+    @SerializedName("match_status") val matchStatus: String?,
+    @SerializedName("home_team_name") val homeTeamName: String?,
+    @SerializedName("away_team_name") val awayTeamName: String?
+)
 
+data class PhaseBracket(
+    val phaseId: Int,
+    val phaseName: String,
+    val phaseType: String,
+    val slots: List<BracketSlot>
+)
+
+data class BracketResponse(
+    val success: Boolean,
+    val data: List<PhaseBracket>
 )

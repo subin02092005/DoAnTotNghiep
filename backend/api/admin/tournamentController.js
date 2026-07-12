@@ -348,11 +348,11 @@
 
         // 3. Lặp qua từng vòng đấu để gắn groups và teams
         for (let phase of phases) {
+            // LUÔN LẤY GROUPS CHO CẢ ROUND ROBIN VÀ KNOCKOUT
+            const [groups] = await pool.execute('SELECT id, name FROM `groups` WHERE phase_id = ?', [phase.id]);
+            phase.groups = groups || [];
+
             if (phase.format === 'round_robin') {
-                // Lấy groups
-                const [groups] = await pool.execute('SELECT id, name FROM `groups` WHERE phase_id = ?', [phase.id]);
-                phase.groups = groups || []; 
-                
                 // Lấy đội qua bảng groups
                 const [teamsInPhase] = await pool.execute(`
                     SELECT st.id, st.team_id, t.name, st.status, st.group_id 
@@ -362,15 +362,27 @@
                     WHERE g.phase_id = ?`, [phase.id]);
                 phase.teams = teamsInPhase || [];
             } else {
-                // Lấy đội cho vòng knockout qua bảng bracket_slots
-                const [teamsInPhase] = await pool.execute(`
-                    SELECT DISTINCT t.id as team_id, t.name, 'active' as status
-                    FROM bracket_slots bs
-                    JOIN teams t ON (bs.seeded_home_team_id = t.id OR bs.seeded_away_team_id = t.id)
-                    WHERE bs.phase_id = ?`, [phase.id]);
-                phase.teams = teamsInPhase || [];
+                // Lấy đội cho vòng knockout - Ưu tiên lấy theo group_id nếu đã được kéo vào bảng ảo
+                const [teamsInGroups] = await pool.execute(`
+                    SELECT st.id, st.team_id, t.name, st.status, st.group_id
+                    FROM season_teams st
+                    JOIN teams t ON st.team_id = t.id
+                    JOIN \`groups\` g ON st.group_id = g.id
+                    WHERE g.phase_id = ?`, [phase.id]);
+
+                if (teamsInGroups.length > 0) {
+                    phase.teams = teamsInGroups;
+                } else {
+                    // Nếu chưa có trong bảng ảo, lấy từ bracket_slots (dữ liệu cũ)
+                    const [teamsInPhase] = await pool.execute(`
+                        SELECT DISTINCT t.id as team_id, t.name, 'active' as status
+                        FROM bracket_slots bs
+                        JOIN teams t ON (bs.seeded_home_team_id = t.id OR bs.seeded_away_team_id = t.id)
+                        WHERE bs.phase_id = ?`, [phase.id]);
+                    phase.teams = teamsInPhase || [];
+                }
             }
-        } // <--- ĐÓNG VÒNG LẶP FOR Ở ĐÂY
+        }
 
         // 4. Lấy danh sách TẤT CẢ đội của mùa giải
         const [allTeams] = await pool.execute(`

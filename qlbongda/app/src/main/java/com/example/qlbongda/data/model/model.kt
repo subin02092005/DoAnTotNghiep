@@ -308,8 +308,8 @@ data class DetailedStanding(
 
 data class DetailedStandingResponse(
     val status: String,
-    val message: String,
-    val data: List<GroupStanding> // Thay vì List<DetailedStanding>, giờ là danh sách các Bảng
+    val message: String? = null,
+    val data: List<GroupStanding>
 )
 data class GroupStanding(
     val phaseId: Int,

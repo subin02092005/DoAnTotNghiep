@@ -73,8 +73,9 @@ const [matchRows] = await pool.execute(`
             teamB: matchData.teamB,
             status: matchData.status,
             isStarted: matchData.status !== 'pending',
-            scoreA: matchData.home_final_score || 0,
-            scoreB: matchData.away_final_score || 0,
+            // Đảm bảo trả về 0 nếu tỉ số trong database là null
+            scoreA: matchData.home_final_score !== null ? matchData.home_final_score : (matchData.home_score || 0),
+            scoreB: matchData.away_final_score !== null ? matchData.away_final_score : (matchData.away_score || 0),
             time: matchData.scheduled_at,
             date: matchData.scheduled_at,
             stadium: matchData.venue_name || "Đang cập nhật",
@@ -89,7 +90,11 @@ const [matchRows] = await pool.execute(`
             isHot: matchData.phase_type === 'semi_final' || matchData.phase_type === 'final'
         };
 
-        return res.status(200).json({ status: "success", data: responseData });
+        return res.status(200).json({
+            success: true,
+            status: "success",
+            data: responseData
+        });
 
     } catch (error) {
         console.error("Lỗi API:", error);

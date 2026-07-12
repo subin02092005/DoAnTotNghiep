@@ -279,6 +279,10 @@
             @Path("seasonId") seasonId: Int,
             @Body request: CreatePhaseRequest
         ): Response<GenericAdminResponse>
+
+        @DELETE("phases/{id}")
+        suspend fun deletePhase(@Path("id") phaseId: Int): Response<GenericAdminResponse>
+
         @POST("phases/{phaseId}/add-team")
         suspend fun addTeamToPhase(
             @Path("phaseId") phaseId: Int,
@@ -345,4 +349,7 @@
         ): Response<BaseResponse>
         @POST("create_rules")
         suspend fun createRules(@Body request: CreateRuleRequest): Response<Void>
+
+        @GET("seasons/{seasonId}/knockout-bracket")
+        suspend fun getKnockoutBracket(@Path("seasonId") seasonId: Int): Response<BracketResponse>
     }

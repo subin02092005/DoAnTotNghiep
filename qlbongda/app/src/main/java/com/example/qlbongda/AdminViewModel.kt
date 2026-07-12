@@ -533,18 +533,27 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     val matchDetail: StateFlow<FullMatchDetail?> = _matchDetail
 
     fun fetchMatchDetail(matchId: Int) {
+        // 1. XÓA DỮ LIỆU CŨ NGAY LẬP TỨC để tránh hiện tỉ số cũ (0-3)
+        _matchDetail.value = null
+        
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 val rawResponse = apiService.getMatchRawDetail(matchId)
                 val rawMatch = rawResponse.body()?.data
                 if (rawMatch != null) {
+                    // Nếu đang đá, ưu tiên lấy từ raw match
                     if (rawMatch.status == "ongoing" || rawMatch.status == "live") {
                         _matchDetail.value = rawMatch
                     } else {
+                        // Nếu chưa đá hoặc đã xong, lấy chi tiết đầy đủ
                         val detailResponse = apiService.getMatchDetail(matchId)
-                        if (detailResponse.isSuccessful && detailResponse.body()?.success == true) {
-                            _matchDetail.value = detailResponse.body()?.data
+                        val body = detailResponse.body()
+                        if (detailResponse.isSuccessful && body != null) {
+                            // Chấp nhận cả success == true hoặc status == "success"
+                            if (body.success == true || body.status == "success") {
+                                _matchDetail.value = body.data
+                            }
                         }
                     }
                 }
@@ -859,13 +868,41 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             try {
                 val response = apiService.createSeasonPhase(seasonId, request)
-                if (response.isSuccessful) {
-                    _message.value = "Tạo vòng đấu thành công"; fetchSeasonDetails(seasonId)
+                val body = response.body()
+                
+                if (response.isSuccessful && body != null) {
+                    if (body.success) {
+                        _message.value = "Tạo vòng đấu thành công"
+                        fetchSeasonDetails(seasonId)
+                    } else {
+                        _message.value = "Lỗi: ${body.message}"
+                    }
                 } else {
-                    _message.value = "Lỗi tạo vòng đấu: ${response.code()}"
+                    val errorMsg = response.errorBody()?.string() ?: "Mã lỗi: ${response.code()}"
+                    _message.value = "Lỗi tạo vòng đấu: $errorMsg"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun deletePhase(seasonId: Int, phaseId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.deletePhase(phaseId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Đã xóa vòng đấu thành công"
+                    fetchSeasonDetails(seasonId)
+                } else {
+                    val errorMsg = response.body()?.message ?: response.errorBody()?.string() ?: "Lỗi server"
+                    _message.value = "Xóa thất bại: $errorMsg"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -881,6 +918,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 if (response.isSuccessful && (response.body()?.success == true || response.body()?.status == "success")) {
                     _message.value = "Đã xếp lịch tự động thành công!"
                     _seasonDetail.value?.season?.id?.let { fetchSeasonDetails(it) }
+                    fetchMatches() // Cập nhật lại danh sách trận đấu tổng thể
                 } else {
                     _message.value = response.body()?.message ?: "Lỗi xếp lịch tự động"
                 }
@@ -968,7 +1006,8 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     }
                 }
 
-                _message.value = "Đã chuyển $successCount/$totalAdvancing đội vào vòng đấu mới!"
+                val targetPhaseName = if (totalAdvancing == 8) "Tứ Kết" else if (totalAdvancing == 4) "Bán Kết" else "vòng tiếp theo"
+                _message.value = "Đã chuyển thành công $successCount đội vào $targetPhaseName!"
 
                 // 3. Sau khi chuyển xong, Admin có thể nhấn "Auto Xếp Lịch" ở vòng Knockout 
                 // để hệ thống tự động random cặp đấu (bao gồm cả logic 3 đội).
@@ -1049,9 +1088,17 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     }
 
     fun removeTeamFromPhase(phaseId: Int, teamId: Int, seasonId: Int) {
+        // Cập nhật local state tức thì
+        val currentDetail = _seasonDetail.value
+        if (currentDetail != null) {
+            val updatedTeams = currentDetail.teams.map { 
+                if (it.team_id == teamId) it.copy(groupId = null) else it 
+            }
+            _seasonDetail.value = currentDetail.copy(teams = updatedTeams)
+        }
+
         viewModelScope.launch {
             try {
-                _isLoading.value = true
                 val response = apiService.removeTeamFromPhase(phaseId, teamId, seasonId)
                 val body = response.body()
 
@@ -1059,40 +1106,44 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     _message.value = "Đã xóa đội khỏi vòng đấu"
                     fetchSeasonDetails(currentSeasonId)
                 } else {
-                    // Đọc message từ body hoặc errorBody nếu thất bại
-                    val errorMsg =
-                        body?.message ?: response.errorBody()?.string() ?: "Lỗi không xác định"
+                    val errorMsg = body?.message ?: response.errorBody()?.string() ?: "Lỗi không xác định"
                     _message.value = "Thất bại: $errorMsg"
+                    fetchSeasonDetails(currentSeasonId)
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
-            } finally {
-                _isLoading.value = false
+                fetchSeasonDetails(currentSeasonId)
             }
         }
     }
 
     fun assignTeamToGroup(phaseId: Int, globalTeamId: Int, groupId: Int?) {
+        // Cập nhật local state tức thì để giao diện mượt mà (Optimistic Update)
+        val currentDetail = _seasonDetail.value
+        if (currentDetail != null) {
+            val updatedTeams = currentDetail.teams.map { 
+                if (it.team_id == globalTeamId) it.copy(groupId = groupId) else it 
+            }
+            _seasonDetail.value = currentDetail.copy(teams = updatedTeams)
+        }
+
         viewModelScope.launch {
             try {
-                _isLoading.value = true
-
-                // Gửi Global Team ID
                 val request = AddTeamRequestadmin(teamId = globalTeamId, groupId = groupId)
                 val response = apiService.addTeamToPhase(phaseId, request)
                 val body = response.body()
 
                 if (response.isSuccessful && body?.success == true) {
                     _message.value = "Di chuyển đội thành công!"
+                    fetchSeasonDetails(currentSeasonId) // Đồng bộ lại với Server
                 } else {
                     val errorMsg = body?.message ?: response.errorBody()?.string() ?: "Lỗi server"
                     _message.value = "Thất bại: $errorMsg"
+                    fetchSeasonDetails(currentSeasonId) // Rollback nếu lỗi
                 }
-                fetchSeasonDetails(currentSeasonId)
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
-            } finally {
-                _isLoading.value = false
+                fetchSeasonDetails(currentSeasonId) // Rollback
             }
         }
     }
@@ -1124,6 +1175,27 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             }
         }
 
+    }
+
+    private val _bracketData = MutableStateFlow<List<PhaseBracket>>(emptyList())
+    val bracketData: StateFlow<List<PhaseBracket>> = _bracketData.asStateFlow()
+
+    fun fetchKnockoutBracket(seasonId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.getKnockoutBracket(seasonId)
+                if (response.isSuccessful) {
+                    _bracketData.value = response.body()?.data ?: emptyList()
+                } else {
+                    _message.value = "Lỗi tải nhánh đấu: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 }
 

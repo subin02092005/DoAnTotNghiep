@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2/promise');
+const { updateGroupStandings } = require('./admin/standingsHelper');
 
 // Cấu hình pool kết nối
 const pool = mysql.createPool({
@@ -8,82 +9,118 @@ const pool = mysql.createPool({
     user: 'root',
     password: '123456',
     database: 'football_management',
-   
 });
 
 router.get('/standings', async (req, res) => {
+    const { seasonId } = req.query;
+    if (!seasonId) {
+        return res.status(400).json({ success: false, message: "Thiếu Season ID" });
+    }
+
+    let connection;
     try {
-        const { seasonId } = req.query;
-        let query = `
-            SELECT 
-                s.team_id,
-                s.group_id,
-                s.matches_played AS played,
-                s.wins AS won, 
-                s.draws AS drawn, 
-                s.losses AS lost, 
-                s.goals_for, 
-                s.goals_against, 
-                (s.goals_for - s.goals_against) AS goal_difference, 
-                s.points,
-                t.name AS team_name, 
-                g.name AS group_name,
-                p.id AS phase_id
-            FROM team_standings s
-            JOIN teams t ON s.team_id = t.id
-            JOIN \`groups\` g ON s.group_id = g.id
-            JOIN phases p ON g.phase_id = p.id
-            WHERE s.is_active = 1
-        `;
-        
-        const params = [];
-        if (seasonId) {
-            query += ` AND p.season_id = ? `;
-            params.push(seasonId);
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // 1. Lấy danh sách các bảng đấu (groups) thuộc mùa giải này
+        const [groups] = await connection.execute(
+            `SELECT g.id FROM \`groups\` g
+             JOIN phases p ON g.phase_id = p.id
+             WHERE p.season_id = ?`,
+            [seasonId]
+        );
+
+        // 2. Đảm bảo dữ liệu được khởi tạo và cập nhật
+        for (const group of groups) {
+            const [teamsInGroup] = await connection.execute(
+                `SELECT team_id FROM season_teams WHERE group_id = ? AND deleted_at IS NULL`,
+                [group.id]
+            );
+
+            for (const t of teamsInGroup) {
+                const [exists] = await connection.execute(
+                    `SELECT id FROM team_standings WHERE team_id = ? AND group_id = ?`,
+                    [t.team_id, group.id]
+                );
+                if (exists.length === 0) {
+                    await connection.execute(
+                        `INSERT INTO team_standings (team_id, group_id, position, matches_played, wins, draws, losses, goals_for, goals_against, points, is_active, created_at)
+                         VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 1, NOW())`,
+                        [t.team_id, group.id]
+                    );
+                }
+            }
+            await updateGroupStandings(connection, group.id);
         }
 
-        query += ` ORDER BY p.id ASC, g.name ASC, s.points DESC, goal_difference DESC`;
+        await connection.commit();
 
-        const [rows] = await pool.query(query, params);
+        // 3. Truy vấn dữ liệu trả về
+        const query = `
+            SELECT 
+                st.team_id,
+                st.group_id,
+                g.name AS group_name,
+                p.id AS phase_id,
+                t.name AS team_name,
+                t.logo AS team_logo,
+                COALESCE(st.matches_played, 0) AS played,
+                COALESCE(st.wins, 0) AS won,
+                COALESCE(st.draws, 0) AS drawn,
+                COALESCE(st.losses, 0) AS lost,
+                COALESCE(st.goals_for, 0) AS goals_for,
+                COALESCE(st.goals_against, 0) AS goals_against,
+                (COALESCE(st.goals_for, 0) - COALESCE(st.goals_against, 0)) AS goal_difference,
+                COALESCE(st.points, 0) AS points
+            FROM team_standings st
+            JOIN teams t ON st.team_id = t.id
+            JOIN \`groups\` g ON st.group_id = g.id
+            JOIN phases p ON g.phase_id = p.id
+            WHERE p.season_id = ? AND st.is_active = 1
+            ORDER BY p.id ASC, g.name ASC, st.points DESC, goal_difference DESC, t.name ASC
+        `;
+
+        const [rows] = await connection.query(query, [seasonId]);
         const formattedData = [];
         const groupsMap = {};
 
         for (const row of rows) {
-            // Lấy 5 trận gần nhất đã kết thúc cho đội này
-            const [recentMatches] = await pool.query(
-                `SELECT home_team_id, away_team_id, home_score, away_score 
-                 FROM matches 
-                 WHERE (home_team_id = ? OR away_team_id = ?) 
-                 AND status = 'finished' 
+            const groupKey = `${row.phase_id}_${row.group_id}`;
+
+            // Lấy 5 trận gần nhất để hiển thị phong độ
+            const [recentMatches] = await connection.query(
+                `SELECT home_team_id, away_team_id, home_score, away_score
+                 FROM matches
+                 WHERE (home_team_id = ? OR away_team_id = ?)
+                 AND status = 'finished'
                  ORDER BY played_at DESC LIMIT 5`,
                 [row.team_id, row.team_id]
             );
 
-            // Tính toán W, D, L cho đội dựa trên home_score và away_score
             const formArray = recentMatches.map(m => {
                 const isHome = (m.home_team_id === row.team_id);
                 const teamScore = isHome ? m.home_score : m.away_score;
                 const oppScore = isHome ? m.away_score : m.home_score;
-
                 if (teamScore > oppScore) return 'W';
                 if (teamScore < oppScore) return 'L';
                 return 'D';
             });
 
-            if (!groupsMap[row.group_name]) {
-                groupsMap[row.group_name] = {
+            if (!groupsMap[groupKey]) {
+                groupsMap[groupKey] = {
                     phaseId: row.phase_id,
-                    groupId: row.group_id, // Cần lấy thêm group_id
+                    groupId: row.group_id,
                     groupName: row.group_name,
                     standings: []
                 };
-                formattedData.push(groupsMap[row.group_name]);
+                formattedData.push(groupsMap[groupKey]);
             }
 
-            groupsMap[row.group_name].standings.push({
+            groupsMap[groupKey].standings.push({
                 id: row.team_id,
-                rank: groupsMap[row.group_name].standings.length + 1,
+                rank: groupsMap[groupKey].standings.length + 1,
                 teamName: row.team_name,
+                logoUrl: row.team_logo || "",
                 played: row.played,
                 won: row.won,
                 drawn: row.drawn,
@@ -96,9 +133,18 @@ router.get('/standings', async (req, res) => {
             });
         }
 
-        return res.status(200).json({ status: "success", data: formattedData });
+        return res.status(200).json({
+            success: true,
+            status: "success",
+            data: formattedData
+        });
+
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        if (connection) await connection.rollback();
+        console.error("Lỗi API Bảng xếp hạng:", error.message);
+        res.status(500).json({ success: false, message: error.message });
+    } finally {
+        if (connection) connection.release();
     }
 });
 
