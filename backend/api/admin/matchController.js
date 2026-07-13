@@ -20,11 +20,12 @@ router.get('/matchesadmin', async (req, res) => {
         let query = `
             SELECT m.id, m.phase_id, m.group_id, m.home_team_id, ht.name AS home_team_name,
                    m.away_team_id, at.name AS away_team_name, m.scheduled_at, m.played_at,
-                   m.home_score, m.away_score, m.status, m.round, m.leg, m.venue_id,
+                   m.home_score, m.away_score, m.status, m.round, m.leg, m.venue_id, v.name AS venue_name,
                    m.referee, m.season_id, m.is_published, m.created_at, m.updated_at
             FROM matches m
             LEFT JOIN teams ht ON m.home_team_id = ht.id
             LEFT JOIN teams at ON m.away_team_id = at.id
+            LEFT JOIN venues v ON m.venue_id = v.id
             WHERE m.deleted_at IS NULL AND m.is_featured = 0
         `;
         const params = [];
@@ -74,18 +75,19 @@ router.get('/matches/:id', async (req, res) => {
     try {
         const [matches] = await pool.execute(
             `SELECT m.id, m.phase_id, m.group_id, 
-                    m.home_team_id AS teamAId, 
+                    m.home_team_id,
                     ht.name AS teamA,
-                    m.away_team_id AS teamBId, 
+                    m.away_team_id,
                     at.name AS teamB, 
                     m.scheduled_at, m.played_at,
                     m.home_score AS scoreA, 
                     m.away_score AS scoreB, 
-                    m.status, m.round, m.leg, m.venue_id,
+                    m.status, m.round, m.leg, m.venue_id, v.name AS venue_name,
                     m.referee, m.season_id, m.is_published, m.created_at, m.updated_at
              FROM matches m
              LEFT JOIN teams ht ON m.home_team_id = ht.id
              LEFT JOIN teams at ON m.away_team_id = at.id
+             LEFT JOIN venues v ON m.venue_id = v.id
              WHERE m.id = ? AND m.deleted_at IS NULL`,
             [id]
         );
@@ -433,6 +435,16 @@ router.patch('/matches/:id/reschedule', async (req, res) => {
         }
 
         res.json({ success: true, message: 'Đã dời trận đấu thành công.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Lấy danh sách sân đấu
+router.get('/venues', async (req, res) => {
+    try {
+        const [rows] = await pool.execute('SELECT * FROM venues WHERE is_active = 1 AND deleted_at IS NULL');
+        res.json({ success: true, data: rows });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

@@ -338,7 +338,7 @@ data class FullMatchDetail(
     val scoreB: Int = 0,
     val time: String,
     val date: String,
-    val stadium: String,
+    @SerializedName("venue_name", alternate = ["stadium"]) val stadium: String?,
     val events: List<MatchEvent>,
     val lineupA: List<PlayerInfo>,
     val lineupB: List<PlayerInfo>,

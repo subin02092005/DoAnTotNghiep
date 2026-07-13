@@ -230,6 +230,12 @@
             @Body request: CardRequest
         ): Response<GenericEventResponse>
 
+        @POST("match-events/{matchId}/goal")
+        suspend fun addGoal(
+            @Path("matchId") matchId: Int,
+            @Body request: GoalRequest
+        ): Response<GenericEventResponse>
+
         @GET("match-events/{matchId}")
         suspend fun getMatchEvents(
             @Path("matchId") matchId: Int
@@ -352,4 +358,7 @@
 
         @GET("seasons/{seasonId}/knockout-bracket")
         suspend fun getKnockoutBracket(@Path("seasonId") seasonId: Int): Response<BracketResponse>
+
+        @GET("venues")
+        suspend fun getVenues(): Response<VenueResponse>
     }

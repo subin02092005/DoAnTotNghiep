@@ -488,13 +488,13 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
-    fun rescheduleMatch(id: Int, scheduledAt: String) {
+    fun rescheduleMatch(id: Int, scheduledAt: String, venueId: Int? = null) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 val response = apiService.rescheduleMatch(
                     id,
-                    RescheduleMatchRequest(scheduledAt = scheduledAt)
+                    RescheduleMatchRequest(scheduledAt = scheduledAt, venueId = venueId)
                 )
                 if (response.isSuccessful && response.body()?.success == true) {
                     _message.value = "Đã dời lịch thi đấu"
@@ -654,8 +654,8 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     fun addSubstitution(
         matchId: Int,
         teamId: Int,
-        playerInId: Int,
-        playerOutId: Int,
+        jerseyIn: Int,
+        jerseyOut: Int,
         minute: Int,
         period: String
     ) {
@@ -664,7 +664,13 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             try {
                 val response = apiService.addSubstitution(
                     matchId,
-                    SubstitutionRequest(teamId, playerInId, playerOutId, minute, period)
+                    SubstitutionRequest(
+                        teamId = teamId,
+                        jerseyIn = jerseyIn,
+                        jerseyOut = jerseyOut,
+                        minute = minute,
+                        period = period
+                    )
                 )
                 if (response.isSuccessful && response.body()?.success == true) {
                     _message.value = "Thay người thành công"
@@ -683,7 +689,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     fun addCard(
         matchId: Int,
         teamId: Int,
-        playerId: Int,
+        jerseyNumber: Int,
         minute: Int,
         period: String,
         isRed: Boolean,
@@ -692,7 +698,13 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val request = CardRequest(teamId, playerId, minute, period, note)
+                val request = CardRequest(
+                    teamId = teamId, 
+                    jerseyNumber = jerseyNumber, 
+                    minute = minute, 
+                    period = period, 
+                    note = note
+                )
                 val response = if (isRed) apiService.addRedCard(
                     matchId,
                     request
@@ -703,6 +715,41 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     ); fetchMatches()
                 } else {
                     _message.value = response.body()?.message ?: "Lỗi thêm thẻ"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun addGoal(
+        matchId: Int,
+        teamId: Int,
+        jerseyNumber: Int,
+        minute: Int,
+        period: String,
+        note: String? = null
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val request = GoalRequest(
+                    teamId = teamId,
+                    jerseyNumber = jerseyNumber,
+                    minute = minute,
+                    period = period,
+                    note = note
+                )
+                val response = apiService.addGoal(matchId, request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Ghi nhận bàn thắng thành công"
+                    fetchMatchEvents(matchId)
+                    fetchMatchDetail(matchId)
+                    fetchMatches()
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi ghi bàn"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
@@ -1180,6 +1227,22 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
 
     private val _bracketData = MutableStateFlow<List<PhaseBracket>>(emptyList())
     val bracketData: StateFlow<List<PhaseBracket>> = _bracketData.asStateFlow()
+
+    private val _venues = MutableStateFlow<List<VenueItem>>(emptyList())
+    val venues: StateFlow<List<VenueItem>> = _venues.asStateFlow()
+
+    fun fetchVenues() {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getVenues()
+                if (response.isSuccessful) {
+                    _venues.value = response.body()?.data ?: emptyList()
+                }
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error fetching venues", e)
+            }
+        }
+    }
 
     fun fetchKnockoutBracket(seasonId: Int) {
         viewModelScope.launch {

@@ -71,6 +71,8 @@ const [matchRows] = await pool.execute(`
             id: matchData.id,
             teamA: matchData.teamA,
             teamB: matchData.teamB,
+            home_team_id: matchData.home_team_id,
+            away_team_id: matchData.away_team_id,
             status: matchData.status,
             isStarted: matchData.status !== 'pending',
             // Đảm bảo trả về 0 nếu tỉ số trong database là null

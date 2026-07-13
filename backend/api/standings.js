@@ -137,7 +137,7 @@ router.get('/standings', async (req, res) => {
             JOIN \`groups\` g ON st.group_id = g.id
             JOIN phases p ON g.phase_id = p.id
             WHERE p.season_id = ? AND st.is_active = 1
-            ORDER BY p.id ASC, g.name ASC, st.points DESC, goal_difference DESC, t.name ASC
+            ORDER BY p.id ASC, g.name ASC, st.points DESC, goal_difference DESC, st.goals_for DESC, t.name ASC
         `;
 
         const [rows] = await connection.query(query, [seasonId]);

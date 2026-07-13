@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.SportsFootball
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -304,7 +305,7 @@ fun MatchScheduleManagementScreen(viewModel: AdminViewModel, onManageMatch: (Int
                             onToggleFeatured = { viewModel.toggleFeatured(match.id, match.isFeatured == 0) },
                             onManage = { onManageMatch(match.id) },
                             onCancel = { viewModel.cancelMatch(match.id) },
-                            onReschedule = { newTime -> viewModel.rescheduleMatch(match.id, newTime) }
+                            onReschedule = { newTime, newVenueId -> viewModel.rescheduleMatch(match.id, newTime, newVenueId) }
                         )
                     }
                 }
@@ -331,7 +332,7 @@ fun MatchAdminCard(
     onToggleFeatured: () -> Unit,
     onManage: () -> Unit,
     onCancel: () -> Unit,
-    onReschedule: (String) -> Unit
+    onReschedule: (String, Int?) -> Unit
 ) {
     var showRescheduleDialog by remember { mutableStateOf(false) }
 
@@ -388,6 +389,13 @@ fun MatchAdminCard(
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
+                    match.venueName?.let {
+                        Text(
+                            text = "Sân đấu: $it",
+                            color = Color.Gray,
+                            fontSize = 12.sp
+                        )
+                    }
                     Text(
                         text = "Trạng thái: ${match.status.uppercase()}",
                         color = when(match.status) {
@@ -462,9 +470,10 @@ fun MatchAdminCard(
     if (showRescheduleDialog) {
         RescheduleDialog(
             currentDateTime = match.scheduledAt,
+            currentVenueId = match.venueId,
             onDismiss = { showRescheduleDialog = false },
-            onConfirm = { newTime ->
-                onReschedule(newTime)
+            onConfirm = { newTime, newVenueId ->
+                onReschedule(newTime, newVenueId)
                 showRescheduleDialog = false
             }
         )
@@ -477,6 +486,7 @@ fun AddMatchDialog(onDismiss: () -> Unit, onConfirm: (CreateMatchRequest) -> Uni
     var awayId by remember { mutableStateOf("") }
     var dateTime by remember { mutableStateOf("2025-06-01 19:00:00") }
     var seasonId by remember { mutableStateOf("") }
+    var venueId by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -487,6 +497,7 @@ fun AddMatchDialog(onDismiss: () -> Unit, onConfirm: (CreateMatchRequest) -> Uni
                 OutlinedTextField(value = awayId, onValueChange = { awayId = it }, label = { Text("ID Đội khách") })
                 OutlinedTextField(value = dateTime, onValueChange = { dateTime = it }, label = { Text("Thời gian (YYYY-MM-DD HH:MM:SS)") })
                 OutlinedTextField(value = seasonId, onValueChange = { seasonId = it }, label = { Text("ID Mùa giải") })
+                OutlinedTextField(value = venueId, onValueChange = { venueId = it }, label = { Text("ID Sân đấu") })
             }
         },
         confirmButton = {
@@ -495,7 +506,8 @@ fun AddMatchDialog(onDismiss: () -> Unit, onConfirm: (CreateMatchRequest) -> Uni
                     homeTeamId = homeId.toIntOrNull() ?: 0,
                     awayTeamId = awayId.toIntOrNull() ?: 0,
                     scheduledAt = dateTime,
-                    seasonId = seasonId.toIntOrNull()
+                    seasonId = seasonId.toIntOrNull(),
+                    venueId = venueId.toIntOrNull()
                 ))
             }) {
                 Text("Tạo")
@@ -508,8 +520,14 @@ fun AddMatchDialog(onDismiss: () -> Unit, onConfirm: (CreateMatchRequest) -> Uni
 }
 
 @Composable
-fun RescheduleDialog(currentDateTime: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+fun RescheduleDialog(
+    currentDateTime: String, 
+    currentVenueId: Int?, 
+    onDismiss: () -> Unit, 
+    onConfirm: (String, Int?) -> Unit
+) {
     var newDateTime by remember { mutableStateOf(currentDateTime) }
+    var newVenueId by remember { mutableStateOf(currentVenueId?.toString() ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -518,10 +536,12 @@ fun RescheduleDialog(currentDateTime: String, onDismiss: () -> Unit, onConfirm: 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Nhập thời gian mới:")
                 OutlinedTextField(value = newDateTime, onValueChange = { newDateTime = it }, label = { Text("YYYY-MM-DD HH:MM:SS") })
+                Text("Nhập ID sân đấu mới:")
+                OutlinedTextField(value = newVenueId, onValueChange = { newVenueId = it }, label = { Text("ID Sân đấu") })
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(newDateTime) }) {
+            Button(onClick = { onConfirm(newDateTime, newVenueId.toIntOrNull()) }) {
                 Text("Cập nhật")
             }
         },
@@ -1122,6 +1142,10 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
     var selectedPhaseForTeam by remember { mutableStateOf<PhaseItem?>(null) }
     var showAutoScheduleDialog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        viewModel.fetchVenues()
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         val unassignedTeams = allTeams.filter { it.groupId == null }
         
@@ -1312,8 +1336,10 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
     }
 
     if (showAutoScheduleDialog) {
+        val venues by viewModel.venues.collectAsState()
         AutoSchedulePhaseSelectorDialog(
             phases = phases,
+            venues = venues,
             seasonStartDate = seasonDetail?.season?.startDate,
             onDismiss = { showAutoScheduleDialog = false },
             onConfirm = { phaseId, options ->
@@ -1669,13 +1695,21 @@ fun AddPhaseDialog(onDismiss: () -> Unit, onConfirm: (CreatePhaseRequest) -> Uni
 }
 
 @Composable
-fun AutoSchedulePhaseSelectorDialog(phases: List<PhaseItem>, seasonStartDate: String?, onDismiss: () -> Unit, onConfirm: (Int, ScheduleOptionsRequest) -> Unit) {
+fun AutoSchedulePhaseSelectorDialog(
+    phases: List<PhaseItem>, 
+    venues: List<VenueItem>,
+    seasonStartDate: String?, 
+    onDismiss: () -> Unit, 
+    onConfirm: (Int, ScheduleOptionsRequest) -> Unit
+) {
     var selectedPhaseId by remember { mutableIntStateOf(-1) }
     var isAutoDate by remember { mutableStateOf(true) }
     var isAutoTime by remember { mutableStateOf(true) }
     var startDate by remember(seasonStartDate) { mutableStateOf(seasonStartDate?.split("T")?.get(0) ?: "2025-06-01") }
     var startTime by remember { mutableStateOf("18:00") }
     var intervalHours by remember { mutableIntStateOf(2) }
+    
+    val selectedVenueIds = remember { mutableStateListOf<Int>() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1694,7 +1728,34 @@ fun AutoSchedulePhaseSelectorDialog(phases: List<PhaseItem>, seasonStartDate: St
                         }
                     }
                 }
+                
                 Spacer(modifier = Modifier.height(16.dp))
+                Text("2. Chọn danh sách sân đấu:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NeonGreen)
+                if (venues.isEmpty()) {
+                    Text("Không có sân đấu nào được tìm thấy", color = Color.Gray, fontSize = 12.sp)
+                }
+                venues.forEach { venue ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically, 
+                        modifier = Modifier.fillMaxWidth().clickable { 
+                            if (selectedVenueIds.contains(venue.id)) selectedVenueIds.remove(venue.id)
+                            else selectedVenueIds.add(venue.id)
+                        }.padding(vertical = 4.dp)
+                    ) {
+                        Checkbox(
+                            checked = selectedVenueIds.contains(venue.id), 
+                            onCheckedChange = { 
+                                if (it) selectedVenueIds.add(venue.id)
+                                else selectedVenueIds.remove(venue.id)
+                            },
+                            colors = CheckboxDefaults.colors(checkedColor = NeonGreen)
+                        )
+                        Text(venue.name, color = Color.White, fontSize = 14.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("3. Thời gian:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NeonGreen)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = isAutoDate, onCheckedChange = { isAutoDate = it }, colors = CheckboxDefaults.colors(checkedColor = NeonGreen))
                     Text("Tự động chọn ngày", color = Color.White, fontSize = 12.sp)
@@ -1706,7 +1767,7 @@ fun AutoSchedulePhaseSelectorDialog(phases: List<PhaseItem>, seasonStartDate: St
                 }
                 if (!isAutoTime) OutlinedTextField(value = startTime, onValueChange = { startTime = it }, label = { Text("Giờ bắt đầu") }, modifier = Modifier.fillMaxWidth(), textStyle = TextStyle(color = Color.White))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("3. Khoảng cách (giờ):", color = NeonGreen)
+                Text("4. Khoảng cách (giờ):", color = NeonGreen)
                 Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (1..10).forEach { hour ->
                         FilterChip(selected = intervalHours == hour, onClick = { intervalHours = hour }, label = { Text(hour.toString()) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = NeonGreen, labelColor = Color.White, selectedLabelColor = Color.Black))
@@ -1715,7 +1776,21 @@ fun AutoSchedulePhaseSelectorDialog(phases: List<PhaseItem>, seasonStartDate: St
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(selectedPhaseId, ScheduleOptionsRequest(startDate = if (isAutoDate) null else startDate, startTime = if (isAutoTime) null else startTime, intervalHours = intervalHours)) }, enabled = selectedPhaseId != -1, colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)) {
+            Button(
+                onClick = { 
+                    onConfirm(
+                        selectedPhaseId, 
+                        ScheduleOptionsRequest(
+                            startDate = if (isAutoDate) null else startDate, 
+                            startTime = if (isAutoTime) null else startTime, 
+                            intervalHours = intervalHours,
+                            venueIds = if (selectedVenueIds.isEmpty()) null else selectedVenueIds.toList()
+                        )
+                    ) 
+                }, 
+                enabled = selectedPhaseId != -1, 
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            ) {
                 Text("Chạy tự động", color = Color.Black)
             }
         },
@@ -2079,8 +2154,10 @@ fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: 
     val events by viewModel.matchEvents.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     var showScoreDialog by remember { mutableStateOf(false) }
+    var showGoalDialog by remember { mutableStateOf(false) }
     var showSubDialog by remember { mutableStateOf(false) }
     var showCardDialog by remember { mutableStateOf(false) }
+    var initialIsTeamAForGoal by remember { mutableStateOf(true) }
 
     LaunchedEffect(matchId) { viewModel.fetchMatchDetail(matchId); viewModel.fetchMatchEvents(matchId) }
 
@@ -2093,20 +2170,96 @@ fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: 
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
                 matchDetail?.let { match ->
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A))) {
-                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(match.teamA, color = Color.White); Text("${match.scoreA}", color = NeonGreen, fontSize = 32.sp) }
-                                Text("VS", color = Color.Gray)
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(match.teamB, color = Color.White); Text("${match.scoreB}", color = NeonGreen, fontSize = 32.sp) }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
+                        border = BorderStroke(1.dp, Color(0xFF333333))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Đội A
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(match.teamA, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                    Text("${match.scoreA}", color = NeonGreen, fontSize = 48.sp, fontWeight = FontWeight.Black)
+                                    Button(
+                                        onClick = { 
+                                            initialIsTeamAForGoal = true
+                                            showGoalDialog = true 
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("GHI BÀN +1", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                Text("VS", color = Color.Gray, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
+
+                                // Đội B
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(match.teamB, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                    Text("${match.scoreB}", color = NeonGreen, fontSize = 48.sp, fontWeight = FontWeight.Black)
+                                    Button(
+                                        onClick = { 
+                                            initialIsTeamAForGoal = false
+                                            showGoalDialog = true 
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("GHI BÀN +1", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
-                            Button(onClick = { showScoreDialog = true }, colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)) { Text("Cập nhật tỉ số", color = Color.Black) }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            TextButton(onClick = { showScoreDialog = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Sửa tỉ số thủ công", color = Color.Gray, fontSize = 12.sp)
+                            }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { showSubDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) { Text("Thay người") }
-                        Button(onClick = { showCardDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) { Text("Thẻ phạt") }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = { showSubDialog = true }, 
+                            modifier = Modifier.weight(1f), 
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF252525)),
+                            border = BorderStroke(1.dp, Color.Gray)
+                        ) { 
+                            Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Thay người") 
+                        }
+                        Button(
+                            onClick = { showCardDialog = true }, 
+                            modifier = Modifier.weight(1f), 
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF252525)),
+                            border = BorderStroke(1.dp, Color.Gray)
+                        ) { 
+                            Icon(Icons.Default.Style, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Thẻ phạt") 
+                        }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -2117,23 +2270,254 @@ fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: 
         }
     }
     if (showScoreDialog && matchDetail != null) UpdateScoreDialog(currentScoreA = matchDetail!!.scoreA, currentScoreB = matchDetail!!.scoreB, onDismiss = { showScoreDialog = false }, onConfirm = { home, away -> viewModel.updateScore(matchId, home, away); showScoreDialog = false })
+    if (showGoalDialog && matchDetail != null) GoalDialog(
+        matchDetail = matchDetail!!, 
+        initialIsTeamA = initialIsTeamAForGoal,
+        onDismiss = { showGoalDialog = false }, 
+        onConfirm = { teamId, jersey, min, period -> viewModel.addGoal(matchId, teamId, jersey, min, period); showGoalDialog = false }
+    )
     if (showSubDialog && matchDetail != null) SubstitutionDialog(matchDetail = matchDetail!!, onDismiss = { showSubDialog = false }, onConfirm = { teamId, pIn, pOut, min, period -> viewModel.addSubstitution(matchId, teamId, pIn, pOut, min, period); showSubDialog = false })
     if (showCardDialog && matchDetail != null) CardDialog(matchDetail = matchDetail!!, onDismiss = { showCardDialog = false }, onConfirm = { teamId, playerId, min, period, isRed -> viewModel.addCard(matchId, teamId, playerId, min, period, isRed); showCardDialog = false })
 }
 
 @Composable
 fun EventAdminItem(event: MatchEventDetailed, onDelete: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF121212))) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(36.dp).background(NeonGreen.copy(alpha = 0.2f), RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) { Text("${event.minute}'", color = NeonGreen, fontWeight = FontWeight.Bold) }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(event.type, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(event.playerName ?: "", color = Color.Gray, fontSize = 12.sp)
+    val eventColor = when (event.type) {
+        "goal" -> Color(0xFFFFD700) // Vàng Gold cho bàn thắng
+        "yellow_card" -> Color.Yellow
+        "red_card", "second_yellow" -> Color.Red
+        "substitution_in", "substitution_out" -> NeonGreen
+        else -> Color.White
+    }
+
+    val eventTitle = when (event.type) {
+        "goal" -> "BÀN THẮNG ⚽"
+        "yellow_card" -> "THẺ VÀNG"
+        "red_card" -> "THẺ ĐỎ"
+        "second_yellow" -> "THẺ ĐỎ (2 THẺ VÀNG)"
+        "substitution_in" -> "THAY NGƯỜI (VÀO)"
+        "substitution_out" -> "THAY NGƯỜI (RA)"
+        else -> event.type.uppercase()
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
+        border = BorderStroke(0.5.dp, Color(0xFF333333))
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(eventColor.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                    .border(1.dp, eventColor.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${event.minute}'",
+                    color = eventColor,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp
+                )
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red) }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = when {
+                            event.type == "goal" -> Icons.Default.SportsFootball
+                            event.type.contains("card") -> Icons.Default.Style
+                            event.type.contains("sub") -> Icons.Default.Sync
+                            else -> Icons.Default.Info
+                        },
+                        contentDescription = null,
+                        tint = eventColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = eventTitle,
+                        color = eventColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "• ${event.teamName ?: ""}",
+                        color = Color.Gray,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                val detailText = when (event.type) {
+                    "substitution_in" -> {
+                        if (event.subOutPlayerName != null) {
+                            "Vào: ${event.playerName} \nRa: ${event.subOutPlayerName}"
+                        } else {
+                            "Vào sân: ${event.playerName}"
+                        }
+                    }
+                    "substitution_out" -> "Rời sân: ${event.playerName}"
+                    else -> "Cầu thủ: ${event.playerName ?: "N/A"}"
+                }
+
+                Text(
+                    text = detailText,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 18.sp
+                )
+                
+                if (!event.note.isNullOrBlank()) {
+                    Text(
+                        text = "Ghi chú: ${event.note}",
+                        color = Color.LightGray,
+                        fontSize = 11.sp,
+                        style = TextStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.background(Color.Red.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.Red,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
+}
+
+@Composable
+fun GoalDialog(
+    matchDetail: FullMatchDetail, 
+    initialIsTeamA: Boolean,
+    onDismiss: () -> Unit, 
+    onConfirm: (Int, Int, Int, String) -> Unit
+) {
+    var isTeamASelected by remember(initialIsTeamA) { mutableStateOf(initialIsTeamA) }
+    var jerseyNumber by remember { mutableStateOf("") }
+    var minute by remember { mutableStateOf("1") }
+    var period by remember { mutableStateOf("first_half") }
+    var expandedPeriod by remember { mutableStateOf(false) }
+
+    val periods = mapOf(
+        "first_half" to "Hiệp 1",
+        "second_half" to "Hiệp 2",
+        "extra_time_first" to "Hiệp phụ 1",
+        "extra_time_second" to "Hiệp phụ 2",
+        "penalty_shootout" to "Loạt sút luân lưu"
+    )
+
+    val selectedTeamId = if (isTeamASelected) matchDetail.teamAId else matchDetail.teamBId
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ghi nhận bàn thắng ⚽", color = Color.White, fontWeight = FontWeight.Bold) },
+        containerColor = NeonSurface,
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { isTeamASelected = true }
+                    ) {
+                        RadioButton(selected = isTeamASelected, onClick = { isTeamASelected = true }, colors = RadioButtonDefaults.colors(selectedColor = NeonGreen))
+                        Text(matchDetail.teamA, color = Color.White, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.width(24.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { isTeamASelected = false }
+                    ) {
+                        RadioButton(selected = !isTeamASelected, onClick = { isTeamASelected = false }, colors = RadioButtonDefaults.colors(selectedColor = NeonGreen))
+                        Text(matchDetail.teamB, color = Color.White, fontSize = 14.sp)
+                    }
+                }
+
+                // Chọn hiệp đấu
+                Box {
+                    OutlinedButton(
+                        onClick = { expandedPeriod = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, Color.Gray)
+                    ) {
+                        Text(periods[period] ?: "Chọn hiệp", color = Color.White)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White)
+                    }
+                    DropdownMenu(
+                        expanded = expandedPeriod,
+                        onDismissRequest = { expandedPeriod = false },
+                        modifier = Modifier.background(NeonSurface)
+                    ) {
+                        periods.forEach { (key, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = Color.White) },
+                                onClick = {
+                                    period = key
+                                    expandedPeriod = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = jerseyNumber,
+                    onValueChange = { jerseyNumber = it.filter { it.isDigit() } },
+                    label = { Text("Số áo cầu thủ ghi bàn") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = minute,
+                    onValueChange = { minute = it.filter { it.isDigit() } },
+                    label = { Text("Phút ghi bàn") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    if (jerseyNumber.isNotBlank()) {
+                        onConfirm(selectedTeamId, jerseyNumber.toIntOrNull() ?: 0, minute.toIntOrNull() ?: 0, period) 
+                    }
+                },
+                enabled = jerseyNumber.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            ) {
+                Text("Xác nhận", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy", color = NeonGray) }
+        }
+    )
 }
 
 @Composable
@@ -2151,42 +2535,258 @@ fun UpdateScoreDialog(currentScoreA: Int, currentScoreB: Int, onDismiss: () -> U
 
 @Composable
 fun SubstitutionDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, String) -> Unit) {
-    var selectedTeamId by remember { mutableIntStateOf(matchDetail.teamAId) }
-    var playerInId by remember { mutableIntStateOf(0) }
-    var playerOutId by remember { mutableIntStateOf(0) }
+    var isTeamASelected by remember { mutableStateOf(true) }
+    var jerseyIn by remember { mutableStateOf("") }
+    var jerseyOut by remember { mutableStateOf("") }
     var minute by remember { mutableStateOf("45") }
-    var period by remember { mutableStateOf("1") }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Thay người") }, text = {
-        Column {
-            Row {
-                RadioButton(selected = selectedTeamId == matchDetail.teamAId, onClick = { selectedTeamId = matchDetail.teamAId }); Text(matchDetail.teamA)
-                RadioButton(selected = selectedTeamId == matchDetail.teamBId, onClick = { selectedTeamId = matchDetail.teamBId }); Text(matchDetail.teamB)
+    var period by remember { mutableStateOf("first_half") }
+    var expandedPeriod by remember { mutableStateOf(false) }
+
+    val periods = mapOf(
+        "first_half" to "Hiệp 1",
+        "second_half" to "Hiệp 2",
+        "extra_time_first" to "Hiệp phụ 1",
+        "extra_time_second" to "Hiệp phụ 2",
+        "penalty_shootout" to "Loạt sút luân lưu"
+    )
+
+    val selectedTeamId = if (isTeamASelected) matchDetail.teamAId else matchDetail.teamBId
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Thay người", color = Color.White, fontWeight = FontWeight.Bold) },
+        containerColor = NeonSurface,
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { isTeamASelected = true }
+                    ) {
+                        RadioButton(
+                            selected = isTeamASelected,
+                            onClick = { isTeamASelected = true },
+                            colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
+                        )
+                        Text(matchDetail.teamA, color = Color.White, fontSize = 14.sp)
+                    }
+
+                    Spacer(modifier = Modifier.width(24.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { isTeamASelected = false }
+                    ) {
+                        RadioButton(
+                            selected = !isTeamASelected,
+                            onClick = { isTeamASelected = false },
+                            colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
+                        )
+                        Text(matchDetail.teamB, color = Color.White, fontSize = 14.sp)
+                    }
+                }
+
+                // Chọn hiệp đấu
+                Box {
+                    OutlinedButton(
+                        onClick = { expandedPeriod = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, Color.Gray)
+                    ) {
+                        Text(periods[period] ?: "Chọn hiệp", color = Color.White)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White)
+                    }
+                    DropdownMenu(
+                        expanded = expandedPeriod,
+                        onDismissRequest = { expandedPeriod = false },
+                        modifier = Modifier.background(NeonSurface)
+                    ) {
+                        periods.forEach { (key, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = Color.White) },
+                                onClick = {
+                                    period = key
+                                    expandedPeriod = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = minute,
+                    onValueChange = { minute = it.filter { it.isDigit() } },
+                    label = { Text("Phút thi đấu") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = jerseyIn,
+                    onValueChange = { jerseyIn = it.filter { it.isDigit() } },
+                    label = { Text("Số áo cầu thủ VÀO") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = jerseyOut,
+                    onValueChange = { jerseyOut = it.filter { it.isDigit() } },
+                    label = { Text("Số áo cầu thủ RA") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-            OutlinedTextField(value = minute, onValueChange = { minute = it }, label = { Text("Phút") })
-            OutlinedTextField(value = playerInId.toString(), onValueChange = { playerInId = it.toIntOrNull() ?: 0 }, label = { Text("ID Cầu thủ VÀO") })
-            OutlinedTextField(value = playerOutId.toString(), onValueChange = { playerOutId = it.toIntOrNull() ?: 0 }, label = { Text("ID Cầu thủ RA") })
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    if (jerseyIn.isNotBlank() && jerseyOut.isNotBlank()) {
+                        onConfirm(selectedTeamId, jerseyIn.toInt(), jerseyOut.toInt(), minute.toIntOrNull() ?: 0, period) 
+                    }
+                },
+                enabled = jerseyIn.isNotBlank() && jerseyOut.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            ) {
+                Text("Thêm", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy", color = NeonGray) }
         }
-    }, confirmButton = { Button(onClick = { onConfirm(selectedTeamId, playerInId, playerOutId, minute.toIntOrNull() ?: 0, period) }) { Text("Thêm") } })
+    )
 }
 
 @Composable
 fun CardDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (Int, Int, Int, String, Boolean) -> Unit) {
-    var selectedTeamId by remember { mutableIntStateOf(matchDetail.teamAId) }
-    var playerId by remember { mutableIntStateOf(0) }
+    var isTeamASelected by remember { mutableStateOf(true) }
+    var jerseyNumber by remember { mutableStateOf("") }
     var minute by remember { mutableStateOf("45") }
-    var period by remember { mutableStateOf("1") }
+    var period by remember { mutableStateOf("first_half") }
+    var expandedPeriod by remember { mutableStateOf(false) }
     var isRed by remember { mutableStateOf(false) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Thẻ phạt") }, text = {
-        Column {
-            Row {
-                RadioButton(selected = selectedTeamId == matchDetail.teamAId, onClick = { selectedTeamId = matchDetail.teamAId }); Text(matchDetail.teamA)
-                RadioButton(selected = selectedTeamId == matchDetail.teamBId, onClick = { selectedTeamId = matchDetail.teamBId }); Text(matchDetail.teamB)
+
+    val periods = mapOf(
+        "first_half" to "Hiệp 1",
+        "second_half" to "Hiệp 2",
+        "extra_time_first" to "Hiệp phụ 1",
+        "extra_time_second" to "Hiệp phụ 2",
+        "penalty_shootout" to "Loạt sút luân lưu"
+    )
+
+    val selectedTeamId = if (isTeamASelected) matchDetail.teamAId else matchDetail.teamBId
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Thẻ phạt", color = Color.White, fontWeight = FontWeight.Bold) },
+        containerColor = NeonSurface,
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { isTeamASelected = true }
+                    ) {
+                        RadioButton(
+                            selected = isTeamASelected,
+                            onClick = { isTeamASelected = true },
+                            colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
+                        )
+                        Text(matchDetail.teamA, color = Color.White, fontSize = 14.sp)
+                    }
+
+                    Spacer(modifier = Modifier.width(24.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { isTeamASelected = false }
+                    ) {
+                        RadioButton(
+                            selected = !isTeamASelected,
+                            onClick = { isTeamASelected = false },
+                            colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
+                        )
+                        Text(matchDetail.teamB, color = Color.White, fontSize = 14.sp)
+                    }
+                }
+
+                // Chọn hiệp đấu
+                Box {
+                    OutlinedButton(
+                        onClick = { expandedPeriod = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, Color.Gray)
+                    ) {
+                        Text(periods[period] ?: "Chọn hiệp", color = Color.White)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White)
+                    }
+                    DropdownMenu(
+                        expanded = expandedPeriod,
+                        onDismissRequest = { expandedPeriod = false },
+                        modifier = Modifier.background(NeonSurface)
+                    ) {
+                        periods.forEach { (key, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = Color.White) },
+                                onClick = {
+                                    period = key
+                                    expandedPeriod = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = jerseyNumber,
+                    onValueChange = { jerseyNumber = it.filter { char -> char.isDigit() } },
+                    label = { Text("Số áo cầu thủ") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = minute,
+                    onValueChange = { minute = it.filter { char -> char.isDigit() } },
+                    label = { Text("Phút thi đấu") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { isRed = !isRed }
+                ) {
+                    Checkbox(
+                        checked = isRed,
+                        onCheckedChange = { isRed = it },
+                        colors = CheckboxDefaults.colors(checkedColor = NeonRed)
+                    )
+                    Text("Thẻ đỏ trực tiếp", color = Color.White)
+                }
             }
-            OutlinedTextField(value = playerId.toString(), onValueChange = { playerId = it.toIntOrNull() ?: 0 }, label = { Text("ID Cầu thủ") })
-            OutlinedTextField(value = minute, onValueChange = { minute = it }, label = { Text("Phút") })
-            Row { Checkbox(checked = isRed, onCheckedChange = { isRed = it }); Text("Thẻ đỏ") }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (jerseyNumber.isNotBlank()) {
+                        onConfirm(selectedTeamId, jerseyNumber.toIntOrNull() ?: 0, minute.toIntOrNull() ?: 0, period, isRed)
+                    }
+                },
+                enabled = jerseyNumber.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            ) {
+                Text("Thêm", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy", color = NeonGray) }
         }
-    }, confirmButton = { Button(onClick = { onConfirm(selectedTeamId, playerId, minute.toIntOrNull() ?: 0, period, isRed) }) { Text("Thêm") } })
+    )
 }
 
 @Composable

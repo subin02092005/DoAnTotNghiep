@@ -152,6 +152,9 @@ fun ScheduleTabContent(
                                             Text(DateUtils.formatDate(match.date), color = Color.LightGray, fontSize = 9.sp)
                                         }
                                     }
+                                    match.stadium?.let {
+                                        Text(it, color = Color.Gray, fontSize = 8.sp, maxLines = 1)
+                                    }
                                 }
                             }
 

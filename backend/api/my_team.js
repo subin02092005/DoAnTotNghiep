@@ -416,16 +416,17 @@ router.post('/register_to_season', async (req, res) => {
             return res.status(400).json({ status: "error", message: "Bạn đã đăng ký một giải đấu khác rồi, vui lòng hủy giải cũ trước!" });
         }
 
-        // 3. Kiểm tra xem đội đã đăng ký VÀO CHÍNH GIẢI NÀY chưa
+        // 3. Kiểm tra xem đội đã đăng ký VÀO CHÍNH GIẢI NÀY chưa (kiểm tra cả bản ghi cũ)
         const [existing] = await pool.query(
-            "SELECT id FROM season_teams WHERE team_id = ? AND season_id = ? AND is_active = 1",
+            "SELECT id, is_active FROM season_teams WHERE team_id = ? AND season_id = ?",
             [team_id, season_id]
         );
-        if (existing.length > 0) {
+
+        if (existing.length > 0 && existing[0].is_active === 1) {
             return res.status(400).json({ status: "error", message: "Đội bóng đã đăng ký giải này rồi!" });
         }
 
-        // 4. Kiểm tra số lượng đội
+        // 4. Kiểm tra số lượng đội (chỉ đếm đội đang active)
         const [count] = await pool.query(
             "SELECT COUNT(*) as total FROM season_teams WHERE season_id = ? AND is_active = 1",
             [season_id]
@@ -434,8 +435,7 @@ router.post('/register_to_season', async (req, res) => {
             return res.status(400).json({ status: "error", message: "Giải đấu đã đủ số lượng đội!" });
         }
 
-        // 5. Bắt đầu Transaction để tạo đồng thời season_team và record payment
-       // 5. Bắt đầu Transaction
+        // 5. Bắt đầu Transaction
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
@@ -451,7 +451,7 @@ router.post('/register_to_season', async (req, res) => {
                 [season_team_id]
             );
         } else {
-            // Đội chưa từng đăng ký giải này -> Thêm mới hoàn toàn
+            // Đội chưa từng đăng ký giải này -> Thêm mới hoàn toàn với status = 'active'
             const [insertResult] = await connection.query(
                 "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at) VALUES (?, ?, 'active', 1, NOW())",
                 [season_id, team_id]

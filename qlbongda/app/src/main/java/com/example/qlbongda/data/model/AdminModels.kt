@@ -112,6 +112,7 @@ data class AdminMatchItem(
     val round: Int?,
     val leg: Int?,
     @SerializedName("venue_id") val venueId: Int?,
+    @SerializedName("venue_name") val venueName: String?,
     val referee: String?,
     @SerializedName("season_id") val seasonId: Int?,
     @SerializedName("is_published") val isPublished: Int,
@@ -199,15 +200,27 @@ data class UpdateScoreRequest(
 
 data class SubstitutionRequest(
     @SerializedName("team_id") val teamId: Int,
-    @SerializedName("player_in_id") val playerInId: Int,
-    @SerializedName("player_out_id") val playerOutId: Int,
+    @SerializedName("player_in_id") val playerInId: Int? = null,
+    @SerializedName("player_out_id") val playerOutId: Int? = null,
+    @SerializedName("jersey_in") val jerseyIn: Int? = null,
+    @SerializedName("jersey_out") val jerseyOut: Int? = null,
     val minute: Int,
     val period: String
 )
 
 data class CardRequest(
     @SerializedName("team_id") val teamId: Int,
-    @SerializedName("player_id") val playerId: Int,
+    @SerializedName("player_id") val playerId: Int? = null,
+    @SerializedName("jersey_number") val jerseyNumber: Int? = null,
+    val minute: Int,
+    val period: String,
+    val note: String? = null
+)
+
+data class GoalRequest(
+    @SerializedName("team_id") val teamId: Int,
+    @SerializedName("player_id") val playerId: Int? = null,
+    @SerializedName("jersey_number") val jerseyNumber: Int? = null,
     val minute: Int,
     val period: String,
     val note: String? = null
@@ -397,7 +410,21 @@ data class ScheduleOptionsRequest(
     @SerializedName("interval_hours") val intervalHours: Int? = 2,
     @SerializedName("interval_minutes") val intervalMinutes: Int? = 0,
     @SerializedName("teamIds") val teamIds: List<Int>? = null,
-    @SerializedName("phaseId") val phaseId: Int? = null // For season-level API
+    @SerializedName("phaseId") val phaseId: Int? = null, // For season-level API
+    @SerializedName("venueIds") val venueIds: List<Int>? = null
+)
+
+data class VenueItem(
+    val id: Int,
+    val name: String,
+    val address: String?,
+    @SerializedName("is_active") val isActive: Int
+)
+
+data class VenueResponse(
+    val success: Boolean,
+    val data: List<VenueItem>? = null,
+    val message: String? = null
 )
 
 data class AutoImportAndScheduleRequest(

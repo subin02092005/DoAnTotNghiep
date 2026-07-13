@@ -438,7 +438,7 @@ router.get('/seasons/:seasonId/phases', async (req, res) => {
 router.post('/phases/:phaseId/generate-schedule', async (req, res) => {
     try {
         const phaseId = req.params.phaseId;
-        const { start_date, start_time, interval_hours, interval_minutes, teamIds } = req.body || {};
+        const { start_date, start_time, interval_hours, interval_minutes, teamIds, venueIds } = req.body || {};
 
         const connection = await mysql.createConnection(dbConfig);
         try {
@@ -452,7 +452,7 @@ router.post('/phases/:phaseId/generate-schedule', async (req, res) => {
             try { await connection.end(); } catch (_) {}
         }
 
-        const result = await generateScheduleForPhase(phaseId, { start_date, start_time, interval_hours, interval_minutes });
+        const result = await generateScheduleForPhase(phaseId, { start_date, start_time, interval_hours, interval_minutes, venueIds });
         return res.status(200).json({ 
             status: 'success', 
             message: `Đã tự động xếp thành công ${result.matchesCreated} trận đấu!`, 
@@ -466,7 +466,7 @@ router.post('/phases/:phaseId/generate-schedule', async (req, res) => {
 
 router.post('/seasons/:seasonId/auto-import-teams-and-schedule', async (req, res) => {
     const seasonId = req.params.seasonId;
-    const { phaseId, teamIds, start_date, start_time, interval_hours, interval_minutes } = req.body || {};
+    const { phaseId, teamIds, start_date, start_time, interval_hours, interval_minutes, venueIds } = req.body || {};
 
     if (!seasonId) {
         return res.status(400).json({ status: 'error', message: 'Thiếu seasonId' });
@@ -494,7 +494,7 @@ router.post('/seasons/:seasonId/auto-import-teams-and-schedule', async (req, res
             try { await connection.end(); } catch (_) {}
         }
 
-        const result = await generateScheduleForPhase(targetPhaseId, { start_date, start_time, interval_hours, interval_minutes });
+        const result = await generateScheduleForPhase(targetPhaseId, { start_date, start_time, interval_hours, interval_minutes, venueIds });
 
         return res.status(200).json({
             status: 'success',
@@ -713,7 +713,7 @@ router.post('/phases/:phaseId/add-team', async (req, res) => {
 });
 // Reusable function to generate schedule for a phase
 async function generateScheduleForPhase(phaseId, options = {}) {
-    const { start_date, start_time, interval_hours, interval_minutes } = options;
+    const { start_date, start_time, interval_hours, interval_minutes, venueIds } = options;
    
     let connection;
     try {
@@ -768,6 +768,8 @@ async function generateScheduleForPhase(phaseId, options = {}) {
 
         const intervalMs = ((interval_hours || 2) * 60 + (interval_minutes || 0)) * 60 * 1000;
 
+        const venues = Array.isArray(venueIds) && venueIds.length > 0 ? venueIds : [null];
+
         // --- XỬ LÝ VÒNG TRÒN (ROUND ROBIN) ---
         if (phase.format === 'round_robin') {
             for (const group of groups) {
@@ -785,10 +787,12 @@ async function generateScheduleForPhase(phaseId, options = {}) {
 
                 for (const matchInfo of randomizedSchedule) {
                     const matchDate = new Date(baseDate.getTime() + (totalMatchesCreated * intervalMs));
+                    const venueId = venues[totalMatchesCreated % venues.length];
+
                     await connection.execute(
-                        `INSERT INTO matches (phase_id, group_id, home_team_id, away_team_id, scheduled_at, status, season_id, created_at, updated_at)
-                         VALUES (?, ?, ?, ?, ?, 'scheduled', ?, NOW(3), NOW(3))`,
-                        [phaseId, group.id, matchInfo.home, matchInfo.away, matchDate, seasonId]
+                        `INSERT INTO matches (phase_id, group_id, home_team_id, away_team_id, scheduled_at, status, season_id, venue_id, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?, NOW(3), NOW(3))`,
+                        [phaseId, group.id, matchInfo.home, matchInfo.away, matchDate, seasonId, venueId]
                     );
                     totalMatchesCreated++;
                 }
@@ -820,10 +824,12 @@ async function generateScheduleForPhase(phaseId, options = {}) {
 
             for (const slot of round1Slots) {
                 const matchDate = new Date(baseDate.getTime() + (totalMatchesCreated * intervalMs));
+                const venueId = venues[totalMatchesCreated % venues.length];
+
                 const [mResult] = await connection.execute(
-                    `INSERT INTO matches (phase_id, group_id, home_team_id, away_team_id, scheduled_at, status, season_id, created_at, updated_at)
-                     VALUES (?, ?, ?, ?, ?, 'scheduled', ?, NOW(3), NOW(3))`,
-                    [phaseId, slot.group_id || groupIds[0], slot.seeded_home_team_id, slot.seeded_away_team_id, matchDate, seasonId]
+                    `INSERT INTO matches (phase_id, group_id, home_team_id, away_team_id, scheduled_at, status, season_id, venue_id, created_at, updated_at)
+                     VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?, NOW(3), NOW(3))`,
+                    [phaseId, slot.group_id || groupIds[0], slot.seeded_home_team_id, slot.seeded_away_team_id, matchDate, seasonId, venueId]
                 );
 
                 await connection.execute('UPDATE bracket_slots SET match_id = ? WHERE id = ?', [mResult.insertId, slot.id]);
