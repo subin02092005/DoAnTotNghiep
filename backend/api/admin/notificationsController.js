@@ -27,8 +27,8 @@ router.post('/create_notification', async (req, res) => {
 
     try {
         // 1. Lưu vào database
-        const query = `INSERT INTO notifications (title, content, type, source, target_team_id, recipient_user_id) VALUES (?, ?, ?, 'manual', ?, ?)`;
-        await pool.query(query, [title, content, type, target_team_id || null, recipient_user_id || null]);
+        const query = `INSERT INTO notifications (title, content, type, source, target_team_id, recipient_user_id) VALUES (?, ?, ?, ?, ?, ?)`;
+await pool.query(query, [title, content, type, source || 'manual', target_team_id || null, recipient_user_id || null]);
 
         // 2. Lấy token để gửi thông báo đẩy (FCM)
         let fcmTokens = [];
@@ -146,10 +146,21 @@ router.post('/create_rules', async (req, res) => {
         await connection.beginTransaction();
 
         try {
-            // 1. TÌM TOURNAMENT_ID TỪ SEASON_ID
-            const [seasonRows] = await connection.query("SELECT tournament_id FROM seasons WHERE id = ?", [season_id]);
-            if (seasonRows.length === 0) throw new Error("Không tìm thấy giải đấu!");
+            // 🌟 1. LẤY TÊN GIẢI ĐẤU VÀ TÊN MÙA GIẢI (Sửa lỗi dấu phẩy dư và JOIN chuẩn)
+            const querySeason = `
+                SELECT 
+                    s.tournament_id, 
+                    s.name AS season_name   
+                FROM seasons s
+                WHERE s.id = ?
+            `;
+            const [seasonRows] = await connection.query(querySeason, [season_id]);
+
+            if (seasonRows.length === 0) throw new Error("Không tìm thấy mùa giải hoặc giải đấu hợp lệ!");
+
             const tournament_id = seasonRows[0].tournament_id;
+            const season_name = seasonRows[0].season_name;
+        
 
             // 2. CẬP NHẬT LUẬT (ON DUPLICATE KEY UPDATE)
             const updateQuery = `
@@ -171,8 +182,8 @@ router.post('/create_rules', async (req, res) => {
                 tournament_id, min_players, max_players, points_win, points_draw, points_loss, forfeit_score, description
             ]);
 
-            // 3. LẤY DANH SÁCH USERS VÀ FCM_TOKEN
-            const [users] = await pool.query(`
+            // 3. LẤY DANH SÁCH USERS VÀ FCM_TOKEN (Chuyển sang dùng connection để chạy chung Transaction)
+            const [users] = await connection.query(`
                 SELECT DISTINCT u.id as user_id, u.fcm_token 
                 FROM users u
                 JOIN team_players tp ON u.id = tp.user_id
@@ -180,24 +191,31 @@ router.post('/create_rules', async (req, res) => {
                 WHERE ts.season_id = ? AND u.fcm_token IS NOT NULL
             `, [season_id]);
 
-           // 4. LƯU VÀO DB 1 LẦN VÀ GỬI FCM CHO TỪNG NGƯỜI
-const notifyTitle = "Cập nhật luật giải đấu mới";
-const notifyContent = `Luật mới: ${min_players}-${max_players} cầu thủ. Điểm: T(${points_win}) H(${points_draw}) B(${points_loss}). ${description ? 'Ghi chú: ' + description : ''}`;
+            // 4. LƯU VÀO DB VÀ GỬI FCM
+            const notifyTitle = `Cập nhật luật giải đấu ${season_name}`;
+            const notifyContent = `Giải [ ${season_name}] áp dụng luật: Đội hình ${min_players}-${max_players} cầu thủ. Điểm số: Thắng (${points_win}) - Hòa (${points_draw}) - Thua (${points_loss}). ${description ? 'Ghi chú: ' + description : ''}`;
 
-// BƯỚC A: Lưu 1 dòng duy nhất vào DB với type = 'general'
-await connection.query(
-    "INSERT INTO notifications (title, content, type) VALUES (?, ?, 'general')",
-    [notifyTitle, notifyContent]
-);
+            // 🌟 BƯỚC A: Lưu đúng cấu trúc Schema (source='system', điền ref_entity để Android xử lý nút)
+            const insertNotifyQuery = `
+                INSERT INTO notifications 
+                (title, content, type, source, season_id, ref_entity_type, ref_entity_id) 
+                VALUES (?, ?, 'general', 'system', ?, 'tournament_rules', ?)
+            `;
+            await connection.query(insertNotifyQuery, [
+                notifyTitle, 
+                notifyContent, 
+                season_id, 
+                tournament_id
+            ]);
 
-// BƯỚC B: Chỉ thực hiện gửi FCM trong vòng lặp (Không insert DB ở đây nữa)
-const sendPromises = users.map(u => sendFCMNotification(u.fcm_token, notifyTitle, notifyContent));
-await Promise.all(sendPromises);
+            // BƯỚC B: Gửi thông báo đẩy FCM
+            const sendPromises = users.map(u => sendFCMNotification(u.fcm_token, notifyTitle, notifyContent));
+            await Promise.all(sendPromises);
 
-await connection.commit();
-connection.release();
+            await connection.commit();
+            connection.release();
 
-res.status(200).json({ status: "success", message: "Đã áp dụng luật và thông báo cho người chơi" });
+            res.status(200).json({ status: "success", message: `Đã áp dụng luật cho giải ${season_name} và thông báo cho người chơi.` });
 
         } catch (dbError) {
             await connection.rollback();

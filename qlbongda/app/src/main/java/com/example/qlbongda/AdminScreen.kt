@@ -1777,31 +1777,51 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
     val teamList by viewModel.teamNotifications.collectAsStateWithLifecycle()
     val personalList by viewModel.personalNotifications.collectAsStateWithLifecycle()
     val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
+
+    // 🌟 1. THÊM STATE NÀY ĐỂ QUẢN LÝ DIALOG SỬA LUẬT
+    var editingRuleSeasonId by remember { mutableStateOf<Int?>(null) }
+
     LaunchedEffect(Unit) { viewModel.fetchNotifications() }
 
     val displayList = remember(selectedTab, generalList, teamList, personalList) {
         when (selectedTab) { 0 -> generalList; 1 -> teamList; else -> personalList }
     }
+
+    // --- CÁC DIALOG HIỆN CÓ CỦA BẠN ---
     if (showAddRuleDialog) {
         AddRuleDialog(
             onDismiss = { viewModel.setShowAddRuleDialog(false) },
             onConfirm = { sId, min, max, win, draw, loss, forfeit, desc ->
-                // Tạo request với trường mới
+                val request = CreateRuleRequest(season_id = sId, min_players = min, max_players = max, points_win = win, points_draw = draw, points_loss = loss, forfeit_score = forfeit, description = desc)
+                viewModel.createRules(request)
+                viewModel.setShowAddRuleDialog(false)
+            }
+        )
+    }
+
+    // 🌟 2. BẬT DIALOG SỬA LUẬT (Hiện lên y chang cái hình bạn gửi)
+    if (editingRuleSeasonId != null) {
+        // Ở đây bạn có thể tái sử dụng AddRuleDialog hoặc tạo EditRuleDialog tùy bạn.
+        // Vì API của bạn là ON DUPLICATE KEY UPDATE nên cứ truyền season_id vào là nó tự cập nhật đè lên luật cũ.
+        AddRuleDialog(
+            onDismiss = { editingRuleSeasonId = null },
+            onConfirm = { sId, min, max, win, draw, loss, forfeit, desc ->
                 val request = CreateRuleRequest(
-                    season_id = sId,
+                    season_id = sId, // Chính là cái editingRuleSeasonId đang sửa
                     min_players = min,
                     max_players = max,
                     points_win = win,
                     points_draw = draw,
                     points_loss = loss,
                     forfeit_score = forfeit,
-                    description = desc // Đảm bảo Data Class CreateRuleRequest của bạn đã thêm trường này
+                    description = desc
                 )
-                viewModel.createRules(request)
-                viewModel.setShowAddRuleDialog(false)
+                viewModel.createRules(request) // Gọi API lưu luật mới
+                editingRuleSeasonId = null // Đóng dialog
             }
         )
     }
+
     if (showAddDialog) {
         AddNotificationDialog(onDismiss = { viewModel.setShowAddDialog(false) }, onConfirm = { title, content, type, teamId, userId -> viewModel.createNotification(title, content, type, teamId, userId); viewModel.setShowAddDialog(false) })
     }
@@ -1818,23 +1838,38 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
             Column {
                 FloatingActionButton(onClick = { viewModel.setShowCleanupDialog(true) }, containerColor = NeonRed, contentColor = Color.Black) { Icon(Icons.Default.Delete, contentDescription = "Dọn dẹp") }
                 Spacer(modifier = Modifier.height(16.dp))
-                // Nút Thêm Luật
-                FloatingActionButton(onClick = { viewModel.setShowAddRuleDialog(true) }, containerColor = Color.Yellow) {
-                    Icon(Icons.Default.Settings, contentDescription = "Luật")
-                }
+                FloatingActionButton(onClick = { viewModel.setShowAddRuleDialog(true) }, containerColor = Color.Yellow) { Icon(Icons.Default.Settings, contentDescription = "Luật") }
                 Spacer(modifier = Modifier.height(16.dp))
                 FloatingActionButton(onClick = { viewModel.setShowAddDialog(true) }, containerColor = NeonGreen, contentColor = Color.Black) { Icon(Icons.Default.Add, contentDescription = "Thêm") }
             }
         }
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues).fillMaxSize().background(NeonBlack)) {
+            ManagementHeader(title = "QUẢN LÝ THÔNG BÁO", subtitle = "Quản lý và gửi thông báo hệ thống")
+
             TabRow(selectedTabIndex = selectedTab, containerColor = NeonSurface, indicator = { tabPositions -> TabRowDefaults.SecondaryIndicator(modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]), color = NeonGreen, height = 3.dp) }) {
                 listOf("Chung", "Theo Team", "Cá nhân").forEachIndexed { index, title ->
                     Tab(selected = selectedTab == index, onClick = { selectedTab = index }, text = { Text(text = title, color = if (selectedTab == index) NeonGreen else NeonGray, fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal) })
                 }
             }
-            LazyColumn(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 160.dp)) {
-                items(displayList) { item -> NotificationItemCard(item = item, onDelete = { viewModel.deleteNotification(item.id) }, onEdit = { viewModel.setSelectedNotification(item) }) }
+
+            LazyColumn {
+                items(displayList) { notification ->
+                    NotificationItemCard(
+                        item = notification,
+                        onDelete = { viewModel.deleteNotification(notification.id) },
+                        onEdit = { item ->
+                            // 🌟 3. XỬ LÝ LOGIC BẤM NÚT SỬA TẠI ĐÂY
+                            if (item.source == "manual") {
+                                // Nếu thông báo tạo tay -> Mở Dialog sửa chữ thông báo bình thường
+                                viewModel.setSelectedNotification(item)
+                            } else if (item.ref_entity_type == "tournament_rules") {
+                                // Nếu thông báo luật -> Gán ID để bật Dialog cấu hình luật lên đè lên màn hình
+                                editingRuleSeasonId = item.season_id
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -1863,8 +1898,25 @@ fun AddNotificationDialog(onDismiss: () -> Unit, onConfirm: (String, String, Str
                     RadioButton(selected = type == "match_schedule", onClick = { type = "match_schedule" }); Text("Đội", color = NeonWhite)
                     RadioButton(selected = type == "player_approved", onClick = { type = "player_approved" }); Text("Cá nhân", color = NeonWhite)
                 }
-                if (type == "match_schedule") OutlinedTextField(value = targetTeamId, onValueChange = { targetTeamId = it }, label = { Text("ID Team") })
-                if (type == "player_approved") OutlinedTextField(value = recipientUserId, onValueChange = { recipientUserId = it }, label = { Text("ID Người nhận") })
+
+                // --- ĐÃ THÊM: filter để chỉ nhận kí tự là chữ số (isDigit) và hiển thị bàn phím số ---
+                if (type == "match_schedule") {
+                    OutlinedTextField(
+                        value = targetTeamId,
+                        onValueChange = { newValue -> targetTeamId = newValue.filter { it.isDigit() } },
+                        label = { Text("ID Team") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+                if (type == "player_approved") {
+                    OutlinedTextField(
+                        value = recipientUserId,
+                        onValueChange = { newValue -> recipientUserId = newValue.filter { it.isDigit() } },
+                        label = { Text("ID Người nhận") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+
                 errorMessage?.let { Text(it, color = NeonRed, style = MaterialTheme.typography.bodySmall) }
             }
         },
@@ -1902,26 +1954,28 @@ fun AddRuleDialog(onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, Int, In
                     "ID Mùa giải" to seasonId, "Tối thiểu cầu thủ" to minPlayers,
                     "Tối đa cầu thủ" to maxPlayers, "Điểm thắng" to ptsWin,
                     "Điểm hòa" to ptsDraw, "Điểm thua" to ptsLoss, "Điểm xử thua" to forfeitScore,
-                    "Mô tả" to description // Thêm vào danh sách
+                    "Mô tả" to description
                 )
 
                 fields.forEach { (label, value) ->
                     OutlinedTextField(
                         value = value,
-                        onValueChange = {
+                        onValueChange = { newValue ->
+                            // --- ĐÃ THÊM: Lọc giữ lại số nếu không phải là trường "Mô tả" ---
+                            val filteredValue = if (label != "Mô tả") newValue.filter { it.isDigit() } else newValue
+
                             when(label) {
-                                "ID Mùa giải" -> seasonId = it
-                                "Tối thiểu cầu thủ" -> minPlayers = it
-                                "Tối đa cầu thủ" -> maxPlayers = it
-                                "Điểm thắng" -> ptsWin = it
-                                "Điểm hòa" -> ptsDraw = it
-                                "Điểm thua" -> ptsLoss = it
-                                "Điểm xử thua" -> forfeitScore = it
-                                "Mô tả" -> description = it // Thêm vào xử lý
+                                "ID Mùa giải" -> seasonId = filteredValue
+                                "Tối thiểu cầu thủ" -> minPlayers = filteredValue
+                                "Tối đa cầu thủ" -> maxPlayers = filteredValue
+                                "Điểm thắng" -> ptsWin = filteredValue
+                                "Điểm hòa" -> ptsDraw = filteredValue
+                                "Điểm thua" -> ptsLoss = filteredValue
+                                "Điểm xử thua" -> forfeitScore = filteredValue
+                                "Mô tả" -> description = filteredValue
                             }
                         },
                         label = { Text(label, color = NeonGray) },
-                        // Nếu là mô tả thì dùng text, còn lại dùng số
                         keyboardOptions = KeyboardOptions(keyboardType = if (label == "Mô tả") KeyboardType.Text else KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     )
@@ -1938,7 +1992,7 @@ fun AddRuleDialog(onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, Int, In
                     ptsDraw.toIntOrNull() ?: 1,
                     ptsLoss.toIntOrNull() ?: 0,
                     forfeitScore.toIntOrNull() ?: 3,
-                    description // Truyền giá trị vào đây
+                    description
                 )
             }) {
                 Text("Lưu Luật", color = NeonGreen)
@@ -1983,15 +2037,21 @@ fun EditNotificationDialog(notification: NotificationItem, onDismiss: () -> Unit
 }
 
 @Composable
-fun NotificationItemCard(item: NotificationItem, onDelete: () -> Unit, onEdit: () -> Unit) {
+fun NotificationItemCard(item: NotificationItem, onDelete: () -> Unit, onEdit: (NotificationItem) -> Unit) {
     Card(modifier = Modifier.padding(8.dp).fillMaxWidth(), elevation = CardDefaults.cardElevation(4.dp)) {
         Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(item.content, maxLines = 2, fontSize = 14.sp)
             }
-            IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Sửa") }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Xóa") }
+
+            // 🌟 CHỈ HIỂN THỊ CẶP NÚT NÀY NẾU LÀ THÔNG BÁO TẠO TAY (MANUAL)
+            if (item.source == "manual") {
+                IconButton(onClick = { onEdit(item) }) { Icon(Icons.Default.Edit, "Sửa") }
+                IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Xóa") }
+            } else if (item.source == "system" && item.ref_entity_type == "tournament_rules") {
+                IconButton(onClick = { onEdit(item) }) { Icon(Icons.Default.Edit, "Sửa luật") }
+            }
         }
     }
 }

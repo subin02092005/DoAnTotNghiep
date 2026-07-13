@@ -57,31 +57,32 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 val response = apiService.getAllNotifications()
 
                 if (response.isSuccessful) {
-                    // 1. Lấy dữ liệu thô từ API (List<Notification>)
                     val apiList = response.body()?.data ?: emptyList()
 
-                    // 2. Chuyển đổi sang kiểu dữ liệu mà UI cần (List<NotificationItem>)
-                    // Đây chính là chỗ tạo ra biến uiData mà bạn đang thiếu
                     val uiData = apiList.map { item ->
                         NotificationItem(
                             id = item.id,
                             title = item.title,
                             content = item.content,
-                            type = "general",            // Gán giá trị trực tiếp
-                            source = "manual",           // Gán giá trị trực tiếp
-                            target_team_id = item.target_team_id ?.toString()?.toIntOrNull(), // Dùng toán tử ?: để tránh null
-                            recipient_user_id = item.recipient_user_id?.toString()?.toIntOrNull(), // Nếu null thì gán 0
+                            type = item.type ?: "general",
+                            source = item.source ?: "manual",
+                            target_team_id = item.target_team_id?.toString()?.toIntOrNull(),
+                            recipient_user_id = item.recipient_user_id?.toString()?.toIntOrNull(),
+                            is_active = if (item.is_active == 1) 1 else 0,
+                            created_at = item.created_at ?: "",
 
-                            is_active = if (item.is_active == 1) 1 else 0,// Nếu null thì gán true
-                            created_at = item.created_at ?: "" // Nếu null thì gán chuỗi rỗng
+                            // 🌟 BỔ SUNG 2 DÒNG NÀY ĐỂ HỨNG DỮ LIỆU TỪ API GỬI VỀ
+                            season_id = item.season_id,
+                            ref_entity_type = item.ref_entity_type,
                         )
                     }
 
-
-                    // 3. Cập nhật vào Repository
+                    // 1. Cập nhật vào Repository nếu bạn cần lưu trữ
                     NotificationRepository.updateNotifications(uiData)
 
-                    // Lưu ý: Nếu bạn dùng Repo thì không cần dùng _notifications.value nữa
+                    // 2. Bơm dữ liệu vào luồng gốc để tự động lọc sang 3 tab
+                    _notifications.value = uiData
+
                 } else {
                     _message.value = "Lỗi: ${response.code()}"
                 }

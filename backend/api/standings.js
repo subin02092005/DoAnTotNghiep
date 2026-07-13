@@ -10,7 +10,67 @@ const pool = mysql.createPool({
     password: '123456',
     database: 'football_management',
 });
+router.get('/all_seasons', async (req, res) => {
+    let connection;
+    try {
+        connection = await pool.getConnection();
 
+        // Sử dụng LEFT JOIN để lấy cả mùa giải chưa có vòng đấu nào
+        const query = `
+            SELECT 
+                s.id AS season_id, 
+                s.name AS season_name, 
+                p.id AS phase_id, 
+                p.name AS phase_name 
+            FROM seasons s 
+            LEFT JOIN phases p ON s.id = p.season_id
+            ORDER BY s.id DESC, p.id ASC
+        `;
+
+        const [rows] = await connection.query(query);
+
+        // Khởi tạo mảng để gom nhóm dữ liệu theo cấu trúc lồng nhau (Nested JSON)
+        const formattedData = [];
+        const seasonsMap = {};
+
+        for (const row of rows) {
+            // Nếu database trống hoàn toàn
+            if (!row.season_id) continue;
+
+            // Nếu mùa giải này chưa được tạo trong Map thì khởi tạo mới
+            if (!seasonsMap[row.season_id]) {
+                seasonsMap[row.season_id] = {
+                    id: row.season_id,
+                    name: row.season_name,
+                    phases: [] // Mảng chứa các vòng đấu thuộc giải này
+                };
+                formattedData.push(seasonsMap[row.season_id]);
+            }
+
+            // Nếu mùa giải có vòng đấu đi kèm (phase_id không null) thì đẩy vào mảng phases
+            if (row.phase_id) {
+                seasonsMap[row.season_id].phases.push({
+                    id: row.phase_id,
+                    name: row.phase_name
+                });
+            }
+        }
+
+        // Trả về kết quả chuẩn trạng thái success như cấu trúc của bạn
+        return res.status(200).json({
+            success: true,
+            status: "success",
+            data: formattedData // Nếu rỗng sẽ là [], Android nhận vào sẽ biết là "Không có dữ liệu"
+        });
+
+    } catch (error) {
+        console.error("Lỗi API Danh sách Mùa giải:", error.message);
+        res.status(500).json({ success: false, message: error.message });
+    } finally {
+        // Luôn giải phóng kết nối về lại cho Pool
+        if (connection) connection.release();
+    }
+});
 router.get('/standings', async (req, res) => {
     const { seasonId } = req.query;
     if (!seasonId) {

@@ -104,7 +104,7 @@
 
         @GET("standings")
         suspend fun getDetailedStandings(@Query("seasonId") seasonId: Int? = null): Response<DetailedStandingResponse>
-        @GET("all-data")
+        @GET("all_seasons")
         suspend fun getAllData(): Response<ApiResponses<List<SeasonWithPhases>>>
 
         @GET("seasons/{seasonId}/phases") // Đã sửa theo server.js: /api/seasons/:seasonId/phases

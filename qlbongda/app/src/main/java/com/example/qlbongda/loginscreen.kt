@@ -253,6 +253,7 @@ fun LoginScreen(
                                         android.util.Log.d("DEBUG_API", "User role từ API: ${loginResult.user?.role}")
                                         sharedPref.edit().apply {
                                             putInt("USER_ID", userId)
+                                            putInt("TEAM_ID", loginResult.user?.team_id ?: 0)
                                             putString("ACCESS_TOKEN", loginResult.token ?: "")
                                             putString("USER_ROLE", user?.role ?: "player")
                                             putString(

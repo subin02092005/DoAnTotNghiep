@@ -20,6 +20,10 @@ data class NotificationItem(
     val source: String,
     val target_team_id: Int?,
     val recipient_user_id: Int?,
+    @SerializedName("season_id")
+    val season_id: Int?,
+    @SerializedName("ref_entity_type")
+    val ref_entity_type: String?,
     val is_active: Int,
     val created_at: String
 )

@@ -22,6 +22,7 @@ data class User(
     val phone: String?,
     val role:String?,
     val email_verified: Int,
+    val team_id: Int?,
     @SerializedName("is_admin") val isAdmin: Boolean? = false,
     @SerializedName("fcm_token") val fcmToken: String?
 )
@@ -31,7 +32,8 @@ data class LoginResponse(
     val success: Boolean,
     val message: String,
     val token: String?,
-    val user: User?
+    val user: User?,
+    val team_id: Int?
 )
 
 // Dữ liệu gửi lên API đăng ký

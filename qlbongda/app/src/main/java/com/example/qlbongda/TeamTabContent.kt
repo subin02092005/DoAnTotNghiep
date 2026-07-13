@@ -402,31 +402,110 @@ fun CoachCaptainScreen(
                     Row(modifier = Modifier.padding(vertical = 8.dp)) {
                         OutlinedTextField(
                             value = nbr,
-                            onValueChange = { if (isNumberValid(it)) nbr = it },
-                            label = { Text("Số", fontSize = 12.sp) }, // Giảm font label cho gọn
+                            onValueChange = { if (isNumberValid(it)) nbr = it }, // Chỉ cho phép nhập số
+                            label = { Text("Số", fontSize = 12.sp) },
                             modifier = Modifier
-                                .width(70.dp) // 🌟 Thay vì weight, hãy dùng độ rộng cố định nhỏ
-                                .height(56.dp), // Chiều cao chuẩn
+                                .width(95.dp) // 🌟 Nới nhẹ lên 95.dp để vừa chỗ cho cụm mũi tên
+                                .height(56.dp),
                             singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White)
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                focusedBorderColor = NeonGreen,
+                                unfocusedBorderColor = Color.DarkGray,
+                                focusedLabelColor = NeonGreen
+                            ),
+                            // 🌟 THÊM CỤM NÚT LÊN XUỐNG TẠI ĐÂY
+                            trailingIcon = {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(end = 2.dp),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    // Nút mũi tên LÊN (Tăng số áo)
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowUp,
+                                        contentDescription = "Tăng",
+                                        tint = NeonGreen,
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clickable {
+                                                val current = nbr.toIntOrNull() ?: 0
+                                                if (current < 99) { // Giới hạn số áo tối đa là 99
+                                                    nbr = (current + 1).toString()
+                                                }
+                                            }
+                                    )
+
+                                    // Nút mũi tên XUỐNG (Giảm số áo)
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Giảm",
+                                        tint = NeonGreen,
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clickable {
+                                                val current = nbr.toIntOrNull() ?: 0
+                                                if (current > 0) { // Giới hạn số áo tối thiểu là 0
+                                                    nbr = (current - 1).toString()
+                                                }
+                                            }
+                                    )
+                                }
+                            }
                         )
 
                         Spacer(modifier = Modifier.width(8.dp))
 
-                        // Cụm Vị trí (vẫn giữ weight để nó chiếm phần còn lại)
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        // 🌟 THAY THẾ CỤM FILTERCHIP CŨ BẰNG THANH TRƯỢT SIÊU MƯỢT TẠI ĐÂY
+                        val positions = listOf("GK", "DF", "MF", "FW")
+                        val selectedIndex = positions.indexOf(pos)
+
+                       BoxWithConstraints(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp) // Khớp chính xác chiều cao với ô Số áo
+                                .background(Color(0xFF222222), RoundedCornerShape(8.dp))
+                                .padding(4.dp)
                         ) {
-                            listOf("GK", "DF", "MF", "FW").forEach { p ->
-                                FilterChip(
-                                    selected = pos == p,
-                                    onClick = { pos = p },
-                                    label = { Text(p, fontSize = 10.sp) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = NeonGreen
-                                    )
-                                )
+                            // Tính toán độ rộng của từng ô vị trí dựa trên không gian thực tế
+                            val itemWidth = maxWidth / 4
+
+                            // Tạo hiệu ứng lướt mượt mà cho khối màu NeonGreen
+                            val indicatorOffset by androidx.compose.animation.core.animateDpAsState(
+                                targetValue = itemWidth * selectedIndex,
+                                animationSpec = androidx.compose.animation.core.tween(durationMillis = 250),
+                                label = "PositionSlider"
+                            )
+
+                            // Khối nền Neon chạy phía dưới
+                            Box(
+                                modifier = Modifier
+                                    .width(itemWidth)
+                                    .fillMaxHeight()
+                                    .offset(x = indicatorOffset)
+                                    .background(NeonGreen, RoundedCornerShape(6.dp))
+                            )
+
+                            // Hàng chữ hiển thị đè lên trên nền
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                positions.forEachIndexed { index, p ->
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .clickable { pos = p }, // Chạm nhẹ là tự động lướt
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = p,
+                                            color = if (selectedIndex == index) Color.Black else Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -457,7 +536,6 @@ fun CoachCaptainScreen(
                                             val response = RetrofitClient.getClient(context).updatePlayer(request)
 
                                             if (response.isSuccessful) {
-
                                                 // Cập nhật UI
                                                 playerList[editIdx] = player.copy(
                                                     number = nbr,
@@ -466,7 +544,6 @@ fun CoachCaptainScreen(
                                                 Toast.makeText(context, "Cập nhật thành công!", Toast.LENGTH_SHORT).show()
                                                 isEditing = false; editIdx = -1; email = ""; nbr = ""; pos = "FW"
                                             } else {
-                                                // 3. Thông báo lỗi cụ thể từ Server (ví dụ: DB lỗi, trùng số áo từ phía Server)
                                                 val errorMsg = response.errorBody()?.string() ?: "Không thể cập nhật!"
                                                 Toast.makeText(context, "Lỗi: $errorMsg", Toast.LENGTH_LONG).show()
                                             }
@@ -481,7 +558,6 @@ fun CoachCaptainScreen(
                                 if (!isEmailFormatValid(email)) {
                                     Toast.makeText(context, "Email không đúng định dạng!", Toast.LENGTH_SHORT).show()
                                 } else
-                                // 🌟 Xử lý trực tiếp tại đây mà không cần gọi hàm handleAddPlayer()
                                     if (email.isEmpty() || nbr.isEmpty()) {
                                         Toast.makeText(
                                             context,
@@ -502,32 +578,22 @@ fun CoachCaptainScreen(
                                                 if (response.isSuccessful) {
                                                     val newPlayer = response.body()?.data
                                                     if (newPlayer != null) {
-                                                        // 1. Thêm cầu thủ vào danh sách trước (để UI cập nhật ngay)
                                                         playerList.add(newPlayer)
                                                         email = ""; nbr = ""; pos = "FW"
                                                         Toast.makeText(context, "Đã thêm ${newPlayer.name} vào đội!", Toast.LENGTH_SHORT).show()
-
                                                     }
-                                                } else {val errorString = response.errorBody()?.string()
+                                                } else {
+                                                    val errorString = response.errorBody()?.string()
                                                     try {
-                                                        // 2. Chỉ trích xuất phần "message" từ JSON
                                                         val jsonObject = org.json.JSONObject(errorString ?: "{}")
                                                         val errorMessage = jsonObject.optString("message", "Có lỗi xảy ra!")
-
-                                                        // 3. Hiển thị thông báo (chỉ hiện nội dung message)
                                                         Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
-
                                                     } catch (e: Exception) {
-                                                        // Dự phòng: nếu server không trả về JSON chuẩn
                                                         Toast.makeText(context, "Lỗi: Không thể thêm cầu thủ", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             } catch (e: Exception) {
-                                                Toast.makeText(
-                                                    context,
-                                                    "Lỗi kết nối: ${e.message}",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
+                                                Toast.makeText(context, "Lỗi kết nối: ${e.message}", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     }
@@ -538,7 +604,8 @@ fun CoachCaptainScreen(
                     ) {
                         Text(
                             if (isEditing) "CẬP NHẬT THÔNG TIN" else "THÊM VÀO ĐỘI",
-                            color = Color.Black
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -791,79 +858,119 @@ fun TeamRegistrationScreen(
     val currentUserName = sharedPref.getString("USER_NAME", "Người dùng") ?: "Người dùng"
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black) // 🌟 Thêm màu nền đen đồng bộ
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("ĐĂNG KÝ ĐỘI BÓNG", color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(20.dp))
+        // Tiêu đề viết đậm, sắc nét
+        Text(
+            "ĐĂNG KÝ ĐỘI BÓNG",
+            color = NeonGreen,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Black // Đổi sang Black giống tiêu đề tổng
+        )
 
+        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .width(120.dp)
+                .height(2.dp)
+                .background(Color.White)
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Ô nhập tên đội bóng với viền Neon khi bấm vào
         OutlinedTextField(
             value = teamName,
             onValueChange = { teamName = it },
             label = { Text("Nhập tên đội bóng") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = NeonGreen,
+                unfocusedBorderColor = Color.DarkGray,
+                focusedLabelColor = NeonGreen,
+                unfocusedLabelColor = Color.Gray,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                cursorColor = NeonGreen
+            )
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Captain lấy mặc định là mình
+        // Ô Đội trưởng (bị khóa) làm mờ viền và đổi màu chữ Gray cho hợp lý
         OutlinedTextField(
             value = currentUserName,
             onValueChange = {},
             label = { Text("Đội trưởng") },
             enabled = false, // Không cho sửa
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledBorderColor = Color(0xFF222222),
+                disabledLabelColor = Color.Gray,
+                disabledTextColor = Color.LightGray
+            )
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
-        Button(onClick = {
-            if (teamName.isBlank()) {
-                Toast.makeText(context, "Vui lòng nhập tên đội bóng!", Toast.LENGTH_SHORT).show()
-                return@Button
-            }
-
-            scope.launch {
-                try {
-                    val userId = sharedPref.getInt("USER_ID", -1)
-                    val request = RegisterTeamRequest(teamName, "Chưa cập nhật", userId)
-                    val response = RetrofitClient.getClient(context).registerTeam(request)
-
-                    if (response.isSuccessful) {
-                        // ĐĂNG KÝ THÀNH CÔNG
-                        val teamId = response.body()?.teamId ?: -1
-
-                        // Lưu vào SharedPreferences để app biết user này đã có đội
-                        sharedPref.edit().putInt("TEAM_ID", teamId).apply()
-
-                        Toast.makeText(
-                            context,
-                            "Đăng ký thành công! Chào mừng đội trưởng.",
-                            Toast.LENGTH_LONG
-                        ).show()
-
-                        // Chuyển màn hình sang giao diện quản lý đội (Màn hình Đội trưởng)
-                        onTeamRegisteredChange(true)
-                    } else {
-                        // ĐĂNG KÝ THẤT BẠI
-                        val errorBody = response.errorBody()?.string()
-                        val message = try {
-                            org.json.JSONObject(errorBody ?: "").getString("message")
-                        } catch (e: Exception) {
-                            "Lỗi: ${response.code()}"
-                        }
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                    }
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Lỗi kết nối server!", Toast.LENGTH_SHORT).show()
+        // Nút hoàn tất chuyển sang màu NeonGreen, chữ Đen bôi đậm chuẩn bài
+        Button(
+            onClick = {
+                if (teamName.isBlank()) {
+                    Toast.makeText(context, "Vui lòng nhập tên đội bóng!", Toast.LENGTH_SHORT).show()
+                    return@Button
                 }
-            }
-        }) {
-            Text("HOÀN TẤT ĐĂNG KÝ")
+
+                scope.launch {
+                    try {
+                        val userId = sharedPref.getInt("USER_ID", -1)
+                        val request = RegisterTeamRequest(teamName, "Chưa cập nhật", userId)
+                        val response = RetrofitClient.getClient(context).registerTeam(request)
+
+                        if (response.isSuccessful) {
+                            val teamId = response.body()?.teamId ?: -1
+                            sharedPref.edit().putInt("TEAM_ID", teamId).apply()
+
+                            Toast.makeText(
+                                context,
+                                "Đăng ký thành công! Chào mừng đội trưởng.",
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                            onTeamRegisteredChange(true)
+                        } else {
+                            val errorBody = response.errorBody()?.string()
+                            val message = try {
+                                org.json.JSONObject(errorBody ?: "").getString("message")
+                            } catch (e: Exception) {
+                                "Lỗi: ${response.code()}"
+                            }
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Lỗi kết nối server!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp), // Thêm chiều cao cho nút bấm nhìn xịn hơn
+            shape = RoundedCornerShape(12.dp) // Bo góc nhẹ cho hiện đại
+        ) {
+            Text(
+                "HOÀN TẤT ĐĂNG KÝ",
+                color = Color.Black,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
         }
     }
-
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

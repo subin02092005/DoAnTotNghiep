@@ -67,8 +67,10 @@ class MainActivity : ComponentActivity() {
                     var selectedTab by remember { mutableIntStateOf(0) }
                     var currentStandingTabIndex by remember { mutableIntStateOf(0) }
 
+                    // 🌟 LẮNG NGHE DÒNG DỮ LIỆU ĐỘNG TỪ VIEWMODEL TRÊN ĐÂY
+                    val seasonList by homeViewModel.seasonsWithPhases.collectAsState(initial = emptyList())
                     val matchList by homeViewModel.matchList.collectAsState()
-                   // val hotMatchList by homeViewModel.hotMatchList.collectAsState()
+                    // val hotMatchList by homeViewModel.hotMatchList.collectAsState()x
                     val phaseList by homeViewModel.phases.collectAsState()
                     val standingList by homeViewModel.standingList.collectAsState()
                     val isLoading by homeViewModel.isLoading.collectAsState()
@@ -133,6 +135,7 @@ class MainActivity : ComponentActivity() {
                                     homeViewModel = homeViewModel,
                                     selectedTab = selectedTab,
                                     onTabSelected = { selectedTab = it },
+                                    seasonList = seasonList, // 🌟 TRUYỀN THAM SỐ GIẢI ĐẤU XUỐNG ĐÂY
                                     phaseList = phaseList,
                                     matchList = matchList,
                                     // 🌟 TRUYỀN DÒNG NÀY
@@ -198,7 +201,7 @@ class MainActivity : ComponentActivity() {
                                     val clickedTeam = standingList.flatMap { it.standings }
                                         .find { it.teamName.equals(teamName, ignoreCase = true) }
                                     if (clickedTeam != null) {
-                                       selectedTeamObjectForDetail = StandingItem(clickedTeam.id, clickedTeam.teamName,  clickedTeam.goalDifference,  "Đang cập nhật", emptyList())
+                                        selectedTeamObjectForDetail = StandingItem(clickedTeam.id, clickedTeam.teamName,  clickedTeam.goalDifference,  "Đang cập nhật", emptyList())
                                         previousScreen = "standing_detail"
                                         currentScreen = "team_detail"
                                     }

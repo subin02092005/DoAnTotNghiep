@@ -1,328 +1,361 @@
-package com.example.qlbongda.data.api
+    package com.example.qlbongda.data.api
 
-import android.util.Log
-import androidx.compose.runtime.derivedStateOf
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.qlbongda.data.model.ChangePasswordRequest
-import com.example.qlbongda.data.model.FullMatchDetail
-import com.example.qlbongda.data.model.GroupStanding
-import com.example.qlbongda.data.model.MyTeamData
-import com.example.qlbongda.data.model.PlayerInfo
-import com.example.qlbongda.data.model.SeasonWithPhases
-import com.example.qlbongda.data.model.StandingItem
-import com.example.qlbongda.data.model.TeamDetailData
-import com.example.qlbongda.data.model.TournamentPhase
-import com.example.qlbongda.data.model.TournamentRules
-import com.example.qlbongda.data.model.UpdateProfileRequest
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-class HomeViewModel(private val apiService: ApiService) : ViewModel() {
+    import android.util.Log
+    import androidx.compose.runtime.derivedStateOf
+    import androidx.lifecycle.ViewModel
+    import androidx.lifecycle.viewModelScope
+    import com.example.qlbongda.data.model.ChangePasswordRequest
+    import com.example.qlbongda.data.model.FullMatchDetail
+    import com.example.qlbongda.data.model.GroupStanding
+    import com.example.qlbongda.data.model.MyTeamData
+    import com.example.qlbongda.data.model.PlayerInfo
+    import com.example.qlbongda.data.model.SeasonWithPhases
+    import com.example.qlbongda.data.model.StandingItem
+    import com.example.qlbongda.data.model.TeamDetailData
+    import com.example.qlbongda.data.model.TournamentPhase
+    import com.example.qlbongda.data.model.TournamentRules
+    import com.example.qlbongda.data.model.UpdateProfileRequest
+    import kotlinx.coroutines.flow.MutableStateFlow
+    import kotlinx.coroutines.flow.StateFlow
+    import kotlinx.coroutines.flow.asStateFlow
+    import kotlinx.coroutines.launch
+    class HomeViewModel(private val apiService: ApiService) : ViewModel() {
 
-    // --- CÁC STATEFLOW DỮ LIỆU ---
-    private val _phases = MutableStateFlow<List<TournamentPhase>>(emptyList())
-    val phases: StateFlow<List<TournamentPhase>> = _phases
+        // --- CÁC STATEFLOW DỮ LIỆU ---
+        private val _phases = MutableStateFlow<List<TournamentPhase>>(emptyList())
+        val phases: StateFlow<List<TournamentPhase>> = _phases
 
-    val matchList = MutableStateFlow<List<FullMatchDetail>>(emptyList())
-    val hotMatchList = MutableStateFlow<List<FullMatchDetail>>(emptyList())
-    val standingList = MutableStateFlow<List<GroupStanding>>(emptyList())
+        val matchList = MutableStateFlow<List<FullMatchDetail>>(emptyList())
+        val hotMatchList = MutableStateFlow<List<FullMatchDetail>>(emptyList())
+        val standingList = MutableStateFlow<List<GroupStanding>>(emptyList())
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+        private val _isLoading = MutableStateFlow(false)
+        val isLoading: StateFlow<Boolean> = _isLoading
+        private val _selectedSeason = MutableStateFlow<SeasonWithPhases?>(null)
 
-    init {
-        // Tự động load dữ liệu khi khởi tạo ViewModel
-        loadTournamentPhases(seasonId = 1)
-        loadMatches()
-        loadFeaturedMatches()
-        loadStandings(seasonId = 1)
-        loadGlobalRules()
-    }
-
-    // --- CÁC HÀM GỌI API ---
-
-    fun loadTournamentPhases(seasonId: Int) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val response = apiService.getSeasonPhases(seasonId)
-                if (response.isSuccessful && response.body()?.status == "success") {
-                    _phases.value = response.body()?.data?.phases ?: emptyList()
-                } else {
-                    setMockData()
-                }
-            } catch (e: Exception) {
-                setMockData()
-            } finally {
-                _isLoading.value = false
+        // 2. Biến công khai để MainActivity lắng nghe
+        val selectedSeason = _selectedSeason.asStateFlow()
+        init {
+            // Tự động load dữ liệu khi khởi tạo ViewModel
+            //loadTournamentPhases(seasonId = 1)
+            loadMatches()
+            loadFeaturedMatches()
+         //  loadStandings(seasonId = 24)
+            loadGlobalRules()
+            loadSeasons()
+        }
+        fun selectSeason(season: SeasonWithPhases) {
+            // Thêm check kỹ ở đây:
+            if (_selectedSeason.value?.id != season.id) {
+                _selectedSeason.value = season
             }
         }
-    }
 
-    fun loadMatches() {
+        // --- CÁC HÀM GỌI API ---
 
-        viewModelScope.launch {
-            try {
-                val response = apiService.getMatches()
-                if (response.isSuccessful) {
-                    val listDto = response.body()?.data ?: emptyList()
+        private var lastSuccessfullyLoadedPhasesId: Int? = null
 
-                    // Map từ DTO sang Model hiển thị
-                    matchList.value = listDto.map { dto ->android.util.Log.d("DEBUG_HOT", "ID: ${dto.id}, isFeatured: ${dto.isHot}")
-                        FullMatchDetail(
-                            id = dto.id,
-                            teamA = dto.teamA, // Lấy từ MatchDto
-                            teamB = dto.teamB, // Lấy từ MatchDto
-                            status = dto.status, // <--- THÊM DÒNG NÀY VÀO ĐỂ TRUYỀN DỮ LIỆU
-                            scoreA = dto.home_score ?: 0,
-                            scoreB = dto.away_score ?: 0,
-                            time = dto.scheduled_at ?: "",
-                            date = dto.scheduled_at ?: "",
-                            stadium = "Chưa cập nhật",
-                            isStarted = dto.isStarted,
-                            // Các trường mặc định để hiển thị UI
+        // 2. Cập nhật lại hàm loadTournamentPhases
+        fun loadTournamentPhases(seasonId: Int) {
+            // CHỐT CHẶN: Nếu ID này vừa được gọi thành công rồi thì KHÔNG GỌI API NỮA
+            if (lastSuccessfullyLoadedPhasesId == seasonId) return
 
-                            events = emptyList(), lineupA = emptyList(), lineupB = emptyList(),
-                            subsA = emptyList(), subsB = emptyList(), PossessionA = "0%",
-                            PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = "",
-                            isHot = dto.isHot
-                        )
+            // Đánh dấu là đang/đã xử lý ID này
+            lastSuccessfullyLoadedPhasesId = seasonId
+
+            viewModelScope.launch {
+                _isLoading.value = true
+                try {
+                    val response = apiService.getSeasonPhases(seasonId)
+                    if (response.isSuccessful && response.body()?.status == "success") {
+                        _phases.value = response.body()?.data?.phases ?: emptyList()
+                    } else {
+                        setMockData()
+                        // Mở khóa nếu gọi API thất bại để cho phép thử lại sau
+                        lastSuccessfullyLoadedPhasesId = null
                     }
+                } catch (e: Exception) {
+                    setMockData()
+                    // Mở khóa nếu có lỗi mạng/văng app
+                    lastSuccessfullyLoadedPhasesId = null
+                } finally {
+                    _isLoading.value = false
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
-    }
-    // Trong HomeViewModel.kt
-    private val _tournamentRules = MutableStateFlow<TournamentRules?>(null)
-    val tournamentRules: StateFlow<TournamentRules?> = _tournamentRules.asStateFlow()
 
-    // Hàm gọi API lấy luật chung
-    fun loadGlobalRules() {
-        viewModelScope.launch {
-            try {
-                val response = apiService.getGlobalRules()
-                if (response.isSuccessful && response.body()?.status == "success") {
-                    _tournamentRules.value = response.body()?.data
-                } else {
-                    Log.e("HomeViewModel", "Không lấy được luật: ${response.code()}")
-                }
-            } catch (e: Exception) {
-                Log.e("HomeViewModel", "Lỗi Exception: ${e.message}")
-            }
-        }
-    }
-    fun loadFeaturedMatches() {
-        viewModelScope.launch {
-            try {
-                val response = apiService.getFeaturedMatches(limit = 5)
+        fun loadMatches() {
 
-                if (response.isSuccessful) {
-                    val listDto = response.body()?.data
+            viewModelScope.launch {
+                try {
+                    val response = apiService.getMatches()
+                    if (response.isSuccessful) {
+                        val listDto = response.body()?.data ?: emptyList()
 
-                    if (listDto != null) {
-                        hotMatchList.value = listDto.map { dto ->
+                        // Map từ DTO sang Model hiển thị
+                        matchList.value = listDto.map { dto ->android.util.Log.d("DEBUG_HOT", "ID: ${dto.id}, isFeatured: ${dto.isHot}")
                             FullMatchDetail(
                                 id = dto.id,
-                                teamA = dto.homeTeamName ?: "TBD", // Tránh lỗi null nếu tên đội trống
-                                teamB = dto.awayTeamName ?: "TBD",
-                                status = dto.status ?: "scheduled",
-                                scoreA = dto.homeScore ?: 0,
-                                scoreB = dto.awayScore ?: 0,
-                                time = dto.scheduledAt ?: "",
-                                date = dto.scheduledAt ?: "",
+                                teamA = dto.teamA, // Lấy từ MatchDto
+                                teamB = dto.teamB, // Lấy từ MatchDto
+                                status = dto.status, // <--- THÊM DÒNG NÀY VÀO ĐỂ TRUYỀN DỮ LIỆU
+                                scoreA = dto.home_score ?: 0,
+                                scoreB = dto.away_score ?: 0,
+                                time = dto.scheduled_at ?: "",
+                                date = dto.scheduled_at ?: "",
                                 stadium = "Chưa cập nhật",
-                                isStarted = dto.status != "scheduled",
-                                events = emptyList(),
-                                lineupA = emptyList(),
-                                lineupB = emptyList(),
-                                subsA = emptyList(),
-                                subsB = emptyList(),
-                                PossessionA = "0%",
-                                PossessionB = "0%",
-                                ShotsA = "0",
-                                ShotsB = "0",
-                                mvp = "",
-                                isHot = true
+                                isStarted = dto.isStarted,
+                                // Các trường mặc định để hiển thị UI
+
+                                events = emptyList(), lineupA = emptyList(), lineupB = emptyList(),
+                                subsA = emptyList(), subsB = emptyList(), PossessionA = "0%",
+                                PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = "",
+                                isHot = dto.isHot
                             )
                         }
-                        Log.d("API_SUCCESS", "Đã tải ${listDto.size} trận đấu hot")
-                    } else {
-                        Log.e("API_ERROR", "Body data bị null")
                     }
-                } else {
-                    Log.e("API_ERROR", "Response không thành công: ${response.code()}")
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-            } catch (e: Exception) {
-                Log.e("API_CRASH", "Lỗi mapping dữ liệu: ${e.message}")
-                e.printStackTrace()
             }
         }
-    }
+        // Trong HomeViewModel.kt
+        private val _tournamentRules = MutableStateFlow<TournamentRules?>(null)
+        val tournamentRules: StateFlow<TournamentRules?> = _tournamentRules.asStateFlow()
 
-    private val _selectedMatchDetail = MutableStateFlow<FullMatchDetail?>(null)
-    val selectedMatchDetail: StateFlow<FullMatchDetail?> = _selectedMatchDetail
-    fun fetchMatchDetail(matchId: Int) {
-        viewModelScope.launch {
-            try {
-                val response = apiService.getMatchDetail(matchId)
-                Log.d("API_CHECK_FULL", "Raw Body: ${response.body()}")
-                if (response.isSuccessful) {
-                    _selectedMatchDetail.value = response.body()?.data
+        // Hàm gọi API lấy luật chung
+        fun loadGlobalRules() {
+            viewModelScope.launch {
+                try {
+                    val response = apiService.getGlobalRules()
+                    if (response.isSuccessful && response.body()?.status == "success") {
+                        _tournamentRules.value = response.body()?.data
+                    } else {
+                        Log.e("HomeViewModel", "Không lấy được luật: ${response.code()}")
+                    }
+                } catch (e: Exception) {
+                    Log.e("HomeViewModel", "Lỗi Exception: ${e.message}")
                 }
-                Log.d("API_CHECK", "Data nhận được: ${response.body()?.data}")
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
-    }
-    private val _teamDetail = MutableStateFlow<TeamDetailData?>(null)
-    val teamDetail = _teamDetail.asStateFlow()
-    fun fetchTeamDetail(teamId: Int) {
-        Log.d("TeamViewModel", "Đang gọi API chi tiết với teamId: $teamId")
+        fun loadFeaturedMatches() {
+            viewModelScope.launch {
+                try {
+                    val response = apiService.getFeaturedMatches(limit = 5)
 
-        // Kiểm tra nhanh: Nếu ID bằng 0, không gọi API nữa để tránh lỗi server
-        if (teamId <= 0) {
-            Log.e("TeamViewModel", "teamId không hợp lệ: $teamId")
-            _isLoading.value = false
-            return
+                    if (response.isSuccessful) {
+                        val listDto = response.body()?.data
+
+                        if (listDto != null) {
+                            hotMatchList.value = listDto.map { dto ->
+                                FullMatchDetail(
+                                    id = dto.id,
+                                    teamA = dto.homeTeamName ?: "TBD", // Tránh lỗi null nếu tên đội trống
+                                    teamB = dto.awayTeamName ?: "TBD",
+                                    status = dto.status ?: "scheduled",
+                                    scoreA = dto.homeScore ?: 0,
+                                    scoreB = dto.awayScore ?: 0,
+                                    time = dto.scheduledAt ?: "",
+                                    date = dto.scheduledAt ?: "",
+                                    stadium = "Chưa cập nhật",
+                                    isStarted = dto.status != "scheduled",
+                                    events = emptyList(),
+                                    lineupA = emptyList(),
+                                    lineupB = emptyList(),
+                                    subsA = emptyList(),
+                                    subsB = emptyList(),
+                                    PossessionA = "0%",
+                                    PossessionB = "0%",
+                                    ShotsA = "0",
+                                    ShotsB = "0",
+                                    mvp = "",
+                                    isHot = true
+                                )
+                            }
+                            Log.d("API_SUCCESS", "Đã tải ${listDto.size} trận đấu hot")
+                        } else {
+                            Log.e("API_ERROR", "Body data bị null")
+                        }
+                    } else {
+                        Log.e("API_ERROR", "Response không thành công: ${response.code()}")
+                    }
+                } catch (e: Exception) {
+                    Log.e("API_CRASH", "Lỗi mapping dữ liệu: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
         }
 
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val response = apiService.getTeamDetail(teamId)
-                if (response.isSuccessful && response.body() != null) {
-                    _teamDetail.value = response.body()?.data
-                    Log.d("API_DEBUG", "Dữ liệu body: ${response.body()}")
-                    Log.d("TeamViewModel", "Lấy dữ liệu thành công cho teamId: $teamId")
-                } else {
-                    Log.e("TeamViewModel", "API trả về lỗi: ${response.code()}")
+        private val _selectedMatchDetail = MutableStateFlow<FullMatchDetail?>(null)
+        val selectedMatchDetail: StateFlow<FullMatchDetail?> = _selectedMatchDetail
+        fun fetchMatchDetail(matchId: Int) {
+            viewModelScope.launch {
+                try {
+                    val response = apiService.getMatchDetail(matchId)
+                    Log.d("API_CHECK_FULL", "Raw Body: ${response.body()}")
+                    if (response.isSuccessful) {
+                        _selectedMatchDetail.value = response.body()?.data
+                    }
+                    Log.d("API_CHECK", "Data nhận được: ${response.body()?.data}")
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-            } catch (e: Exception) {
-                Log.e("API_DEBUG", "Lỗi API: ${e.message}")
-                Log.e("TeamViewModel", "Exception: ${e.message}")
-            } finally {
+            }
+        }
+        private val _teamDetail = MutableStateFlow<TeamDetailData?>(null)
+        val teamDetail = _teamDetail.asStateFlow()
+        fun fetchTeamDetail(teamId: Int) {
+            Log.d("TeamViewModel", "Đang gọi API chi tiết với teamId: $teamId")
+
+            // Kiểm tra nhanh: Nếu ID bằng 0, không gọi API nữa để tránh lỗi server
+            if (teamId <= 0) {
+                Log.e("TeamViewModel", "teamId không hợp lệ: $teamId")
                 _isLoading.value = false
+                return
             }
-        }
-    }
-    fun loadStandings(seasonId: Int? = 1) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                // Đảm bảo ApiService đã có hàm getDetailedStandings()
-                val response = apiService.getDetailedStandings(seasonId)
-                if (response.isSuccessful) {
-                    val data = response.body()?.data ?: emptyList()
-                    allStandings.value = data
-                    standingList.value = data
+
+            viewModelScope.launch {
+                _isLoading.value = true
+                try {
+                    val response = apiService.getTeamDetail(teamId)
+                    if (response.isSuccessful && response.body() != null) {
+                        _teamDetail.value = response.body()?.data
+                        Log.d("API_DEBUG", "Dữ liệu body: ${response.body()}")
+                        Log.d("TeamViewModel", "Lấy dữ liệu thành công cho teamId: $teamId")
+                    } else {
+                        Log.e("TeamViewModel", "API trả về lỗi: ${response.code()}")
+                    }
+                } catch (e: Exception) {
+                    Log.e("API_DEBUG", "Lỗi API: ${e.message}")
+                    Log.e("TeamViewModel", "Exception: ${e.message}")
+                } finally {
+                    _isLoading.value = false
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                _isLoading.value = false
             }
         }
-    }
-    val teamPlayers = MutableStateFlow<List<PlayerInfo>>(emptyList()) // Danh sách cầu thủ của đội
-    // Gọi API lấy chi tiết đội (đã có từ trước)
-    fun loadTeamDetails(teamId: Int) {
-        viewModelScope.launch {
-            try {
-                val response = apiService.getTeamDetail(teamId)
-                if (response.isSuccessful) {
-                    teamPlayers.value = response.body()?.data?.players ?: emptyList()
+
+        // SỬA HÀM loadStandings
+        fun loadStandings(seasonId: Int?) {if (seasonId == null) return
+            viewModelScope.launch {
+                _isLoading.value = true
+                try {
+                    val response = apiService.getDetailedStandings(seasonId)
+                    if (response.isSuccessful) {
+                        val data = response.body()?.data ?: emptyList()
+                        allStandings.value = data
+                        // Cập nhật hiển thị dựa trên phase hiện tại nếu có
+                        standingList.value = if (_selectedPhaseId.value != null && _selectedPhaseId.value != -1) {
+                            data.filter { it.phaseId == _selectedPhaseId.value }
+                        } else {
+                            data
+                        }
+                    }
+                } catch (e: Exception) { e.printStackTrace() }
+                finally { _isLoading.value = false }
+            }
+        }
+        val teamPlayers = MutableStateFlow<List<PlayerInfo>>(emptyList()) // Danh sách cầu thủ của đội
+        // Gọi API lấy chi tiết đội (đã có từ trước)
+        fun loadTeamDetails(teamId: Int) {
+            viewModelScope.launch {
+                try {
+                    val response = apiService.getTeamDetail(teamId)
+                    if (response.isSuccessful) {
+                        teamPlayers.value = response.body()?.data?.players ?: emptyList()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
-    }
-    fun addPlayer(teamId: Int, player: PlayerInfo) {
-        viewModelScope.launch {
-            try {
-                val response = apiService.addPlayerToTeam(teamId, player)
-                if (response.isSuccessful) {
-                    loadTeamDetails(teamId) // Cập nhật lại list sau khi thêm
+        fun addPlayer(teamId: Int, player: PlayerInfo) {
+            viewModelScope.launch {
+                try {
+                    val response = apiService.addPlayerToTeam(teamId, player)
+                    if (response.isSuccessful) {
+                        loadTeamDetails(teamId) // Cập nhật lại list sau khi thêm
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
-    }
 
-    // Hàm xóa cầu thủ
-    fun removePlayer(teamId: Int, playerId: Int) {
-        viewModelScope.launch {
-            try {
-                val response = apiService.removePlayerFromTeam(teamId, playerId)
-                if (response.isSuccessful) {
-                    loadTeamDetails(teamId) // Cập nhật lại list sau khi xóa
+        // Hàm xóa cầu thủ
+        fun removePlayer(teamId: Int, playerId: Int) {
+            viewModelScope.launch {
+                try {
+                    val response = apiService.removePlayerFromTeam(teamId, playerId)
+                    if (response.isSuccessful) {
+                        loadTeamDetails(teamId) // Cập nhật lại list sau khi xóa
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
-    }
 
 
 
 
 
-    private fun setMockData() {
-        _phases.value = listOf(
-            TournamentPhase(1, "Vòng Bảng", "round_robin",""),
-            TournamentPhase(2, "Tứ Kết", "knockout",""),
-            TournamentPhase(3, "Bán Kết", "knockout",""),
-            TournamentPhase(4, "Chung Kết", "knockout","")
-        )
-    }
-
-    val allStandings = MutableStateFlow<List<GroupStanding>>(emptyList())
-
-    // 2. ID của phase đang được chọn (mặc định null hoặc chọn cái đầu tiên)
-    private val _selectedPhaseId = MutableStateFlow<Int?>(null)
-    val selectedPhaseId = _selectedPhaseId.asStateFlow()
-
-    // 3. Logic lọc tự động (Reactive)
-    val filteredStandings = derivedStateOf {
-        val currentId = _selectedPhaseId.value
-        if (currentId == null) {
-            allStandings.value
-        } else {
-            allStandings.value.filter { it.phaseId == currentId }
+        private fun setMockData() {
+            _phases.value = listOf(
+                TournamentPhase(1, "Vòng Bảng", "round_robin",""),
+                TournamentPhase(2, "Tứ Kết", "knockout",""),
+                TournamentPhase(3, "Bán Kết", "knockout",""),
+                TournamentPhase(4, "Chung Kết", "knockout","")
+            )
         }
-    }
 
-    fun selectPhase(phaseId: Int) {
-        _selectedPhaseId.value = phaseId
-        standingList.value = if (phaseId == -1) {
-            allStandings.value
-        } else {
-            allStandings.value.filter { it.phaseId == phaseId }
+        val allStandings = MutableStateFlow<List<GroupStanding>>(emptyList())
+
+        // 2. ID của phase đang được chọn (mặc định null hoặc chọn cái đầu tiên)
+        private val _selectedPhaseId = MutableStateFlow<Int?>(null)
+        val selectedPhaseId = _selectedPhaseId.asStateFlow()
+
+        // 3. Logic lọc tự động (Reactive)
+        val filteredStandings = derivedStateOf {
+            val currentId = _selectedPhaseId.value
+            if (currentId == null) {
+                allStandings.value
+            } else {
+                allStandings.value.filter { it.phaseId == currentId }
+            }
         }
-    }
-    private val _seasonsWithPhases = MutableStateFlow<List<SeasonWithPhases>>(emptyList())
-    val seasonsWithPhases = _seasonsWithPhases.asStateFlow()
 
-    // 2. Hàm gọi dữ liệu từ Backend
-    fun loadSeasons() {
-        viewModelScope.launch {
-            try {
-                // Giả sử bạn có repository để gọi API
-                val response = apiService.getAllData()
-                if (response.body()?.status == "success") {
-                    val myData = response.body()?.data
+        fun selectPhase(phaseId: Int) {
+            _selectedPhaseId.value = phaseId
+            // Chỉ cập nhật hiển thị, không gọi API, không làm loạn dữ liệu gốc
+            standingList.value = if (phaseId == -1) {
+                allStandings.value
+            } else {
+                allStandings.value.filter { it.phaseId == phaseId }
+            }
+        }
+        private val _seasonsWithPhases = MutableStateFlow<List<SeasonWithPhases>>(emptyList())
+        val seasonsWithPhases = _seasonsWithPhases.asStateFlow()
 
+        // 2. Hàm gọi dữ liệu từ Backend
+
+        fun loadSeasons() {
+            viewModelScope.launch {
+                try {
+                    val response = apiService.getAllData()
+                    if (response.isSuccessful && response.body()?.status == "success") {
+                        val data = response.body()?.data ?: emptyList()
+                        _seasonsWithPhases.value = data
+
+                        // Chỉ set mùa giải mặc định nếu hiện tại đang là null (chưa chọn gì)
+                        if (data.isNotEmpty() && _selectedSeason.value == null) {
+                            _selectedSeason.value = data.first()
+                            // XÓA DÒNG loadStandings(firstSeason.id) Ở ĐÂY
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("HomeViewModel", "Lỗi load dữ liệu: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.e("HomeViewModel", "Lỗi load dữ liệu: ${e.message}")
             }
         }
     }
-}
 
