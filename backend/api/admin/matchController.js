@@ -74,16 +74,10 @@ router.get('/matches/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const [matches] = await pool.execute(
-            `SELECT m.id, m.phase_id, m.group_id, 
-                    m.home_team_id,
+            `SELECT m.*,
                     ht.name AS teamA,
-                    m.away_team_id,
-                    at.name AS teamB, 
-                    m.scheduled_at, m.played_at,
-                    m.home_score AS scoreA, 
-                    m.away_score AS scoreB, 
-                    m.status, m.round, m.leg, m.venue_id, v.name AS venue_name,
-                    m.referee, m.season_id, m.is_published, m.created_at, m.updated_at
+                    at.name AS teamB,
+                    v.name AS venue_name
              FROM matches m
              LEFT JOIN teams ht ON m.home_team_id = ht.id
              LEFT JOIN teams at ON m.away_team_id = at.id
@@ -96,8 +90,51 @@ router.get('/matches/:id', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu.' });
         }
 
-        // Trả về dữ liệu đã được đổi tên key chuẩn theo FullMatchDetail của Android
-        res.json({ success: true, data: matches[0] });
+        const matchData = matches[0];
+
+        // Lấy danh sách cầu thủ và phân loại thông minh (Tận dụng logic 11 người đầu)
+        const [allPlayers] = await pool.execute(`
+            SELECT tp.player_id, tp.jersey_number as number, u.name, tp.position, tp.team_id
+            FROM team_players tp
+            JOIN players p ON tp.player_id = p.id
+            JOIN users u ON p.user_id = u.id
+            WHERE tp.team_id IN (?, ?) AND tp.is_active = 1
+            ORDER BY tp.jersey_number ASC
+        `, [matchData.home_team_id, matchData.away_team_id]);
+
+        const processTeam = (teamId) => {
+            const players = allPlayers.filter(p => p.team_id == teamId);
+            return {
+                lineup: players.slice(0, 11),
+                subs: players.slice(11)
+            };
+        };
+
+        const teamAData = processTeam(matchData.home_team_id);
+        const teamBData = processTeam(matchData.away_team_id);
+
+        // Đóng gói dữ liệu chuẩn FullMatchDetail cho App
+        const responseData = {
+            id: matchData.id,
+            teamA: matchData.teamA,
+            teamB: matchData.teamB,
+            home_team_id: matchData.home_team_id,
+            away_team_id: matchData.away_team_id,
+            status: matchData.status,
+            isStarted: matchData.status !== 'scheduled',
+            scoreA: matchData.home_score || 0,
+            scoreB: matchData.away_score || 0,
+            time: matchData.scheduled_at,
+            date: matchData.scheduled_at,
+            venue_name: matchData.venue_name || "Chưa xác định",
+            lineupA: teamAData.lineup,
+            subsA: teamAData.subs,
+            lineupB: teamBData.lineup,
+            subsB: teamBData.subs,
+            events: []
+        };
+
+        res.json({ success: true, data: responseData });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

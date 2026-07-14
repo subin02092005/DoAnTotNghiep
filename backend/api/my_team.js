@@ -442,18 +442,18 @@ router.post('/register_to_season', async (req, res) => {
         let season_team_id;
 
         if (existing.length > 0 && existing[0].is_active === 0) {
-            // Đội đã từng đăng ký rồi hủy -> Cập nhật lại bản ghi cũ thành active
+            // Đội đã từng đăng ký rồi hủy -> Cập nhật lại bản ghi cũ thành pending để Admin duyệt
             season_team_id = existing[0].id;
             await connection.query(
                 `UPDATE season_teams 
-                 SET status = 'active', is_active = 1, deleted_at = NULL, updated_at = NOW() 
+                 SET status = 'pending', is_active = 1, deleted_at = NULL, updated_at = NOW()
                  WHERE id = ?`,
                 [season_team_id]
             );
         } else {
-            // Đội chưa từng đăng ký giải này -> Thêm mới hoàn toàn với status = 'active'
+            // Đội chưa từng đăng ký giải này -> Thêm mới hoàn toàn với status = 'pending'
             const [insertResult] = await connection.query(
-                "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at) VALUES (?, ?, 'active', 1, NOW())",
+                "INSERT INTO season_teams (season_id, team_id, status, is_active, created_at) VALUES (?, ?, 'pending', 1, NOW())",
                 [season_id, team_id]
             );
             season_team_id = insertResult.insertId; 

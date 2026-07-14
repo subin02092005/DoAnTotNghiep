@@ -948,7 +948,7 @@ fun SeasonDetailScreen(seasonId: Int, viewModel: AdminViewModel, onBack: () -> U
         }
 
         when (selectedTabIndex) {
-            0 -> SeasonTeamListContent(viewModel)
+            0 -> SeasonTeamListContent(seasonId, viewModel)
             1 -> SeasonStageContent(seasonId, viewModel)
             2 -> AdminStandingContent(seasonId, viewModel)
             3 -> KnockoutBracketScreen(seasonId, viewModel)
@@ -1104,7 +1104,7 @@ fun AdminStandingContent(seasonId: Int, viewModel: AdminViewModel) {
 }
 
 @Composable
-fun SeasonTeamListContent(viewModel: AdminViewModel) {
+fun SeasonTeamListContent(seasonId: Int, viewModel: AdminViewModel) {
     val seasonDetail by viewModel.seasonDetail.collectAsState()
     val teamList = seasonDetail?.teams ?: emptyList()
 
@@ -1119,8 +1119,32 @@ fun SeasonTeamListContent(viewModel: AdminViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = team.name, color = Color.White, fontWeight = FontWeight.SemiBold)
-                    Text(text = team.status.uppercase(), color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.End)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = team.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = team.status.uppercase(), 
+                            color = when(team.status) {
+                                "pending" -> Color.Yellow
+                                "active", "approved" -> NeonGreen
+                                else -> Color.Red
+                            }, 
+                            fontSize = 11.sp, 
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    Row {
+                        if (team.status == "pending" || team.status == "active") {
+                            if (team.status == "pending") {
+                                IconButton(onClick = { viewModel.approveSeasonTeam(seasonId, team.team_id) }) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = "Approve", tint = NeonGreen)
+                                }
+                            }
+                            IconButton(onClick = { viewModel.rejectSeasonTeam(seasonId, team.team_id) }) {
+                                Icon(Icons.Default.Cancel, contentDescription = "Reject", tint = Color.Red)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1147,7 +1171,10 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        val unassignedTeams = allTeams.filter { it.groupId == null }
+        // CHỈ LỌC NHỮNG ĐỘI ĐÃ DUYỆT (active/approved) ĐỂ XẾP BẢNG
+        val unassignedTeams = allTeams.filter { 
+            it.groupId == null && (it.status == "active" || it.status == "approved") 
+        }
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -1224,7 +1251,15 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
                 Text("Thêm vòng đấu", color = Color.Black, fontWeight = FontWeight.Bold)
             }
             OutlinedButton(
-                onClick = { showAutoScheduleDialog = true }, 
+                onClick = { 
+                    if (unassignedTeams.isNotEmpty()) {
+                        viewModel.updateMessage("Cảnh báo: Còn ${unassignedTeams.size} đội chưa được xếp bảng. Vui lòng xếp tất cả đội vào bảng trước khi xếp lịch!")
+                    } else if (allTeams.isEmpty()) {
+                        viewModel.updateMessage("Mùa giải chưa có đội bóng nào tham gia.")
+                    } else {
+                        showAutoScheduleDialog = true 
+                    }
+                },
                 modifier = Modifier.weight(1f), 
                 border = BorderStroke(1.dp, NeonGreen)
             ) {
@@ -1315,7 +1350,8 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
 
     if (showAddTeamDialog && selectedPhaseForTeam != null) {
         AddTeamToPhaseDialog(
-            teams = allTeams,
+            // CHỈ CHO PHÉP CHỌN ĐỘI ĐÃ DUYỆT
+            teams = allTeams.filter { it.status == "active" || it.status == "approved" },
             groups = selectedPhaseForTeam!!.groups ?: emptyList(),
             onDismiss = { showAddTeamDialog = false },
             onTeamSelected = { team, group ->
@@ -2157,6 +2193,7 @@ fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: 
     var showGoalDialog by remember { mutableStateOf(false) }
     var showSubDialog by remember { mutableStateOf(false) }
     var showCardDialog by remember { mutableStateOf(false) }
+    var showPlayerListDialog by remember { mutableStateOf(false) }
     var initialIsTeamAForGoal by remember { mutableStateOf(true) }
 
     LaunchedEffect(matchId) { viewModel.fetchMatchDetail(matchId); viewModel.fetchMatchEvents(matchId) }
@@ -2170,6 +2207,7 @@ fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: 
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
                 matchDetail?.let { match ->
+                    // ... (phần tỉ số giữ nguyên)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
@@ -2229,10 +2267,17 @@ fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: 
                             
                             Spacer(modifier = Modifier.height(16.dp))
                             
-                            TextButton(onClick = { showScoreDialog = true }) {
-                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
-                                Spacer(Modifier.width(4.dp))
-                                Text("Sửa tỉ số thủ công", color = Color.Gray, fontSize = 12.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { showScoreDialog = true }, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Sửa tỉ số", color = Color.Gray, fontSize = 12.sp)
+                                }
+                                TextButton(onClick = { showPlayerListDialog = true }, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(16.dp), tint = NeonGreen)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Cầu thủ", color = NeonGreen, fontSize = 12.sp)
+                                }
                             }
                         }
                     }
@@ -2278,6 +2323,50 @@ fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: 
     )
     if (showSubDialog && matchDetail != null) SubstitutionDialog(matchDetail = matchDetail!!, onDismiss = { showSubDialog = false }, onConfirm = { teamId, pIn, pOut, min, period -> viewModel.addSubstitution(matchId, teamId, pIn, pOut, min, period); showSubDialog = false })
     if (showCardDialog && matchDetail != null) CardDialog(matchDetail = matchDetail!!, onDismiss = { showCardDialog = false }, onConfirm = { teamId, playerId, min, period, isRed -> viewModel.addCard(matchId, teamId, playerId, min, period, isRed); showCardDialog = false })
+    if (showPlayerListDialog && matchDetail != null) PlayerListDialog(matchDetail = matchDetail!!, onDismiss = { showPlayerListDialog = false })
+}
+
+@Composable
+fun PlayerListDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NeonSurface,
+        title = { 
+            Text("Danh sách thi đấu", color = NeonGreen, fontWeight = FontWeight.Bold) 
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    // Đội A
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(matchDetail.teamA, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                        HorizontalDivider(color = NeonGreen, modifier = Modifier.padding(vertical = 4.dp))
+                        matchDetail.lineupA.forEach { player ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text("#${player.number}", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
+                                Text(player.name, color = Color.White, fontSize = 11.sp, maxLines = 1)
+                            }
+                        }
+                    }
+
+                    // Đội B
+                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+                        Text(matchDetail.teamB, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                        HorizontalDivider(color = NeonGreen, modifier = Modifier.padding(vertical = 4.dp))
+                        matchDetail.lineupB.forEach { player ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text("#${player.number}", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
+                                Text(player.name, color = Color.White, fontSize = 11.sp, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Đóng", color = Color.White) }
+        }
+    )
 }
 
 @Composable
@@ -2550,112 +2639,76 @@ fun SubstitutionDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onCo
         "penalty_shootout" to "Loạt sút luân lưu"
     )
 
+    // Lọc danh sách cầu thủ thông minh
+    val onFieldPlayers = if (isTeamASelected) matchDetail.lineupA else matchDetail.lineupB
+    val benchPlayers = if (isTeamASelected) matchDetail.subsA else matchDetail.subsB
     val selectedTeamId = if (isTeamASelected) matchDetail.teamAId else matchDetail.teamBId
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Thay người", color = Color.White, fontWeight = FontWeight.Bold) },
+        title = { Text("Thay người 🔄", color = Color.White, fontWeight = FontWeight.Bold) },
         containerColor = NeonSurface,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { isTeamASelected = true }
-                    ) {
-                        RadioButton(
-                            selected = isTeamASelected,
-                            onClick = { isTeamASelected = true },
-                            colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
-                        )
-                        Text(matchDetail.teamA, color = Color.White, fontSize = 14.sp)
-                    }
-
-                    Spacer(modifier = Modifier.width(24.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { isTeamASelected = false }
-                    ) {
-                        RadioButton(
-                            selected = !isTeamASelected,
-                            onClick = { isTeamASelected = false },
-                            colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
-                        )
-                        Text(matchDetail.teamB, color = Color.White, fontSize = 14.sp)
-                    }
+                // Chọn đội
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    RadioButton(selected = isTeamASelected, onClick = { isTeamASelected = true; jerseyIn = ""; jerseyOut = "" })
+                    Text(matchDetail.teamA, color = Color.White, modifier = Modifier.align(Alignment.CenterVertically))
+                    Spacer(Modifier.width(20.dp))
+                    RadioButton(selected = !isTeamASelected, onClick = { isTeamASelected = false; jerseyIn = ""; jerseyOut = "" })
+                    Text(matchDetail.teamB, color = Color.White, modifier = Modifier.align(Alignment.CenterVertically))
                 }
 
-                // Chọn hiệp đấu
+                // Chọn hiệp
                 Box {
-                    OutlinedButton(
-                        onClick = { expandedPeriod = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(1.dp, Color.Gray)
-                    ) {
+                    OutlinedButton(onClick = { expandedPeriod = true }, modifier = Modifier.fillMaxWidth()) {
                         Text(periods[period] ?: "Chọn hiệp", color = Color.White)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White)
                     }
-                    DropdownMenu(
-                        expanded = expandedPeriod,
-                        onDismissRequest = { expandedPeriod = false },
-                        modifier = Modifier.background(NeonSurface)
-                    ) {
-                        periods.forEach { (key, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label, color = Color.White) },
-                                onClick = {
-                                    period = key
-                                    expandedPeriod = false
-                                }
-                            )
-                        }
+                    DropdownMenu(expanded = expandedPeriod, onDismissRequest = { expandedPeriod = false }) {
+                        periods.forEach { (k, v) -> DropdownMenuItem(text = { Text(v) }, onClick = { period = k; expandedPeriod = false }) }
                     }
                 }
 
-                OutlinedTextField(
-                    value = minute,
-                    onValueChange = { minute = it.filter { it.isDigit() } },
-                    label = { Text("Phút thi đấu") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = jerseyIn,
-                    onValueChange = { jerseyIn = it.filter { it.isDigit() } },
-                    label = { Text("Số áo cầu thủ VÀO") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = jerseyOut,
-                    onValueChange = { jerseyOut = it.filter { it.isDigit() } },
-                    label = { Text("Số áo cầu thủ RA") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                OutlinedTextField(value = minute, onValueChange = { minute = it.filter { it.isDigit() } }, label = { Text("Phút") })
+
+                Text("Cầu thủ RA (Đang đá):", color = NeonGreen, fontSize = 12.sp)
+                LazyRow(modifier = Modifier.fillMaxWidth()) {
+                    items(onFieldPlayers) { p ->
+                        FilterChip(
+                            selected = jerseyOut == p.number,
+                            onClick = { jerseyOut = p.number },
+                            label = { Text("#${p.number} ${p.name.take(10)}") },
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                    }
+                }
+
+                Text("Cầu thủ VÀO (Dự bị):", color = Color.Yellow, fontSize = 12.sp)
+                LazyRow(modifier = Modifier.fillMaxWidth()) {
+                    items(benchPlayers) { p ->
+                        FilterChip(
+                            selected = jerseyIn == p.number,
+                            onClick = { jerseyIn = p.number },
+                            label = { Text("#${p.number} ${p.name.take(10)}") },
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = { 
-                    if (jerseyIn.isNotBlank() && jerseyOut.isNotBlank()) {
-                        onConfirm(selectedTeamId, jerseyIn.toInt(), jerseyOut.toInt(), minute.toIntOrNull() ?: 0, period) 
+                    val pIn = jerseyIn.toIntOrNull()
+                    val pOut = jerseyOut.toIntOrNull()
+                    if (pIn != null && pOut != null) {
+                        onConfirm(selectedTeamId, pIn, pOut, minute.toIntOrNull() ?: 0, period) 
                     }
                 },
-                enabled = jerseyIn.isNotBlank() && jerseyOut.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
-            ) {
-                Text("Thêm", color = Color.Black, fontWeight = FontWeight.Bold)
-            }
+                enabled = jerseyIn.isNotBlank() && jerseyOut.isNotBlank()
+            ) { Text("Xác nhận") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Hủy", color = NeonGray) }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
     )
 }
 

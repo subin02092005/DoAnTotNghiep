@@ -534,29 +534,17 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     val matchDetail: StateFlow<FullMatchDetail?> = _matchDetail
 
     fun fetchMatchDetail(matchId: Int) {
-        // 1. XÓA DỮ LIỆU CŨ NGAY LẬP TỨC để tránh hiện tỉ số cũ (0-3)
         _matchDetail.value = null
         
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val rawResponse = apiService.getMatchRawDetail(matchId)
-                val rawMatch = rawResponse.body()?.data
-                if (rawMatch != null) {
-                    // Nếu đang đá, ưu tiên lấy từ raw match
-                    if (rawMatch.status == "ongoing" || rawMatch.status == "live") {
-                        _matchDetail.value = rawMatch
-                    } else {
-                        // Nếu chưa đá hoặc đã xong, lấy chi tiết đầy đủ
-                        val detailResponse = apiService.getMatchDetail(matchId)
-                        val body = detailResponse.body()
-                        if (detailResponse.isSuccessful && body != null) {
-                            // Chấp nhận cả success == true hoặc status == "success"
-                            if (body.success == true || body.status == "success") {
-                                _matchDetail.value = body.data
-                            }
-                        }
-                    }
+                // Sử dụng API thô nhưng đã được nâng cấp đầy đủ thông tin ở Backend
+                val response = apiService.getMatchRawDetail(matchId)
+                if (response.isSuccessful && response.body() != null) {
+                    _matchDetail.value = response.body()?.data
+                } else {
+                    _message.value = "Không thể tải chi tiết trận đấu"
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi tải chi tiết: ${e.message}"
@@ -1064,6 +1052,38 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 _message.value = "Lỗi: ${e.localizedMessage}"
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    fun approveSeasonTeam(seasonId: Int, teamId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.approveSeasonTeam(seasonId, teamId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Đã duyệt đội vào mùa giải"
+                    fetchSeasonDetails(seasonId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi khi duyệt"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun rejectSeasonTeam(seasonId: Int, teamId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.rejectSeasonTeam(seasonId, teamId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Đã từ chối đội bóng"
+                    fetchSeasonDetails(seasonId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi khi từ chối"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
             }
         }
     }

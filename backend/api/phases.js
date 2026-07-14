@@ -630,12 +630,18 @@ router.post('/phases/:phaseId/add-team', async (req, res) => {
             if (groups.length > 0) targetGroupId = groups[0].id;
         }
 
-        // Cập nhật season_teams
-        await connection.execute(
+        // Cập nhật season_teams - CHỈ CHO PHÉP ĐỘI ĐÃ DUYỆT (active/approved)
+        const [updateResult] = await connection.execute(
             `UPDATE season_teams SET group_id = ? 
-             WHERE team_id = ? AND season_id = (SELECT season_id FROM phases WHERE id = ?)`, 
+             WHERE team_id = ? AND season_id = (SELECT season_id FROM phases WHERE id = ?)
+             AND status IN ('active', 'approved')`,
             [targetGroupId || null, teamId, phaseId]
         );
+
+        if (updateResult.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(400).json({ success: false, message: "Đội bóng chưa được duyệt hoặc không tồn tại trong mùa giải!" });
+        }
 
         if (format === 'round_robin') {
             // Xóa record cũ của đội này trong TOÀN BỘ các bảng thuộc Phase này (để dọn dẹp trước khi thêm/chuyển)
@@ -743,10 +749,10 @@ async function generateScheduleForPhase(phaseId, options = {}) {
         const groupIds = groups.map(g => g.id);
         const placeholders = groupIds.map(() => '?').join(',');
 
-        // 3. Lấy danh sách đội ĐÃ ĐƯỢC PHÂN VÀO CÁC BẢNG của Phase này
+        // 3. Lấy danh sách đội ĐÃ ĐƯỢC PHÂN VÀO CÁC BẢNG của Phase này (Chỉ lấy đội đã duyệt)
         const [teamsInPhase] = await connection.execute(
             `SELECT team_id, group_id FROM season_teams
-             WHERE group_id IN (${placeholders}) AND season_id = ? AND is_active = 1`,
+             WHERE group_id IN (${placeholders}) AND season_id = ? AND is_active = 1 AND status IN ('active', 'approved')`,
             [...groupIds, seasonId]
         );
 

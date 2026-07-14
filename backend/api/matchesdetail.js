@@ -52,19 +52,28 @@ const [matchRows] = await pool.execute(`
             ORDER BY e.minute ASC
         `, [matchId]);
 
-        // 3. Lấy đội hình từ bảng team_players (Thay cho bảng lineups không tồn tại)
-        // Lấy tất cả cầu thủ thuộc về đội chủ nhà hoặc đội khách trong trận đấu này
+        // 3. Lấy đội hình và phân loại thông minh
         const [allPlayers] = await pool.execute(`
-            SELECT tp.jersey_number, u.name, tp.position, tp.team_id
+            SELECT tp.player_id, tp.jersey_number, u.name, tp.position, tp.team_id
             FROM team_players tp
             JOIN players p ON tp.player_id = p.id
             JOIN users u ON p.user_id = u.id
-            WHERE tp.team_id IN (?, ?)
+            WHERE tp.team_id IN (?, ?) AND tp.is_active = 1
+            ORDER BY tp.jersey_number ASC
         `, [matchData.home_team_id, matchData.away_team_id]);
 
-        // Phân loại cầu thủ vào đội A và đội B
-        const lineupA = allPlayers.filter(p => p.team_id == matchData.home_team_id);
-        const lineupB = allPlayers.filter(p => p.team_id == matchData.away_team_id);
+        const processTeamPlayers = (teamId) => {
+            const players = allPlayers.filter(p => p.team_id == teamId);
+
+            // TẬN DỤNG: Mặc định 11 người đầu tiên (theo số áo) là đá chính, còn lại là dự bị
+            const lineup = players.slice(0, 11).map(p => ({ ...p, number: p.jersey_number }));
+            const subs = players.slice(11).map(p => ({ ...p, number: p.jersey_number }));
+
+            return { lineup, subs };
+        };
+
+        const teamAData = processTeamPlayers(matchData.home_team_id);
+        const teamBData = processTeamPlayers(matchData.away_team_id);
 
         // 4. Trả về JSON
         const responseData = {
@@ -75,15 +84,16 @@ const [matchRows] = await pool.execute(`
             away_team_id: matchData.away_team_id,
             status: matchData.status,
             isStarted: matchData.status !== 'pending',
-            // Đảm bảo trả về 0 nếu tỉ số trong database là null
             scoreA: matchData.home_final_score !== null ? matchData.home_final_score : (matchData.home_score || 0),
             scoreB: matchData.away_final_score !== null ? matchData.away_final_score : (matchData.away_score || 0),
             time: matchData.scheduled_at,
             date: matchData.scheduled_at,
-            stadium: matchData.venue_name || "Đang cập nhật",
+            venue_name: matchData.venue_name || "Đang cập nhật",
             events: events,
-            lineupA: lineupA,
-            lineupB: lineupB,
+            lineupA: teamAData.lineup,
+            subsA: teamAData.subs,
+            lineupB: teamBData.lineup,
+            subsB: teamBData.subs,
             PossessionA: "50%",
             PossessionB: "50%",
             ShotsA: "0",

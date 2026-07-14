@@ -554,4 +554,42 @@
         }
     });
 
+    // DUYỆT ĐỘI BÓNG VÀO MÙA GIẢI
+    router.patch('/seasons/:seasonId/teams/:teamId/approve', async (req, res) => {
+        const { seasonId, teamId } = req.params;
+        try {
+            const [result] = await pool.execute(
+                "UPDATE season_teams SET status = 'active', updated_at = NOW() WHERE season_id = ? AND team_id = ? AND is_active = 1",
+                [seasonId, teamId]
+            );
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin đăng ký của đội bóng.' });
+            }
+
+            res.json({ success: true, message: 'Đã duyệt đội bóng tham gia mùa giải.' });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
+    // TỪ CHỐI/GỠ ĐỘI BÓNG KHỎI MÙA GIẢI
+    router.patch('/seasons/:seasonId/teams/:teamId/reject', async (req, res) => {
+        const { seasonId, teamId } = req.params;
+        try {
+            const [result] = await pool.execute(
+                "UPDATE season_teams SET status = 'eliminated', is_active = 0, updated_at = NOW(), deleted_at = NOW() WHERE season_id = ? AND team_id = ?",
+                [seasonId, teamId]
+            );
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin đăng ký.' });
+            }
+
+            res.json({ success: true, message: 'Đã từ chối/gỡ đội bóng khỏi mùa giải.' });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
     module.exports = router;

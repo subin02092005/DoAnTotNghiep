@@ -359,6 +359,18 @@
         @GET("seasons/{seasonId}/knockout-bracket")
         suspend fun getKnockoutBracket(@Path("seasonId") seasonId: Int): Response<BracketResponse>
 
+        @PATCH("seasons/{seasonId}/teams/{teamId}/approve")
+        suspend fun approveSeasonTeam(
+            @Path("seasonId") seasonId: Int,
+            @Path("teamId") teamId: Int
+        ): Response<GenericAdminResponse>
+
+        @PATCH("seasons/{seasonId}/teams/{teamId}/reject")
+        suspend fun rejectSeasonTeam(
+            @Path("seasonId") seasonId: Int,
+            @Path("teamId") teamId: Int
+        ): Response<GenericAdminResponse>
+
         @GET("venues")
         suspend fun getVenues(): Response<VenueResponse>
     }
