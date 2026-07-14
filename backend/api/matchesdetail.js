@@ -66,8 +66,8 @@ const [matchRows] = await pool.execute(`
             const players = allPlayers.filter(p => p.team_id == teamId);
 
             // TẬN DỤNG: Mặc định 11 người đầu tiên (theo số áo) là đá chính, còn lại là dự bị
-            const lineup = players.slice(0, 11).map(p => ({ ...p, number: p.jersey_number }));
-            const subs = players.slice(11).map(p => ({ ...p, number: p.jersey_number }));
+            const lineup = players.slice(0, 11);
+            const subs = players.slice(11);
 
             return { lineup, subs };
         };

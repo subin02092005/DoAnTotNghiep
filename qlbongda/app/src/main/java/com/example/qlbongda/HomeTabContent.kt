@@ -92,11 +92,12 @@ fun HomeTabContent(
     // 1. Dùng remember thông thường (không key là currentPhases)
     var selectedPhase by remember { mutableStateOf<TournamentPhase?>(null) }
 
+    /* 🌟 BỎ QUA: Load matches/seasons ở đây vì HomeViewModel đã tự load trong init block
     LaunchedEffect(Unit) {
         viewModel.loadMatches()
         viewModel.loadSeasons()
-
     }
+    */
     // ĐÚNG: Chỉ chạy lại nếu ID thay đổi
     LaunchedEffect(selectedSeason?.id) {
         val seasonId = selectedSeason?.id

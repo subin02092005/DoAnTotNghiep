@@ -23,6 +23,7 @@ const featuredMatchApi = require('./api/admin/featuredMatchController');
 const tournamentApi = require('./api/admin/tournamentController');
 const forgotpasswordRouter = require('./api/forgotPassword'); // Đảm bảo đường dẫn đúng đến file này
 const adminNotificationsRouter = require('./api/admin/notificationsController');
+const paymentApi = require('./api/admin/paymentController');
 // 🌟 ĐÃ SỬA: Đường dẫn nạp file phases nằm cùng cấp trong thư mục api
 const phasesRouter = require('./api/phases');
 
@@ -53,6 +54,7 @@ app.use('/api', featuredMatchApi);
 app.use('/api', tournamentApi);
 app.use('/api', forgotpasswordRouter);
 app.use('/api', adminNotificationsRouter);
+app.use('/api', paymentApi);
 app.use('/api', phasesRouter);
 
 app.use('/api', standingsRoutes);

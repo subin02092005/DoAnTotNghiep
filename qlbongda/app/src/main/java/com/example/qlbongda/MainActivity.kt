@@ -124,58 +124,62 @@ class MainActivity : ComponentActivity() {
                         }
 
                         "home" -> {
-                            if (isLoading) {
-                                Box(modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black), contentAlignment = Alignment.Center) {
+                            HomeScreen(
+                                homeViewModel = homeViewModel,
+                                selectedTab = selectedTab,
+                                onTabSelected = { selectedTab = it },
+                                seasonList = seasonList, // 🌟 TRUYỀN THAM SỐ GIẢI ĐẤU XUỐNG ĐÂY
+                                phaseList = phaseList,
+                                matchList = matchList,
+                                // 🌟 TRUYỀN DÒNG NÀY
+                                onNavigateToMatchDetail = { match ->
+                                    homeViewModel.fetchMatchDetail(match.id)
+                                    currentScreen = "match_detail"
+                                },
+                                standingList = standingList,
+                                selectedStandingTab = currentStandingTabIndex,
+                                onStandingTabSelected = { currentStandingTabIndex = it },
+                                onNavigateToStandingDetail = {
+                                    previousScreen = "home"
+                                    currentScreen = "standing_detail"
+                                },
+                                onLogout = {
+                                    currentScreen = "login"
+                                    Toast.makeText(this@MainActivity, "Đã đăng xuất thành công!", Toast.LENGTH_SHORT).show()
+                                },
+                                onTeamClick = { teamIdClicked ->
+                                    Log.d("DEBUG_MA", "Đã nhận ID: $teamIdClicked")
+
+                                    // Cập nhật ID trực tiếp vào state
+                                    currentTeamId = teamIdClicked
+                                    previousScreen = "home"
+                                    currentScreen = "team_detail"
+
+                                },
+                                isTeamRegistered = isTeamRegistered,
+                                onTeamRegisteredChange = { isTeamRegistered = it },
+                                teamName = teamName,
+                                onTeamNameChange = { teamName = it },
+                                leaderName = leaderName,
+                                onLeaderNameChange = { leaderName = it },
+                                coachName = coachName,
+                                onCoachNameChange = { coachName = it },
+                                isLeagueRegistered = isLeagueRegistered,
+                                onLeagueRegisteredChange = { isLeagueRegistered = it },
+                                currentUserRole = currentUserRole, // 🌟 Truyền xuống
+                                playerList = playerList
+                            )
+
+                            // Chỉ hiện overlay nếu đang load lần đầu hoặc đang chuyển đổi quan trọng
+                            if (isLoading && (seasonList.isEmpty() || standingList.isEmpty())) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     CircularProgressIndicator(color = Color(0xFF00FF66))
                                 }
-                            } else {
-                                HomeScreen(
-                                    homeViewModel = homeViewModel,
-                                    selectedTab = selectedTab,
-                                    onTabSelected = { selectedTab = it },
-                                    seasonList = seasonList, // 🌟 TRUYỀN THAM SỐ GIẢI ĐẤU XUỐNG ĐÂY
-                                    phaseList = phaseList,
-                                    matchList = matchList,
-                                    // 🌟 TRUYỀN DÒNG NÀY
-                                    onNavigateToMatchDetail = { match ->
-                                        homeViewModel.fetchMatchDetail(match.id)
-                                        currentScreen = "match_detail"
-                                    },
-                                    standingList = standingList,
-                                    selectedStandingTab = currentStandingTabIndex,
-                                    onStandingTabSelected = { currentStandingTabIndex = it },
-                                    onNavigateToStandingDetail = {
-                                        previousScreen = "home"
-                                        currentScreen = "standing_detail"
-                                    },
-                                    onLogout = {
-                                        currentScreen = "login"
-                                        Toast.makeText(this@MainActivity, "Đã đăng xuất thành công!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    onTeamClick = { teamIdClicked ->
-                                        Log.d("DEBUG_MA", "Đã nhận ID: $teamIdClicked")
-
-                                        // Cập nhật ID trực tiếp vào state
-                                        currentTeamId = teamIdClicked
-                                        previousScreen = "home"
-                                        currentScreen = "team_detail"
-
-                                    },
-                                    isTeamRegistered = isTeamRegistered,
-                                    onTeamRegisteredChange = { isTeamRegistered = it },
-                                    teamName = teamName,
-                                    onTeamNameChange = { teamName = it },
-                                    leaderName = leaderName,
-                                    onLeaderNameChange = { leaderName = it },
-                                    coachName = coachName,
-                                    onCoachNameChange = { coachName = it },
-                                    isLeagueRegistered = isLeagueRegistered,
-                                    onLeagueRegisteredChange = { isLeagueRegistered = it },
-                                    currentUserRole = currentUserRole, // 🌟 Truyền xuống
-                                    playerList = playerList
-                                )
                             }
                         }
 

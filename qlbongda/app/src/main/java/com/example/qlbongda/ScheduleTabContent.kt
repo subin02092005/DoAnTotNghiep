@@ -41,9 +41,11 @@ fun ScheduleTabContent(
         }
     }
 
+    /* Redundant call
     LaunchedEffect(Unit) {
         viewModel.loadFeaturedMatches()
     }
+    */
 
     Column(
         modifier = Modifier.fillMaxSize().padding(12.dp),

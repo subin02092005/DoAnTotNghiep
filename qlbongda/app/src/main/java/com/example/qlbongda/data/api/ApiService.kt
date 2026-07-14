@@ -155,6 +155,9 @@
         @PATCH("teams/{id}/reject")
         suspend fun rejectTeam(@Path("id") id: Int): Response<GenericAdminResponse>
 
+        @GET("teams/{id}")
+        suspend fun getAdminTeamDetail(@Path("id") id: Int): Response<AdminTeamDetailResponse>
+
         // ---- ADMIN MATCHES ----
         @GET("matchesadmin")
         suspend fun getMatchesAdmin(
@@ -373,4 +376,14 @@
 
         @GET("venues")
         suspend fun getVenues(): Response<VenueResponse>
+
+        // ---- PAYMENTS ----
+        @GET("payments")
+        suspend fun getPayments(@Query("status") status: String? = null): Response<PaymentResponse>
+
+        @PATCH("payments/{id}/confirm")
+        suspend fun confirmPaymentAdmin(@Path("id") id: Int): Response<GenericAdminResponse>
+
+        @PATCH("payments/{id}/reject")
+        suspend fun rejectPaymentAdmin(@Path("id") id: Int): Response<GenericAdminResponse>
     }

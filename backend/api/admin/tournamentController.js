@@ -348,6 +348,13 @@
 
         // 3. Lặp qua từng vòng đấu để gắn groups và teams
         for (let phase of phases) {
+            // Lấy danh sách trận đấu của Phase này
+            const [matches] = await pool.execute(
+                'SELECT id, status FROM matches WHERE phase_id = ?',
+                [phase.id]
+            );
+            phase.matches = matches || [];
+
             // LUÔN LẤY GROUPS CHO CẢ ROUND ROBIN VÀ KNOCKOUT
             const [groups] = await pool.execute('SELECT id, name FROM `groups` WHERE phase_id = ?', [phase.id]);
             phase.groups = groups || [];

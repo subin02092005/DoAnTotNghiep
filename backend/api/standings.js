@@ -24,6 +24,7 @@ router.get('/all_seasons', async (req, res) => {
                 p.name AS phase_name 
             FROM seasons s 
             LEFT JOIN phases p ON s.id = p.season_id
+            WHERE s.is_active = 1 AND s.deleted_at IS NULL
             ORDER BY s.id DESC, p.id ASC
         `;
 

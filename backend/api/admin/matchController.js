@@ -94,7 +94,7 @@ router.get('/matches/:id', async (req, res) => {
 
         // Lấy danh sách cầu thủ và phân loại thông minh (Tận dụng logic 11 người đầu)
         const [allPlayers] = await pool.execute(`
-            SELECT tp.player_id, tp.jersey_number as number, u.name, tp.position, tp.team_id
+            SELECT tp.player_id, tp.jersey_number, u.name, tp.position, tp.team_id
             FROM team_players tp
             JOIN players p ON tp.player_id = p.id
             JOIN users u ON p.user_id = u.id

@@ -94,6 +94,41 @@ data class AdminTeamResponse(
     val message: String? = null
 )
 
+data class TeamLeader(
+    val id: Int,
+    @SerializedName("user_id") val userId: Int,
+    val name: String,
+    val email: String,
+    val phone: String?,
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class TeamPlayerDetail(
+    val id: Int,
+    @SerializedName("jersey_number") val jerseyNumber: Int,
+    val position: String,
+    val role: String,
+    val status: String,
+    @SerializedName("approval_status") val approvalStatus: String,
+    @SerializedName("player_id") val playerId: Int,
+    @SerializedName("player_user_id") val playerUserId: Int?,
+    @SerializedName("player_name") val playerName: String,
+    @SerializedName("player_email") val playerEmail: String?,
+    @SerializedName("player_phone") val playerPhone: String?
+)
+
+data class FullTeamDetail(
+    val team: AdminTeamItem,
+    val leaders: List<TeamLeader>,
+    val players: List<TeamPlayerDetail>
+)
+
+data class AdminTeamDetailResponse(
+    val success: Boolean,
+    val data: FullTeamDetail? = null,
+    val message: String? = null
+)
+
 data class AdminMatchItem(
     val id: Int,
     @SerializedName("phase_id") val phaseId: Int?,
@@ -460,4 +495,25 @@ data class PhaseBracket(
 data class BracketResponse(
     val success: Boolean,
     val data: List<PhaseBracket>
+)
+
+// --- PAYMENT MODELS ---
+data class PaymentItem(
+    val id: Int,
+    @SerializedName("season_team_id") val seasonTeamId: Int,
+    val amount: Double,
+    val status: String,
+    @SerializedName("transaction_ref") val transactionRef: String?,
+    @SerializedName("paid_at") val paidAt: String?,
+    @SerializedName("confirmed_at") val confirmedAt: String?,
+    @SerializedName("confirmed_by") val confirmedBy: Int?,
+    @SerializedName("team_name") val teamName: String,
+    @SerializedName("season_name") val seasonName: String,
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class PaymentResponse(
+    val success: Boolean,
+    val data: List<PaymentItem>? = null,
+    val message: String? = null
 )

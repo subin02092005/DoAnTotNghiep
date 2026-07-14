@@ -234,8 +234,14 @@
             }
         }
 
-        // SỬA HÀM loadStandings
-        fun loadStandings(seasonId: Int?) {if (seasonId == null) return
+        private var lastLoadedStandingSeasonId: Int? = null
+
+        fun loadStandings(seasonId: Int?) {
+            if (seasonId == null) return
+            // 🌟 TỐI ƯU: Nếu đang load đúng mùa này rồi thì không load lại nữa
+            if (lastLoadedStandingSeasonId == seasonId && allStandings.value.isNotEmpty()) return
+            
+            lastLoadedStandingSeasonId = seasonId
             viewModelScope.launch {
                 _isLoading.value = true
                 try {
@@ -249,8 +255,14 @@
                         } else {
                             data
                         }
+                    } else {
+                        // Nếu lỗi thì cho phép load lại lần sau
+                        lastLoadedStandingSeasonId = null
                     }
-                } catch (e: Exception) { e.printStackTrace() }
+                } catch (e: Exception) { 
+                    e.printStackTrace() 
+                    lastLoadedStandingSeasonId = null
+                }
                 finally { _isLoading.value = false }
             }
         }

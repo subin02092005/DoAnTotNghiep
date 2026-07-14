@@ -297,7 +297,21 @@ router.delete('/phases/:id', async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
         await connection.beginTransaction();
 
-        // 1. Lấy danh sách các trận đấu thuộc phase này
+        // 🌟 KIỂM TRA: Nếu đã có trận đấu (không phải cancelled), không cho phép xóa
+        const [activeMatches] = await connection.execute(
+            "SELECT id FROM matches WHERE phase_id = ? AND status NOT IN ('cancelled')",
+            [phaseId]
+        );
+
+        if (activeMatches.length > 0) {
+            await connection.rollback();
+            return res.status(200).json({
+                success: false,
+                message: "Không thể xóa vòng đấu vì đã có lịch thi đấu. Vui lòng Hủy (Cancel) tất cả trận đấu của vòng này trước!"
+            });
+        }
+
+        // 1. Lấy danh sách các trận đấu thuộc phase này (lúc này chỉ còn các trận cancelled)
         const [matchRows] = await connection.execute(
             "SELECT id FROM matches WHERE phase_id = ?",
             [phaseId]

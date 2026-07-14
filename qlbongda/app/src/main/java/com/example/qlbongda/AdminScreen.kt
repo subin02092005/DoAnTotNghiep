@@ -126,7 +126,7 @@ fun AdminScreen(
                     currentSection = AdminSection.MATCH_DETAIL_MANAGE
                 })
                 AdminSection.STATS -> NotificationManagementScreen(adminViewModel)
-                AdminSection.PAYMENTS -> PaymentConfirmationScreen()
+                AdminSection.PAYMENTS -> PaymentConfirmationScreen(adminViewModel)
                 AdminSection.MATCH_DETAIL_MANAGE -> {
                     if (selectedMatchId != -1) {
                         MatchEventManagementScreen(
@@ -556,6 +556,7 @@ fun PlayerManagementAdminScreen(viewModel: AdminViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     val players by viewModel.players.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    var selectedPlayer by remember { mutableStateOf<AdminPlayerItem?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchPlayers()
@@ -599,18 +600,30 @@ fun PlayerManagementAdminScreen(viewModel: AdminViewModel) {
                     PlayerAdminCard(
                         player = player,
                         onLockClick = { player.userId?.let { viewModel.lockAccount(it) } },
-                        onUnlockClick = { player.userId?.let { viewModel.unlockAccount(it) } }
+                        onUnlockClick = { player.userId?.let { viewModel.unlockAccount(it) } },
+                        onClick = { selectedPlayer = player }
                     )
                 }
             }
         }
     }
+
+    selectedPlayer?.let { player ->
+        PlayerDetailDialog(player = player, onDismiss = { selectedPlayer = null })
+    }
 }
 
 @Composable
-fun PlayerAdminCard(player: AdminPlayerItem, onLockClick: () -> Unit, onUnlockClick: () -> Unit) {
+fun PlayerAdminCard(
+    player: AdminPlayerItem, 
+    onLockClick: () -> Unit, 
+    onUnlockClick: () -> Unit,
+    onClick: () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
         border = BorderStroke(1.dp, if (player.userActive == 0) Color.Red else Color(0xFF222222))
@@ -662,10 +675,50 @@ fun PlayerAdminCard(player: AdminPlayerItem, onLockClick: () -> Unit, onUnlockCl
 }
 
 @Composable
+fun PlayerDetailDialog(player: AdminPlayerItem, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1E1E1E),
+        title = { 
+            Text(text = "Chi tiết Cầu thủ", color = NeonGreen, fontWeight = FontWeight.Bold) 
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                DetailRow("Họ và tên", player.name)
+                DetailRow("Email", player.email)
+                DetailRow("Số điện thoại", player.phone)
+                DetailRow("Ngày sinh", player.dateOfBirth?.split("T")?.get(0))
+                DetailRow("Quốc tịch", player.nationality)
+                DetailRow("Vị trí", player.position)
+                DetailRow("Chiều cao", "${player.height} cm")
+                DetailRow("Cân nặng", "${player.weight} kg")
+                DetailRow("Trạng thái tài khoản", if (player.userActive == 1) "Đang hoạt động" else "Đang bị khóa")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Đóng", color = NeonGreen)
+            }
+        }
+    )
+}
+
+@Composable
+fun DetailRow(label: String, value: String?) {
+    Column {
+        Text(text = label, color = Color.Gray, fontSize = 12.sp)
+        Text(text = value ?: "Chưa cập nhật", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+        HorizontalDivider(modifier = Modifier.padding(top = 4.dp), color = Color(0xFF333333))
+    }
+}
+
+@Composable
 fun TeamManagementScreen(viewModel: AdminViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     val teams by viewModel.teams.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    var selectedTeamId by remember { mutableIntStateOf(-1) }
+    val teamDetail by viewModel.teamDetail.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.fetchTeams()
@@ -694,7 +747,7 @@ fun TeamManagementScreen(viewModel: AdminViewModel) {
             singleLine = true
         )
 
-        if (isLoading) {
+        if (isLoading && teams.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NeonGreen)
             }
@@ -709,18 +762,29 @@ fun TeamManagementScreen(viewModel: AdminViewModel) {
                     TeamAdminCard(
                         team = team,
                         onApprove = { team.id?.let { viewModel.approveTeam(it) } },
-                        onReject = { team.id?.let { viewModel.rejectTeam(it) } }
+                        onReject = { team.id?.let { viewModel.rejectTeam(it) } },
+                        onClick = { team.id?.let { 
+                            selectedTeamId = it 
+                            viewModel.fetchAdminTeamDetail(it)
+                        } }
                     )
                 }
             }
         }
     }
+
+    if (selectedTeamId != -1 && teamDetail != null) {
+        TeamDetailDialog(
+            detail = teamDetail!!,
+            onDismiss = { selectedTeamId = -1 }
+        )
+    }
 }
 
 @Composable
-fun TeamAdminCard(team: AdminTeamItem, onApprove: () -> Unit, onReject: () -> Unit) {
+fun TeamAdminCard(team: AdminTeamItem, onApprove: () -> Unit, onReject: () -> Unit, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
         border = BorderStroke(1.dp, if (team.isActive == 0) Color.Yellow else Color(0xFF222222))
@@ -763,20 +827,100 @@ fun TeamAdminCard(team: AdminTeamItem, onApprove: () -> Unit, onReject: () -> Un
 
             if (team.isActive == 0) {
                 Row {
-                    IconButton(onClick = onApprove) {
+                    IconButton(onClick = { 
+                        // Ngăn chặn trigger onClick của Card khi bấm nút Duyệt
+                        onApprove() 
+                    }) {
                         Icon(Icons.Default.CheckCircle, contentDescription = "Approve", tint = NeonGreen)
                     }
-                    IconButton(onClick = onReject) {
+                    IconButton(onClick = { 
+                        onReject() 
+                    }) {
                         Icon(Icons.Default.Cancel, contentDescription = "Reject", tint = Color.Red)
                     }
                 }
             } else {
-                IconButton(onClick = onReject) {
+                IconButton(onClick = { 
+                    onReject() 
+                }) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete/Deactivate", tint = Color.Gray)
                 }
             }
         }
     }
+}
+
+@Composable
+fun TeamDetailDialog(detail: FullTeamDetail, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1E1E1E),
+        title = { 
+            Text(text = "Chi tiết Đội bóng", color = NeonGreen, fontWeight = FontWeight.Bold) 
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("THÔNG TIN CHUNG", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                DetailRow("Tên đội", detail.team.name)
+                DetailRow("Huấn luyện viên", detail.team.coachName)
+                DetailRow("Mô tả", detail.team.description)
+                DetailRow("Ngày tạo", detail.team.createdAt?.split("T")?.get(0))
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("NGƯỜI QUẢN LÝ (LEADERS)", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (detail.leaders.isEmpty()) {
+                    Text("Chưa có người quản lý", color = Color.Gray, fontSize = 13.sp)
+                } else {
+                    detail.leaders.forEach { leader ->
+                        Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                            Text(leader.name, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Email: ${leader.email}", color = Color.LightGray, fontSize = 12.sp)
+                            leader.phone?.let { Text("SĐT: $it", color = Color.LightGray, fontSize = 12.sp) }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("DANH SÁCH CẦU THỦ (${detail.players.size})", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (detail.players.isEmpty()) {
+                    Text("Chưa có cầu thủ nào", color = Color.Gray, fontSize = 13.sp)
+                } else {
+                    detail.players.forEach { player ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier.size(30.dp).background(NeonGreen, RoundedCornerShape(4.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("#${player.jerseyNumber}", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(player.playerName, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    if (player.role == "captain") {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(Icons.Default.Star, contentDescription = "Captain", tint = Color.Yellow, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                                Text("${player.position.uppercase()} - ${player.status}", color = Color.Gray, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Đóng", color = NeonGreen)
+            }
+        }
+    )
 }
 
 @Composable
@@ -1285,8 +1429,13 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
                             }
                             Row {
                                 IconButton(onClick = { 
-                                    // Thêm hộp thoại xác nhận nếu cần, ở đây gọi trực tiếp
-                                    viewModel.deletePhase(seasonId, phase.id)
+                                    // KIỂM TRA LỊCH ĐẤU TRƯỚC KHI CHO XÓA
+                                    val hasActiveMatches = phase.matches?.any { it.status != "cancelled" } == true
+                                    if (hasActiveMatches) {
+                                        viewModel.updateMessage("Không thể xóa vòng đấu đã xếp lịch. Vui lòng Hủy (Cancel) tất cả trận đấu trước!")
+                                    } else {
+                                        viewModel.deletePhase(seasonId, phase.id)
+                                    }
                                 }) {
                                     Icon(Icons.Default.Delete, contentDescription = "Xóa vòng đấu", tint = Color.Red.copy(alpha = 0.7f))
                                 }
@@ -2168,16 +2317,105 @@ fun NotificationItemCard(item: NotificationItem, onDelete: () -> Unit, onEdit: (
 }
 
 @Composable
-fun PaymentConfirmationScreen() {
-    ManagementHeader("XÁC NHẬN THANH TOÁN", "Danh sách các giao dịch chờ phê duyệt")
-    val pendingPayments = listOf("Đội Arsenal - Lệ phí: 5.000.000đ", "Đội Chelsea - Lệ phí: 5.000.000đ", "Đội MU - Lệ phí: 5.000.000đ")
-    LazyColumn(modifier = Modifier.padding(16.dp)) {
-        items(pendingPayments) { payment ->
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), border = BorderStroke(1.dp, Color.Gray)) {
-                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(payment, color = Color.White, fontSize = 14.sp)
-                    Button(onClick = { }, colors = ButtonDefaults.buttonColors(containerColor = NeonGreen), shape = RoundedCornerShape(4.dp)) { Text("Duyệt", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+fun PaymentConfirmationScreen(viewModel: AdminViewModel) {
+    val payments by viewModel.payments.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.fetchPayments()
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ManagementHeader("XÁC NHẬN THANH TOÁN", "Danh sách các giao dịch chờ phê duyệt")
+
+        if (isLoading && payments.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = NeonGreen)
+            }
+        } else if (payments.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Không có giao dịch nào", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
+                items(payments) { payment ->
+                    PaymentItemCard(
+                        payment = payment,
+                        onApprove = { viewModel.confirmPayment(payment.id) },
+                        onReject = { viewModel.rejectPayment(payment.id) }
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun PaymentItemCard(payment: PaymentItem, onApprove: () -> Unit, onReject: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
+        border = BorderStroke(1.dp, if (payment.status == "pending") Color.Yellow else Color.Gray)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = payment.teamName,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Mùa giải: ${payment.seasonName}",
+                        color = Color.LightGray,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        text = "Số tiền: ${String.format("%,.0f", payment.amount)}đ",
+                        color = NeonGreen,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (payment.status == "pending") {
+                    Row {
+                        IconButton(onClick = onApprove) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "Approve", tint = NeonGreen)
+                        }
+                        IconButton(onClick = onReject) {
+                            Icon(Icons.Default.Cancel, contentDescription = "Reject", tint = Color.Red)
+                        }
+                    }
+                } else {
+                    Text(
+                        text = payment.status.uppercase(),
+                        color = if (payment.status == "confirmed") NeonGreen else Color.Red,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "Mã GD: ${payment.transactionRef ?: "N/A"}",
+                    color = Color.Gray,
+                    fontSize = 11.sp
+                )
+                Text(
+                    text = payment.createdAt.split("T").getOrNull(0) ?: "",
+                    color = Color.Gray,
+                    fontSize = 11.sp
+                )
             }
         }
     }

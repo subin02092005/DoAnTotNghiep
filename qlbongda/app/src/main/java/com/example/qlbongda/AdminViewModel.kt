@@ -24,6 +24,9 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     private val _teams = MutableStateFlow<List<AdminTeamItem>>(emptyList())
     val teams: StateFlow<List<AdminTeamItem>> = _teams
 
+    private val _teamDetail = MutableStateFlow<FullTeamDetail?>(null)
+    val teamDetail: StateFlow<FullTeamDetail?> = _teamDetail
+
     private val _matches = MutableStateFlow<List<AdminMatchItem>>(emptyList())
     val matches: StateFlow<List<AdminMatchItem>> = _matches
 
@@ -287,6 +290,24 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
 
     fun clearMessage() {
         _message.value = null
+    }
+
+    fun fetchAdminTeamDetail(teamId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.getAdminTeamDetail(teamId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _teamDetail.value = response.body()?.data
+                } else {
+                    _message.value = "Không thể tải chi tiết đội bóng"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 
     fun fetchTeams(name: String? = null) {
@@ -1278,6 +1299,59 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 _message.value = "Lỗi kết nối: ${e.localizedMessage}"
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    private val _payments = MutableStateFlow<List<PaymentItem>>(emptyList())
+    val payments: StateFlow<List<PaymentItem>> = _payments
+
+    fun fetchPayments(status: String? = null) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.getPayments(status)
+                if (response.isSuccessful && response.body() != null) {
+                    _payments.value = response.body()?.data ?: emptyList()
+                } else {
+                    _message.value = "Không thể tải danh sách thanh toán"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun confirmPayment(id: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.confirmPaymentAdmin(id)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Đã xác nhận thanh toán!"
+                    fetchPayments()
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi khi xác nhận"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun rejectPayment(id: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.rejectPaymentAdmin(id)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Đã từ chối thanh toán"
+                    fetchPayments()
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi khi từ chối"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
             }
         }
     }
