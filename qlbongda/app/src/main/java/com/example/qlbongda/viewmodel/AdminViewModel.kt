@@ -321,6 +321,59 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
+    fun updatePlayerStarterStatus(id: Int, isStarter: Boolean, teamId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.updatePlayerStarterStatus(id, mapOf("is_starter" to isStarter))
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = if (isStarter) "Đã đặt làm cầu thủ đá chính" else "Đã chuyển thành dự bị"
+                    fetchAdminTeamDetail(teamId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi khi cập nhật"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun removePlayerFromTeamAdmin(teamPlayerId: Int, teamId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.removePlayerFromTeamAdmin(teamPlayerId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Đã xóa cầu thủ khỏi đội"
+                    fetchAdminTeamDetail(teamId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi khi xóa"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun updateTeamPlayerInfo(teamPlayerId: Int, teamId: Int, jersey: Int, position: String, role: String) {
+        viewModelScope.launch {
+            try {
+                val request = mapOf(
+                    "jersey_number" to jersey,
+                    "position" to position,
+                    "role" to role
+                )
+                val response = apiService.updateTeamPlayerInfo(teamPlayerId, request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Cập nhật cầu thủ thành công"
+                    fetchAdminTeamDetail(teamId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi khi cập nhật"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
     fun clearMessage() {
         _message.value = null
     }

@@ -187,7 +187,18 @@ fun MatchEventManagementScreen(matchId: Int, viewModel: AdminViewModel, onBack: 
         onDismiss = { showGoalDialog = false }, 
         onConfirm = { teamId, jersey, min, period -> viewModel.addGoal(matchId, teamId, jersey, min, period); showGoalDialog = false }
     )
-    if (showSubDialog && matchDetail != null) SubstitutionDialog(matchDetail = matchDetail!!, onDismiss = { showSubDialog = false }, onConfirm = { teamId, pIn, pOut, min, period -> viewModel.addSubstitution(matchId, teamId, pIn, pOut, min, period); showSubDialog = false })
+    if (showSubDialog && matchDetail != null) {
+        val substitutedOutPlayerIds = events.filter { it.type == "substitution_out" }.mapNotNull { it.playerId }.toSet()
+        SubstitutionDialog(
+            matchDetail = matchDetail!!, 
+            substitutedOutPlayerIds = substitutedOutPlayerIds,
+            onDismiss = { showSubDialog = false }, 
+            onConfirm = { teamId, pIn, pOut, min, period -> 
+                viewModel.addSubstitution(matchId, teamId, pIn, pOut, min, period)
+                showSubDialog = false 
+            }
+        )
+    }
     if (showCardDialog && matchDetail != null) CardDialog(matchDetail = matchDetail!!, onDismiss = { showCardDialog = false }, onConfirm = { teamId, playerId, min, period, isRed -> viewModel.addCard(matchId, teamId, playerId, min, period, isRed); showCardDialog = false })
     if (showPlayerListDialog && matchDetail != null) PlayerListDialog(matchDetail = matchDetail!!, onDismiss = { showPlayerListDialog = false })
 }
@@ -505,7 +516,12 @@ fun UpdateScoreDialog(currentScoreA: Int, currentScoreB: Int, onDismiss: () -> U
 }
 
 @Composable
-fun SubstitutionDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, String) -> Unit) {
+fun SubstitutionDialog(
+    matchDetail: FullMatchDetail, 
+    substitutedOutPlayerIds: Set<Int>,
+    onDismiss: () -> Unit, 
+    onConfirm: (Int, Int, Int, Int, String) -> Unit
+) {
     var isTeamASelected by remember { mutableStateOf(true) }
     var jerseyIn by remember { mutableStateOf("") }
     var jerseyOut by remember { mutableStateOf("") }
@@ -523,6 +539,10 @@ fun SubstitutionDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onCo
 
     val onFieldPlayers = if (isTeamASelected) matchDetail.lineupA else matchDetail.lineupB
     val benchPlayers = if (isTeamASelected) matchDetail.subsA else matchDetail.subsB
+    
+    // 🌟 Lọc các cầu thủ dự bị: Không hiển thị những người đã bị thay ra trước đó
+    val availableBenchPlayers = benchPlayers.filter { it.id !in substitutedOutPlayerIds }
+
     val selectedTeamId = if (isTeamASelected) matchDetail.teamAId else matchDetail.teamBId
 
     AlertDialog(
@@ -563,14 +583,18 @@ fun SubstitutionDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onCo
                 }
 
                 Text("Cầu thủ VÀO (Dự bị):", color = Color.Yellow, fontSize = 12.sp)
-                LazyRow(modifier = Modifier.fillMaxWidth()) {
-                    items(benchPlayers) { p ->
-                        FilterChip(
-                            selected = jerseyIn == p.number,
-                            onClick = { jerseyIn = p.number },
-                            label = { Text("#${p.number} ${p.name.take(10)}") },
-                            modifier = Modifier.padding(end = 4.dp)
-                        )
+                if (availableBenchPlayers.isEmpty()) {
+                    Text("Không còn cầu thủ dự bị hợp lệ", color = Color.Gray, fontSize = 11.sp)
+                } else {
+                    LazyRow(modifier = Modifier.fillMaxWidth()) {
+                        items(availableBenchPlayers) { p ->
+                            FilterChip(
+                                selected = jerseyIn == p.number,
+                                onClick = { jerseyIn = p.number },
+                                label = { Text("#${p.number} ${p.name.take(10)}") },
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                        }
                     }
                 }
             }

@@ -109,6 +109,7 @@ data class TeamPlayerDetail(
     val position: String,
     val role: String,
     val status: String,
+    @SerializedName("is_starter") val isStarter: Int? = 0,
     @SerializedName("approval_status") val approvalStatus: String,
     @SerializedName("player_id") val playerId: Int,
     @SerializedName("player_user_id") val playerUserId: Int?,

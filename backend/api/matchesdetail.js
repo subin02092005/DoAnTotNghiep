@@ -43,7 +43,7 @@ const [matchRows] = await pool.execute(`
 
         // 2. Lấy sự kiện trận đấu (có tên đội)
         const [events] = await pool.execute(`
-            SELECT e.minute, e.type, e.team_id, t.name AS team, u.name AS playerName 
+            SELECT e.minute, e.type, e.team_id, t.name AS team, u.name AS playerName, e.player_id, e.sub_out_player_id
             FROM match_events e
             LEFT JOIN teams t ON e.team_id = t.id
             LEFT JOIN players p ON e.player_id = p.id
@@ -52,9 +52,9 @@ const [matchRows] = await pool.execute(`
             ORDER BY e.minute ASC
         `, [matchId]);
 
-        // 3. Lấy đội hình và phân loại thông minh
+        // 3. Lấy đội hình (Dựa vào is_starter)
         const [allPlayers] = await pool.execute(`
-            SELECT tp.player_id, tp.jersey_number, u.name, tp.position, tp.team_id
+            SELECT tp.player_id, tp.jersey_number, u.name, tp.position, tp.team_id, tp.is_starter
             FROM team_players tp
             JOIN players p ON tp.player_id = p.id
             JOIN users u ON p.user_id = u.id
@@ -64,10 +64,16 @@ const [matchRows] = await pool.execute(`
 
         const processTeamPlayers = (teamId) => {
             const players = allPlayers.filter(p => p.team_id == teamId);
+            const lineup = players.filter(p => p.is_starter === 1);
+            const subs = players.filter(p => p.is_starter === 0);
 
-            // TẬN DỤNG: Mặc định 11 người đầu tiên (theo số áo) là đá chính, còn lại là dự bị
-            const lineup = players.slice(0, 11);
-            const subs = players.slice(11);
+            // Fallback nếu chưa có ai là starter (mặc định lấy 11 người đầu)
+            if (lineup.length === 0) {
+                return {
+                    lineup: players.slice(0, 11),
+                    subs: players.slice(11)
+                };
+            }
 
             return { lineup, subs };
         };

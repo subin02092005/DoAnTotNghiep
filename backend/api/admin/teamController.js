@@ -75,7 +75,7 @@ router.get('/teams/:id', async (req, res) => {
         );
 
         const [players] = await pool.execute(
-            `SELECT tp.id, tp.jersey_number, tp.position, tp.role, tp.status, tp.approval_status,
+            `SELECT tp.id, tp.jersey_number, tp.position, tp.role, tp.status, tp.approval_status, tp.is_starter,
                     pl.id AS player_id, pl.user_id AS player_user_id,
                     u.name AS player_name, u.email AS player_email, u.phone AS player_phone
              FROM team_players tp
@@ -208,13 +208,85 @@ router.post('/teams/:teamId/players/add', async (req, res) => {
             });
         }
 
+        // Đếm số lượng cầu thủ hiện tại để tự động set đá chính cho 11 người đầu
+        const [existingCount] = await pool.execute(
+            "SELECT COUNT(*) as count FROM team_players WHERE team_id = ? AND deleted_at IS NULL",
+            [teamId]
+        );
+        const isStarter = (existingCount[0].count < 11) ? 1 : 0;
+
         await pool.execute(
-            `INSERT INTO team_players (team_id, player_id, jersey_number, position, role, approval_status, is_active, created_at)
-             VALUES (?, ?, ?, ?, 'player', 'approved', 1, NOW())`,
-            [teamId, player_id, jersey_number || 0, position || 'midfielder']
+            `INSERT INTO team_players (team_id, player_id, jersey_number, position, role, approval_status, is_starter, is_active, created_at)
+             VALUES (?, ?, ?, ?, 'player', 'approved', ?, 1, NOW())`,
+            [teamId, player_id, jersey_number || 0, position || 'midfielder', isStarter]
         );
 
         res.json({ success: true, message: 'Đã thêm cầu thủ vào đội thành công!' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Cập nhật trạng thái đá chính (Starter)
+router.patch('/team-players/:id/starter', async (req, res) => {
+    const { id } = req.params;
+    const { is_starter } = req.body;
+    try {
+        const [result] = await pool.execute(
+            `UPDATE team_players
+             SET is_starter = ?, updated_at = NOW()
+             WHERE id = ? AND deleted_at IS NULL`,
+            [is_starter ? 1 : 0, id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy cầu thủ.' });
+        }
+
+        res.json({ success: true, message: 'Đã cập nhật trạng thái đá chính.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Xóa cầu thủ khỏi đội bóng (Admin)
+router.delete('/team-players/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [result] = await pool.execute(
+            `UPDATE team_players
+             SET is_active = 0, deleted_at = NOW(), updated_at = NOW()
+             WHERE id = ? AND deleted_at IS NULL`,
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy cầu thủ trong đội.' });
+        }
+
+        res.json({ success: true, message: 'Đã xóa cầu thủ khỏi đội bóng.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Cập nhật thông tin cầu thủ trong đội (Số áo, Vị trí)
+router.put('/team-players/:id', async (req, res) => {
+    const { id } = req.params;
+    const { jersey_number, position, role } = req.body;
+    try {
+        const [result] = await pool.execute(
+            `UPDATE team_players
+             SET jersey_number = ?, position = ?, role = ?, updated_at = NOW()
+             WHERE id = ? AND deleted_at IS NULL`,
+            [jersey_number, position, role || 'player', id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy bản ghi cầu thủ.' });
+        }
+
+        res.json({ success: true, message: 'Cập nhật thông tin cầu thủ thành công.' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

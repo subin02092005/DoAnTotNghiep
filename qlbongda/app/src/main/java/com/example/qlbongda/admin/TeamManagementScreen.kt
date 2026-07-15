@@ -255,6 +255,10 @@ fun AddEditTeamDialog(
 @Composable
 fun TeamDetailDialog(detail: FullTeamDetail, viewModel: AdminViewModel, onDismiss: () -> Unit) {
     var showAddPlayerDialog by remember { mutableStateOf(false) }
+    var playerToEdit by remember { mutableStateOf<TeamPlayerDetail?>(null) }
+
+    val starters = detail.players.filter { it.isStarter == 1 }
+    val reserves = detail.players.filter { it.isStarter == 0 }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -297,33 +301,32 @@ fun TeamDetailDialog(detail: FullTeamDetail, viewModel: AdminViewModel, onDismis
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("DANH SÁCH CẦU THỦ (${detail.players.size})", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                if (detail.players.isEmpty()) {
-                    Text("Chưa có cầu thủ nào", color = Color.Gray, fontSize = 13.sp)
+                Text("ĐỘI HÌNH CHÍNH (${starters.size}/11)", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (starters.isEmpty()) {
+                    Text("Chưa có cầu thủ đá chính", color = Color.Gray, fontSize = 13.sp)
                 } else {
-                    detail.players.forEach { player ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier.size(30.dp).background(NeonGreen, RoundedCornerShape(4.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("#${player.jerseyNumber}", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(player.playerName, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                    if (player.role == "captain") {
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(Icons.Default.Star, contentDescription = "Captain", tint = Color.Yellow, modifier = Modifier.size(14.dp))
-                                    }
-                                }
-                                Text("${player.position.uppercase()} - ${player.status}", color = Color.Gray, fontSize = 11.sp)
-                            }
-                        }
+                    starters.forEach { player ->
+                        PlayerItemRow(
+                            player = player,
+                            teamId = detail.team.id ?: -1,
+                            viewModel = viewModel,
+                            onEdit = { playerToEdit = it }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("DỰ BỊ (${reserves.size})", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (reserves.isEmpty()) {
+                    Text("Không có cầu thủ dự bị", color = Color.Gray, fontSize = 13.sp)
+                } else {
+                    reserves.forEach { player ->
+                        PlayerItemRow(
+                            player = player,
+                            teamId = detail.team.id ?: -1,
+                            viewModel = viewModel,
+                            onEdit = { playerToEdit = it }
+                        )
                     }
                 }
             }
@@ -346,6 +349,127 @@ fun TeamDetailDialog(detail: FullTeamDetail, viewModel: AdminViewModel, onDismis
             }
         )
     }
+
+    if (playerToEdit != null) {
+        EditPlayerInTeamDialogAdmin(
+            player = playerToEdit!!,
+            onDismiss = { playerToEdit = null },
+            onConfirm = { jersey, pos, role ->
+                viewModel.updateTeamPlayerInfo(playerToEdit!!.id, detail.team.id ?: -1, jersey, pos, role)
+                playerToEdit = null
+            }
+        )
+    }
+}
+
+@Composable
+fun PlayerItemRow(
+    player: TeamPlayerDetail,
+    teamId: Int,
+    viewModel: AdminViewModel,
+    onEdit: (TeamPlayerDetail) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(30.dp).background(NeonGreen, RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("#${player.jerseyNumber}", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(player.playerName, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                if (player.role == "captain") {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(Icons.Default.Star, contentDescription = "Captain", tint = Color.Yellow, modifier = Modifier.size(14.dp))
+                }
+            }
+            Text("${player.position.uppercase()} - ${player.status}", color = Color.Gray, fontSize = 11.sp)
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { onEdit(player) }, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.LightGray, modifier = Modifier.size(18.dp))
+            }
+            
+            IconButton(
+                onClick = { viewModel.updatePlayerStarterStatus(player.id, player.isStarter == 0, teamId) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = if (player.isStarter == 1) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                    contentDescription = "Toggle Starter",
+                    tint = if (player.isStarter == 1) NeonGreen else Color.Gray,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            IconButton(
+                onClick = { viewModel.removePlayerFromTeamAdmin(player.id, teamId) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun EditPlayerInTeamDialogAdmin(
+    player: TeamPlayerDetail,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, String, String) -> Unit
+) {
+    var jersey by remember { mutableStateOf(player.jerseyNumber.toString()) }
+    var pos by remember { mutableStateOf(player.position) }
+    var role by remember { mutableStateOf(player.role) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1E1E1E),
+        title = { Text("Sửa thông tin Cầu thủ trong đội", color = NeonGreen) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = jersey,
+                    onValueChange = { jersey = it.filter { c -> c.isDigit() } },
+                    label = { Text("Số áo") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = TextStyle(color = Color.White)
+                )
+                OutlinedTextField(
+                    value = pos,
+                    onValueChange = { pos = it },
+                    label = { Text("Vị trí (gk, defender, midfielder, forward)") },
+                    textStyle = TextStyle(color = Color.White)
+                )
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = role == "captain",
+                        onCheckedChange = { role = if (it) "captain" else "player" },
+                        colors = CheckboxDefaults.colors(checkedColor = NeonGreen)
+                    )
+                    Text("Đội trưởng", color = Color.White)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(jersey.toIntOrNull() ?: 0, pos, role) },
+                enabled = jersey.isNotBlank() && pos.isNotBlank()
+            ) {
+                Text("Lưu")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Hủy") }
+        }
+    )
 }
 
 @Composable

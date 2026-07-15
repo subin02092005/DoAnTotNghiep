@@ -92,9 +92,9 @@ router.get('/matches/:id', async (req, res) => {
 
         const matchData = matches[0];
 
-        // Lấy danh sách cầu thủ và phân loại thông minh (Tận dụng logic 11 người đầu)
+        // Lấy danh sách cầu thủ và phân loại thông minh (Dựa vào is_starter)
         const [allPlayers] = await pool.execute(`
-            SELECT tp.player_id, tp.jersey_number, u.name, tp.position, tp.team_id
+            SELECT tp.player_id, tp.jersey_number, u.name, tp.position, tp.team_id, tp.is_starter
             FROM team_players tp
             JOIN players p ON tp.player_id = p.id
             JOIN users u ON p.user_id = u.id
@@ -104,10 +104,18 @@ router.get('/matches/:id', async (req, res) => {
 
         const processTeam = (teamId) => {
             const players = allPlayers.filter(p => p.team_id == teamId);
-            return {
-                lineup: players.slice(0, 11),
-                subs: players.slice(11)
-            };
+            const lineup = players.filter(p => p.is_starter === 1);
+            const subs = players.filter(p => p.is_starter === 0);
+
+            // Fallback nếu chưa set is_starter (tự động lấy 11 người đầu)
+            if (lineup.length === 0) {
+                return {
+                    lineup: players.slice(0, 11),
+                    subs: players.slice(11)
+                };
+            }
+
+            return { lineup, subs };
         };
 
         const teamAData = processTeam(matchData.home_team_id);

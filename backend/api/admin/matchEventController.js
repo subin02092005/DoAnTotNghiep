@@ -113,20 +113,18 @@ router.post('/match-events/:matchId/substitution', async (req, res) => {
     const { matchId } = req.params;
     const { team_id, player_in_id, player_out_id, jersey_in, jersey_out, minute, period } = req.body;
 
-    if (!team_id || (!player_in_id && !jersey_in) || (!player_out_id && !jersey_out) || !minute || !period) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Vui lòng cung cấp team_id, thông tin cầu thủ vào/ra, phút và hiệp.'
-        });
-    }
+    console.log("-> SUBSTITUTION REQUEST:", { matchId, team_id, jersey_in, jersey_out });
 
+    const connection = await pool.getConnection();
     try {
+        await connection.beginTransaction();
+
         let finalInId = player_in_id;
         let finalOutId = player_out_id;
 
         // Tìm ID cầu thủ vào theo số áo
         if (!finalInId && jersey_in) {
-            const [rows] = await pool.execute(
+            const [rows] = await connection.execute(
                 'SELECT player_id FROM team_players WHERE team_id = ? AND jersey_number = ? AND approval_status = "approved"',
                 [team_id, jersey_in]
             );
@@ -135,7 +133,7 @@ router.post('/match-events/:matchId/substitution', async (req, res) => {
 
         // Tìm ID cầu thủ ra theo số áo
         if (!finalOutId && jersey_out) {
-            const [rows] = await pool.execute(
+            const [rows] = await connection.execute(
                 'SELECT player_id FROM team_players WHERE team_id = ? AND jersey_number = ? AND approval_status = "approved"',
                 [team_id, jersey_out]
             );
@@ -143,30 +141,63 @@ router.post('/match-events/:matchId/substitution', async (req, res) => {
         }
 
         if (!finalInId || !finalOutId) {
+            await connection.rollback();
             return res.status(404).json({ success: false, message: 'Không tìm thấy cầu thủ vào hoặc ra với số áo đã cung cấp.' });
         }
 
-        // Kiểm tra trận đấu có tồn tại không
-        const [match] = await pool.execute('SELECT id FROM matches WHERE id = ?', [matchId]);
-        if (match.length === 0) return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu.' });
+        // 🌟 KIỂM TRA: Cầu thủ đã thay ra không được vào lại sân
+        const [alreadyOut] = await connection.execute(
+            'SELECT id FROM match_events WHERE match_id = ? AND player_id = ? AND type = "substitution_out"',
+            [matchId, finalInId]
+        );
 
-        // Ghi nhận cầu thủ rời sân
-        await pool.execute(
+        if (alreadyOut.length > 0) {
+            await connection.rollback();
+            return res.json({
+                success: false,
+                message: 'Cầu thủ này đã được thay ra trước đó và không thể vào lại sân theo luật thi đấu.'
+            });
+        }
+
+        // Kiểm tra trận đấu có tồn tại không
+        const [match] = await connection.execute('SELECT id FROM matches WHERE id = ?', [matchId]);
+        if (match.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy trận đấu.' });
+        }
+
+        // 1. Ghi nhận sự kiện thay người vào match_events
+        await connection.execute(
             `INSERT INTO match_events (match_id, player_id, team_id, type, minute, period, created_at)
              VALUES (?, ?, ?, 'substitution_out', ?, ?, NOW())`,
             [matchId, finalOutId, team_id, minute, period]
         );
 
-        // Ghi nhận cầu thủ vào sân
-        await pool.execute(
+        await connection.execute(
             `INSERT INTO match_events (match_id, player_id, team_id, type, minute, period, sub_out_player_id, created_at)
              VALUES (?, ?, ?, 'substitution_in', ?, ?, ?, NOW())`,
             [matchId, finalInId, team_id, minute, period, finalOutId]
         );
 
+        // 2. Cập nhật trạng thái starter trong team_players
+        // Cầu thủ ra sân -> is_starter = 0
+        await connection.execute(
+            'UPDATE team_players SET is_starter = 0 WHERE team_id = ? AND player_id = ?',
+            [team_id, finalOutId]
+        );
+        // Cầu thủ vào sân -> is_starter = 1
+        await connection.execute(
+            'UPDATE team_players SET is_starter = 1 WHERE team_id = ? AND player_id = ?',
+            [team_id, finalInId]
+        );
+
+        await connection.commit();
         res.status(201).json({ success: true, message: 'Ghi nhận thay cầu thủ thành công.' });
     } catch (error) {
+        await connection.rollback();
         res.status(500).json({ success: false, message: error.message });
+    } finally {
+        connection.release();
     }
 });
 

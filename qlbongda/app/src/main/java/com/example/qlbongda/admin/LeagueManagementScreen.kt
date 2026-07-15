@@ -243,11 +243,24 @@ fun AdminStandingContent(seasonId: Int, viewModel: AdminViewModel) {
                 val currentPhaseId = standings.firstOrNull()?.phaseId ?: -1
                 val targetPhases = phases.filter { it.format == "knockout" }
 
+                // Kiểm tra hoàn thành tất cả trận đấu của vòng bảng hiện tại
+                val currentPhase = phases.find { it.id == currentPhaseId }
+                val phaseMatches = currentPhase?.matches ?: emptyList()
+                val isPhaseFinished = phaseMatches.isNotEmpty() && phaseMatches.all { it.status == "finished" }
+
                 if (currentPhaseId != -1 && targetPhases.isNotEmpty()) {
                     Box {
                         Button(
-                            onClick = { showGlobalPhaseMenu = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow),
+                            onClick = { 
+                                if (isPhaseFinished) {
+                                    showGlobalPhaseMenu = true 
+                                } else {
+                                    viewModel.updateMessage("Cần hoàn thành tất cả trận đấu của ${currentPhase?.name} trước khi tạo Knockout!")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isPhaseFinished) Color.Yellow else Color.Gray
+                            ),
                             contentPadding = PaddingValues(horizontal = 8.dp),
                             modifier = Modifier.height(32.dp).padding(end = 8.dp)
                         ) {

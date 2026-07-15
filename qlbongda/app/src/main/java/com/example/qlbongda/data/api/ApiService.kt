@@ -150,6 +150,23 @@
         @PATCH("team-players/{id}/status/injured")
         suspend fun markInjured(@Path("id") id: Int): Response<GenericAdminResponse>
 
+        @PATCH("team-players/{id}/starter")
+        suspend fun updatePlayerStarterStatus(
+            @Path("id") id: Int,
+            @Body request: Map<String, Boolean>
+        ): Response<GenericAdminResponse>
+
+        @DELETE("team-players/{id}")
+        suspend fun removePlayerFromTeamAdmin(
+            @Path("id") id: Int
+        ): Response<GenericAdminResponse>
+
+        @PUT("team-players/{id}")
+        suspend fun updateTeamPlayerInfo(
+            @Path("id") id: Int,
+            @Body request: Map<String, Any>
+        ): Response<GenericAdminResponse>
+
         // ---- ADMIN TEAMS ----
         @GET("teams")
         suspend fun getTeamsAdmin(
