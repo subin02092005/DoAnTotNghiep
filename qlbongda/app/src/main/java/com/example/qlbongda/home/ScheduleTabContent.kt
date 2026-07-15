@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -21,10 +21,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.qlbongda.data.api.HomeViewModel
 import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.ui.theme.NeonGreen
 import com.example.qlbongda.utils.DateUtils
+import com.example.qlbongda.viewmodel.HomeViewModel
 
 @Composable
 fun ScheduleTabContent(

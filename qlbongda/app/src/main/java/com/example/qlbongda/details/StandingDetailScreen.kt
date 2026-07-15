@@ -1,19 +1,24 @@
-package com.example.qlbongda
+package com.example.qlbongda.details
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.*
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.GroupStanding
 import com.example.qlbongda.ui.theme.NeonGreen
 
@@ -21,7 +26,7 @@ import com.example.qlbongda.ui.theme.NeonGreen
 @Composable
 fun StandingDetailScreen(
     standings: List<GroupStanding>,
-    initialTabIndex: Int, // <--- Nhận index từ bên ngoài
+    initialTabIndex: Int,
     onBack: () -> Unit,
     onTeamClick: (String) -> Unit
 ) {
@@ -31,14 +36,14 @@ fun StandingDetailScreen(
     Scaffold(
         topBar = {
             Column(modifier = Modifier.background(Color.Black)) {
-                TopAppBar(
+                CenterAlignedTopAppBar(
                     title = { Text("BẢNG XẾP HẠNG CHI TIẾT", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Black) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Black)
                 )
                 if (standings.isNotEmpty()) {
                     TabRow(
@@ -69,7 +74,6 @@ fun StandingDetailScreen(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             if (currentGroup != null) {
-                // 1. HEADER
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -81,17 +85,21 @@ fun StandingDetailScreen(
                             Text("ĐỘI BÓNG", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.width(100.dp))
 
                             Row(modifier = Modifier.horizontalScroll(sharedScrollState)) {
-                                HeaderCell("TRẬN"); HeaderCell("THẮNG"); HeaderCell("HÒA"); HeaderCell("THUA")
-                                HeaderCell("BT"); HeaderCell("BB"); HeaderCell("HS")
-                                HeaderCell("ĐIỂM", true); HeaderCell("5 TRẬN", true, 130.dp)
+                                HeaderCell("TRẬN")
+                                HeaderCell("THẮNG")
+                                HeaderCell("HÒA")
+                                HeaderCell("THUA")
+                                HeaderCell("BT")
+                                HeaderCell("BB")
+                                HeaderCell("HS")
+                                HeaderCell("ĐIỂM", true)
+                                HeaderCell("5 TRẬN", true, 130.dp)
                             }
                         }
                     }
                 }
 
-                // 2. DỮ LIỆU
                 items(currentGroup.standings) { row ->
-                    // Logic màu sắc cho Top 3
                     val rankColor = when (row.rank) {
                         1, 2 -> NeonGreen
                         3 -> Color.White
@@ -115,11 +123,15 @@ fun StandingDetailScreen(
                             )
 
                             Row(modifier = Modifier.horizontalScroll(sharedScrollState)) {
-                                DataCell(row.played.toString()); DataCell(row.won.toString()); DataCell(row.drawn.toString()); DataCell(row.lost.toString())
-                                DataCell(row.goalsFor.toString()); DataCell(row.goalsAgainst.toString()); DataCell(row.goalDifference)
+                                DataCell(row.played.toString())
+                                DataCell(row.won.toString())
+                                DataCell(row.drawn.toString())
+                                DataCell(row.lost.toString())
+                                DataCell(row.goalsFor.toString())
+                                DataCell(row.goalsAgainst.toString())
+                                DataCell(row.goalDifference)
                                 DataCell(row.points.toString(), color = NeonGreen, fontWeight = FontWeight.Bold)
 
-                                // Render phong độ 5 trận
                                 Row(
                                     modifier = Modifier.width(130.dp).padding(start = 8.dp),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -129,7 +141,7 @@ fun StandingDetailScreen(
                                             "W" -> Color(0xFF00C853) to Color.Black
                                             "D" -> Color.DarkGray to Color.White
                                             "L" -> Color.Red to Color.White
-                                            else -> Color.Transparent to Color.Transparent // Tránh lỗi nếu dữ liệu khác lạ
+                                            else -> Color.Transparent to Color.Transparent
                                         }
 
                                         Box(

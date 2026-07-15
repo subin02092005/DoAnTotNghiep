@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.auth
 
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState

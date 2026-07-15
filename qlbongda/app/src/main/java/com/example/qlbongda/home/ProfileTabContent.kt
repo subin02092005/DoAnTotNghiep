@@ -1,4 +1,4 @@
-    package com.example.qlbongda
+package com.example.qlbongda.home
 
     import android.util.Log
     import android.widget.Toast

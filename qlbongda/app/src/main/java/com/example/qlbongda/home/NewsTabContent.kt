@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.home
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke

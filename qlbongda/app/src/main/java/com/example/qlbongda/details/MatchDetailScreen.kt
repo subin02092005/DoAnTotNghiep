@@ -1,6 +1,4 @@
-package com.example.qlbongda
-
-
+package com.example.qlbongda.details
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -9,7 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -19,32 +17,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.qlbongda.data.model.FullMatchDetail
-import com.example.qlbongda.data.model.MatchEvent
-import com.example.qlbongda.data.model.PlayerInfo
-import com.example.qlbongda.utils.DateUtils
+import com.example.qlbongda.data.model.*
 import com.example.qlbongda.ui.theme.NeonGreen
-
-// Định nghĩa cấu trúc dữ liệu chi tiết cho trận đấu
-
+import com.example.qlbongda.utils.DateUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
-    var selectedSubTab by remember { mutableStateOf(0) }
+    var selectedSubTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text("Chi Tiết Trận Đấu", color = NeonGreen, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = { onBack() }) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Quay lại", tint = NeonGreen)
+                    IconButton(onClick = onBack) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = NeonGreen)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Black)
             )
         }
     ) { innerPadding ->
@@ -55,7 +49,6 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // 📊 [PHẦN 1]: BẢNG TỈ SỐ HOẶC GIỜ GIẤC
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -68,16 +61,12 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Team A
                         Text(text = match.teamA, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.4f), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
 
-                        // Khu vực trung tâm - Giới hạn độ rộng cố định để tránh vỡ giao diện
                         Box(modifier = Modifier.weight(0.2f), contentAlignment = Alignment.Center) {
-                            when (match.status) {
-                                // 1. TRẬN ĐANG DIỄN RA
+                            when (match.status.lowercase()) {
                                 "ongoing" -> {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        // Hiển thị phút thi đấu thay vì chỉ tỉ số
                                         Text(
                                             text = "${DateUtils.calculateMinutes(match.time)}'",
                                             color = Color.Red,
@@ -91,8 +80,6 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                                         }
                                     }
                                 }
-
-                                // 2. TRẬN ĐÃ KẾT THÚC
                                 "finished" -> {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(text = match.scoreA.toString(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
@@ -100,8 +87,6 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                                         Text(text = match.scoreB.toString(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
                                     }
                                 }
-
-                                // 3. TRẬN CHƯA ĐÁ (PENDING)
                                 else -> {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 80.dp)) {
                                         Text(text = DateUtils.formatTime(match.time), color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center, maxLines = 1)
@@ -114,17 +99,15 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                             }
                         }
 
-                        // Team B
                         Text(text = match.teamB, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.4f), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = "Sân: ${match.stadium}", color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center)
+                    Text(text = "Sân: ${match.stadium ?: "Chưa xác định"}", color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center)
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 🎯 [PHẦN 2]: THANH TABS
             TabRow(
                 selectedTabIndex = selectedSubTab,
                 containerColor = Color(0xFF121212),
@@ -140,7 +123,6 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 📦 [PHẦN 3]: NỘI DUNG TABS
             Box(modifier = Modifier.fillMaxSize().weight(1f)) {
                 when (selectedSubTab) {
                     0 -> TagDiEnBien(match)
@@ -152,7 +134,6 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
     }
 }
 
-// ======================= THÀNH PHẦN CON CHO TAG 1 =======================
 @Composable
 fun TagDiEnBien(match: FullMatchDetail) {
     if (!match.isStarted) {
@@ -161,8 +142,7 @@ fun TagDiEnBien(match: FullMatchDetail) {
         }
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // SỬA Ở ĐÂY: dùng ?: emptyList() để an toàn
-            items(match.events ?: emptyList()) { event ->
+            items(match.events) { event ->
                 Row(
                     modifier = Modifier.fillMaxWidth().background(Color(0xFF0F0F0F), RoundedCornerShape(8.dp)).padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -176,26 +156,24 @@ fun TagDiEnBien(match: FullMatchDetail) {
             }
         }
     }
-}@Composable
+}
+
+@Composable
 fun TagDoiHinh(match: FullMatchDetail) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("ĐỘI HÌNH RA SÂN CHÍNH THỨC", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
 
         item {
             Row(modifier = Modifier.fillMaxWidth()) {
-                // Đội hình chính Đội A
                 Column(modifier = Modifier.weight(1f)) {
                     Text(match.teamA, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    // SỬA Ở ĐÂY
-                    (match.lineupA ?: emptyList()).forEach { player ->
+                    match.lineupA.forEach { player ->
                         Text("${player.number}. ${player.name} (${player.position})", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp))
                     }
                 }
-                // Đội hình chính Đội B
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                     Text(match.teamB, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    // SỬA Ở ĐÂY
-                    (match.lineupB ?: emptyList()).forEach { player ->
+                    match.lineupB.forEach { player ->
                         Text("${player.name} .${player.number} (${player.position})", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp), textAlign = TextAlign.End)
                     }
                 }
@@ -207,17 +185,13 @@ fun TagDoiHinh(match: FullMatchDetail) {
 
         item {
             Row(modifier = Modifier.fillMaxWidth()) {
-                // Dự bị Đội A
                 Column(modifier = Modifier.weight(1f)) {
-                    // SỬA Ở ĐÂY
-                    (match.subsA ?: emptyList()).forEach { player ->
+                    match.subsA.forEach { player ->
                         Text("${player.number}. ${player.name}", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp))
                     }
                 }
-                // Dự bị Đội B
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    // SỬA Ở ĐÂY
-                    (match.subsB ?: emptyList()).forEach { player ->
+                    match.subsB.forEach { player ->
                         Text("${player.name} .${player.number}", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp), textAlign = TextAlign.End)
                     }
                 }
@@ -225,20 +199,17 @@ fun TagDoiHinh(match: FullMatchDetail) {
         }
     }
 }
-// ======================= THÀNH PHẦN CON CHO TAG 3 =======================
+
 @Composable
 fun TagThongKe(match: FullMatchDetail) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.fillMaxWidth()) {
         Text("BIỂU ĐỒ THỐNG KÊ TRẬN ĐẤU", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
 
-        // Dòng Kiểm soát bóng
         ThongKeRow(title = "Kiểm soát bóng", valA = match.PossessionA, valB = match.PossessionB)
-        // Dòng Sút khung thành
         ThongKeRow(title = "Tổng cú sút", valA = match.ShotsA, valB = match.ShotsB)
 
         HorizontalDivider(color = Color.DarkGray)
 
-        // Mục danh hiệu cầu thủ xuất sắc nhất
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
@@ -257,9 +228,9 @@ fun TagThongKe(match: FullMatchDetail) {
 fun ThongKeRow(title: String, valA: String, valB: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(valA, color = Color.White, fontSize = 14.dp.value.sp, fontWeight = FontWeight.Bold)
-            Text(title, color = Color.Gray, fontSize = 14.dp.value.sp)
-            Text(valB, color = Color.White, fontSize = 14.dp.value.sp, fontWeight = FontWeight.Bold)
+            Text(valA, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = Color.Gray, fontSize = 14.sp)
+            Text(valB, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
         LinearProgressIndicator(
             progress = {
@@ -273,10 +244,10 @@ fun ThongKeRow(title: String, valA: String, valB: String) {
         )
     }
 }
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Trận đã diễn ra")
+
+@Preview(showBackground = true)
 @Composable
 fun MatchDetailScreenStartedPreview() {
-    // Tạo dữ liệu giả lập cho trận đấu đã diễn ra
     val dummyMatchStarted = FullMatchDetail(
         id = 1,
         teamA = "Arsenal",
@@ -296,31 +267,28 @@ fun MatchDetailScreenStartedPreview() {
         ),
         lineupA = listOf(
             PlayerInfo(1,"22", "Raya", "GK"),
-            PlayerInfo(1,"2", "Saliba", "DF"),
-            PlayerInfo(1,"6", "Gabriel", "DF"),
-            PlayerInfo(1,"4", "White", "DF"),
-            PlayerInfo(1,"41", "Rice", "MF"),
-            PlayerInfo(1,"8", "Odegaard", "MF"),
-            PlayerInfo(1,"7", "Saka", "FW")
+            PlayerInfo(2,"2", "Saliba", "DF"),
+            PlayerInfo(3,"6", "Gabriel", "DF"),
+            PlayerInfo(4,"4", "White", "DF"),
+            PlayerInfo(5,"41", "Rice", "MF"),
+            PlayerInfo(6,"8", "Odegaard", "MF"),
+            PlayerInfo(7,"7", "Saka", "FW")
         ),
         lineupB = listOf(
-            PlayerInfo(1,"31", "Ederson", "GK"),
-            PlayerInfo(1,"3", "Dias", "DF"),
-            PlayerInfo(1,"25", "Akanji", "DF"),
-            PlayerInfo(1,"16", "Rodri", "MF"),
-            PlayerInfo(1,"17", "De Bruyne", "MF"),
-            PlayerInfo(1,"47", "Foden", "FW"),
-            PlayerInfo(1,"9", "Haaland", "FW")
+            PlayerInfo(8,"31", "Ederson", "GK"),
+            PlayerInfo(9,"3", "Dias", "DF"),
+            PlayerInfo(10,"25", "Akanji", "DF"),
+            PlayerInfo(11,"16", "Rodri", "MF"),
+            PlayerInfo(12,"17", "De Bruyne", "MF"),
+            PlayerInfo(13,"47", "Foden", "FW"),
+            PlayerInfo(14,"9", "Haaland", "FW")
         ),
-        subsA = listOf(PlayerInfo(1,"29", "Havertz", "FW"), PlayerInfo(1,"11", "Martinelli", "FW")),
-        subsB = listOf(PlayerInfo(1,"10", "Grealish", "FW"), PlayerInfo(1,"19", "Alvarez", "FW")),
+        subsA = listOf(PlayerInfo(15,"29", "Havertz", "FW"), PlayerInfo(16,"11", "Martinelli", "FW")),
+        subsB = listOf(PlayerInfo(17,"10", "Grealish", "FW"), PlayerInfo(18,"19", "Alvarez", "FW")),
         PossessionA = "45%", PossessionB = "55%",
         ShotsA = "12", ShotsB = "14",
         mvp = "Martin Odegaard (Arsenal)",
+    )
 
-        )
-
-    // Gọi màn hình hiển thị dữ liệu test
     MatchDetailScreen(match = dummyMatchStarted, onBack = {})
 }
-

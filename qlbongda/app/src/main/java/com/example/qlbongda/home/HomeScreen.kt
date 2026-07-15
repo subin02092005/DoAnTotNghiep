@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,13 +17,10 @@ import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.FullMatchDetail
 import com.example.qlbongda.data.model.PlayerInfo
 
-import com.example.qlbongda.data.model.TournamentPhase // 🌟 THÊM IMPORT NÀY
-import com.example.qlbongda.data.model.SeasonWithPhases // 🌟 THÊM IMPORT ĐỂ NHẬN LIST GIẢI ĐẤU
+import com.example.qlbongda.data.model.TournamentPhase 
+import com.example.qlbongda.data.model.SeasonWithPhases 
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.qlbongda.data.api.HomeViewModel
-import com.example.qlbongda.data.api.RetrofitClient
+import com.example.qlbongda.viewmodel.HomeViewModel
 import com.example.qlbongda.data.model.GroupStanding
 
 import com.example.qlbongda.ui.theme.NeonGreen
@@ -32,16 +29,15 @@ import com.example.qlbongda.ui.theme.NeonGreen
 @Composable
 fun HomeScreen(
     homeViewModel: HomeViewModel,
-    selectedTab: Int, // Nhận từ MainActivity
-    onTabSelected: (Int) -> Unit, // Nhận hàm callback[cite: 2]
-    seasonList: List<SeasonWithPhases>, // 🌟 THÊM THAM SỐ ĐỂ ĐÓN MẢNG GIẢI ĐẤU/MÙA GIẢI ĐỘNG TỪ MAINACTIVITY
-    phaseList: List<TournamentPhase>, // 🌟 1. THÊM THAM SỐ ĐỂ ĐÓN MẢNG VÒNG ĐẤU ĐỘNG TỪ MAINACTIVITY
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    seasonList: List<SeasonWithPhases>,
+    phaseList: List<TournamentPhase>,
     matchList: List<FullMatchDetail>,
-    //  hotMatchList: List<FullMatchDetail> = emptyList(), // 🌟 THÊM DÒNG NÀY
     onNavigateToMatchDetail: (FullMatchDetail) -> Unit,
-    standingList: List<GroupStanding>, // 🌟 Thêm tham số này
-    selectedStandingTab: Int,           // Thêm tham số
-    onStandingTabSelected: (Int) -> Unit, // Thêm tham số
+    standingList: List<GroupStanding>,
+    selectedStandingTab: Int,
+    onStandingTabSelected: (Int) -> Unit,
     onNavigateToStandingDetail: () -> Unit,
     onLogout: () -> Unit,
     onTeamClick: (Int) -> Unit,
@@ -108,21 +104,18 @@ fun HomeScreen(
         ) { when (selectedTab) {
             0 -> HomeTabContent(
                 viewModel = homeViewModel,
-                seasonList = seasonList, // 🌟 TRUYỀN DANH SÁCH GIẢI ĐẤU XUỐNG ĐỂ HIỂN THỊ CÁC TAB TRÊN CÙNG
+                seasonList = seasonList,
                 phaseList = phaseList,
-                //hotMatches = hotMatchList, // 🌟 TRUYỀN XUỐNG
                 standings = standingList,
-                selectedTabIndex = selectedStandingTab, // Truyền xuống
-                onTabSelected = onStandingTabSelected,  // Truyền xuống
+                selectedTabIndex = selectedStandingTab,
+                onTabSelected = onStandingTabSelected,
                 onNavigateToStandingDetail = onNavigateToStandingDetail,
                 onTeamClick ={ teamId: Int ->
-                    // Đây là nơi nhận ID từ HomeTabContent và chuyển tiếp lên
                     onTeamClick(teamId)}
             )
             1 -> ScheduleTabContent(
                 viewModel = homeViewModel,
-                // matchList = matchList,
-                onMatchClick = { clickedMatch -> // 🌟 Khai báo biến 'clickedMatch' ở đây
+                onMatchClick = { clickedMatch ->
                     onNavigateToMatchDetail(clickedMatch)
                 }
             )
@@ -139,10 +132,9 @@ fun HomeScreen(
                 onCoachNameChange = onCoachNameChange,
                 isLeagueRegistered = isLeagueRegistered,
                 onLeagueRegisteredChange = onLeagueRegisteredChange,
-                currentUserRole = currentUserRole, // Biến này cần được khai báo trong HomeScreen
+                currentUserRole = currentUserRole,
             )
-            4 -> ProfileTabContent(onLogout = onLogout
-            )// Thay đổi biến này để kích hoạt lại các nơi khá)
+            4 -> ProfileTabContent(onLogout = onLogout)
         }
         }
     }

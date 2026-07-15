@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.auth
 
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import com.example.qlbongda.R
 import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.LoginRequest
 import com.example.qlbongda.ui.theme.NeonGreen

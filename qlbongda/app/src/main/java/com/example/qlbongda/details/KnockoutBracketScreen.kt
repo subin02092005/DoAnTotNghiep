@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.details
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.qlbongda.data.model.PhaseBracket
 import com.example.qlbongda.ui.theme.NeonGreen
+import com.example.qlbongda.viewmodel.AdminViewModel
 
 @Composable
 fun KnockoutBracketScreen(seasonId: Int, viewModel: AdminViewModel) {
@@ -46,12 +47,10 @@ fun KnockoutBracketScreen(seasonId: Int, viewModel: AdminViewModel) {
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(48.dp)
         ) {
-            // Vẽ các cột Tứ Kết, Bán Kết, Chung Kết
             bracketData.forEach { phase ->
                 BracketColumn(phase)
             }
             
-            // Cột cuối cùng: Nhà vô địch
             val finalPhase = bracketData.find { it.phaseType == "final" }
             ChampionColumn(finalPhase)
         }

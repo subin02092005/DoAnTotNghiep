@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.details
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -25,27 +25,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.qlbongda.data.api.HomeViewModel
-import com.example.qlbongda.data.model.PlayerInfo
-import com.example.qlbongda.data.model.StandingItem // 🌟 ĐÃ THÊM: Import Model chuẩn nhận từ API MySQL của bạn
+import com.example.qlbongda.data.model.*
 import com.example.qlbongda.ui.theme.NeonGreen
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-// Nếu bạn dùng phiên bản mới, có thể cần thêm:
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.qlbongda.viewmodel.HomeViewModel
+
 val DarkBackground = Color(0xFF0A0A0A)
 val CardBackground = Color(0xFF121212)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TeamDetailScreen(
-    team: StandingItem, // 🌟 ĐÃ SỬA: Nhận trực tiếp gói dữ liệu động tải từ MySQL về thay vì truyền rời rạc các biến tĩnh
+    team: StandingItem,
     onBackClick: () -> Unit
 ) {
-
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
                     Text("CHI TIẾT ĐỘI BÓNG", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 },
@@ -54,7 +49,7 @@ fun TeamDetailScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = NeonGreen)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = DarkBackground)
             )
         },
         containerColor = DarkBackground
@@ -66,7 +61,6 @@ fun TeamDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // --- TÊN ĐỘI BÓNG KHỔ LỚN ---
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -80,7 +74,7 @@ fun TeamDetailScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = team.teamName?.take(2)?.uppercase() ?: "TN",
+                            text = team.teamName.take(2).uppercase(),
                             color = NeonGreen,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black
@@ -88,7 +82,7 @@ fun TeamDetailScreen(
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = team?.teamName?.uppercase() ?: "",
+                        text = team.teamName.uppercase(),
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
@@ -103,13 +97,11 @@ fun TeamDetailScreen(
                 }
             }
 
-            // --- KHU VỰC THÔNG TIN BAN QUẢN LÝ / CHỦ CHỐT (HLV & ĐỘI TRƯỞNG) ---
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Thẻ hiển thị Huấn Luyện Viên
                     Card(
                         modifier = Modifier.weight(1f),
                         colors = CardDefaults.cardColors(containerColor = CardBackground),
@@ -129,7 +121,7 @@ fun TeamDetailScreen(
                             Text("HUẤN LUYỆN VIÊN", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (team.coachName.trim().isEmpty()) "Chưa cập nhật" else team.coachName,
+                                text = team.coachName.ifEmpty { "Chưa cập nhật" },
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
@@ -139,7 +131,6 @@ fun TeamDetailScreen(
                         }
                     }
 
-                    // Thẻ hiển thị Đội Trưởng (Captain)
                     Card(
                         modifier = Modifier.weight(1f),
                         colors = CardDefaults.cardColors(containerColor = CardBackground),
@@ -159,7 +150,7 @@ fun TeamDetailScreen(
                             Text("ĐỘI TRƯỞNG (C)", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (team.captainName.trim().isEmpty()) "Chưa cập nhật" else team.captainName,
+                                text = team.captainName.ifEmpty { "Chưa cập nhật" },
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
@@ -171,7 +162,6 @@ fun TeamDetailScreen(
                 }
             }
 
-            // --- TIÊU ĐỀ DANH SÁCH THÀNH VIÊN ---
             item {
                 Text(
                     text = "DANH SÁCH CẦU THỦ (${team.players.size})",
@@ -182,7 +172,6 @@ fun TeamDetailScreen(
                 )
             }
 
-            // Nếu đội bóng chưa có cầu thủ nào đăng ký từ Database
             if (team.players.isEmpty()) {
                 item {
                     Text(
@@ -195,7 +184,6 @@ fun TeamDetailScreen(
                 }
             }
 
-            // --- DANH SÁCH CẦU THỦ CHI TIẾT ---
             items(team.players) { player ->
                 val isCaptain = player.name == team.captainName
                 Row(
@@ -209,7 +197,6 @@ fun TeamDetailScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Số áo cầu thủ
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -221,7 +208,6 @@ fun TeamDetailScreen(
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    // Tên và vị trí
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(text = player.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -242,15 +228,14 @@ fun TeamDetailScreen(
                         Text(text = "Vị trí: ${player.position}", color = Color.Gray, fontSize = 12.sp)
                     }
 
-                    // Hiển thị tag vị trí bên góc phải màu sắc sinh động (Tiền đạo - FW, Tiền vệ - MF, v.v)
                     Text(
-                        text = when(player.position) {
+                        text = when(player.position.lowercase()) {
                             "defender" -> "DF"
                             "midfielder" -> "MF"
                             "forward" -> "FW"
                             else -> "GK"
                         },
-                        color = when(player.position) {
+                        color = when(player.position.lowercase()) {
                             "forward" -> Color(0xFFFF5252)
                             "midfielder" -> Color(0xFF69F0AE)
                             "defender" -> Color(0xFF40C4FF)
@@ -268,9 +253,8 @@ fun TeamDetailScreen(
 @Preview(showBackground = true)
 @Composable
 fun PreviewTeamDetailScreen() {
-    // 1. Tạo dữ liệu giả khớp với data class của bạn
     val mockTeam = StandingItem(
-        id=0,
+        id = 0,
         teamName = "FC BONG DA",
         coachName = "Park Hang Seo",
         captainName = "Nguyen Van A",
@@ -282,7 +266,6 @@ fun PreviewTeamDetailScreen() {
         )
     )
 
-    // 2. Bọc trong MaterialTheme và Surface để Preview hiển thị đúng màu nền DarkBackground
     MaterialTheme {
         Surface(color = DarkBackground) {
             TeamDetailScreen(
@@ -292,14 +275,15 @@ fun PreviewTeamDetailScreen() {
         }
     }
 }
+
 @Composable
 fun TeamDetailContainer(
     teamId: Int,
-    viewModel: HomeViewModel, // ViewModel đã có sẵn API Service
+    viewModel: HomeViewModel,
     onBackClick: () -> Unit
-) {// Cách 1: Nếu teamState là StateFlow
+) {
     val teamDetail by viewModel.teamDetail.collectAsState(initial = null)
-    // Gọi hàm load dữ liệu nếu chưa có
+    
     LaunchedEffect(teamId) {
         viewModel.fetchTeamDetail(teamId)
     }
@@ -310,10 +294,9 @@ fun TeamDetailContainer(
             teamName = data.teamName ?: "Không có tên",
             coachName = data.coachName ?: "Chưa cập nhật",
             captainName = data.captainName ?: "Chưa cập nhật",
-            players = data.players // Đảm bảo kiểu dữ liệu PlayerInfo khớp nhau
+            players = data.players
         )
 
-        // 3. Truyền biến đã chuyển đổi vào Screen
         TeamDetailScreen(team = mappedTeam, onBackClick = onBackClick)
     } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(color = NeonGreen)

@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.payment
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -34,7 +34,7 @@ import java.util.UUID
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PaymentScreen(season: SeasonInfo, onConfirm: (String) -> Unit, onBack: () -> Unit) {
-    val randomRef = remember { "TXN" + java.util.UUID.randomUUID().toString().take(8).uppercase() }
+    val randomRef = remember { "TXN" + UUID.randomUUID().toString().take(8).uppercase() }
     var transactionRef by remember { mutableStateOf(randomRef) }
 
     Scaffold(
@@ -61,8 +61,14 @@ fun PaymentScreen(season: SeasonInfo, onConfirm: (String) -> Unit, onBack: () ->
             )
         },
         containerColor = Color.Black
-    ) {padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp).background(Color.Black)) {
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color.Black)
+                .padding(16.dp)
+        ) {
             Text(
                 "Thanh toán cho: ${season.name}",
                 color = Color.White,
@@ -91,7 +97,9 @@ fun PaymentScreen(season: SeasonInfo, onConfirm: (String) -> Unit, onBack: () ->
 
             Button(
                 onClick = { onConfirm(transactionRef) },
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
             ) {
                 Text("XÁC NHẬN THANH TOÁN")
             }

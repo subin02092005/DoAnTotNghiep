@@ -1,20 +1,11 @@
-    package com.example.qlbongda.data.api
+package com.example.qlbongda.viewmodel
 
-    import android.util.Log
-    import androidx.compose.runtime.derivedStateOf
-    import androidx.lifecycle.ViewModel
-    import androidx.lifecycle.viewModelScope
-    import com.example.qlbongda.data.model.ChangePasswordRequest
-    import com.example.qlbongda.data.model.FullMatchDetail
-    import com.example.qlbongda.data.model.GroupStanding
-    import com.example.qlbongda.data.model.MyTeamData
-    import com.example.qlbongda.data.model.PlayerInfo
-    import com.example.qlbongda.data.model.SeasonWithPhases
-    import com.example.qlbongda.data.model.StandingItem
-    import com.example.qlbongda.data.model.TeamDetailData
-    import com.example.qlbongda.data.model.TournamentPhase
-    import com.example.qlbongda.data.model.TournamentRules
-    import com.example.qlbongda.data.model.UpdateProfileRequest
+import android.util.Log
+import androidx.compose.runtime.derivedStateOf
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.qlbongda.data.api.ApiService
+import com.example.qlbongda.data.model.*
     import kotlinx.coroutines.flow.MutableStateFlow
     import kotlinx.coroutines.flow.StateFlow
     import kotlinx.coroutines.flow.asStateFlow

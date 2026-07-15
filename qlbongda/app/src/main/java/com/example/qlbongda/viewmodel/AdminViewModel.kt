@@ -1,10 +1,9 @@
-package com.example.qlbongda
+package com.example.qlbongda.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.qlbongda.data.api.ApiService
-import com.example.qlbongda.data.api.RetrofitClient
 import com.example.qlbongda.data.model.*
 import com.example.qlbongda.services.NotificationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +13,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlin.String
 
 class AdminViewModel(private val apiService: ApiService) : ViewModel() {
 
@@ -74,16 +72,12 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                             is_active = if (item.is_active == 1) 1 else 0,
                             created_at = item.created_at ?: "",
 
-                            // 🌟 BỔ SUNG 2 DÒNG NÀY ĐỂ HỨNG DỮ LIỆU TỪ API GỬI VỀ
                             season_id = item.season_id,
                             ref_entity_type = item.ref_entity_type,
                         )
                     }
 
-                    // 1. Cập nhật vào Repository nếu bạn cần lưu trữ
                     NotificationRepository.updateNotifications(uiData)
-
-                    // 2. Bơm dữ liệu vào luồng gốc để tự động lọc sang 3 tab
                     _notifications.value = uiData
 
                 } else {
@@ -557,7 +551,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // 1. Tìm thông tin trận đấu hiện tại để lấy tỉ số và ID 2 đội
                 val match = _matches.value.find { it.id == id }
                 if (match == null) {
                     _message.value = "Không tìm thấy thông tin trận đấu"
@@ -567,15 +560,12 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 val hScore = match.homeScore ?: 0
                 val aScore = match.awayScore ?: 0
 
-                // 2. Xác định Winner ID (null nếu hòa)
                 val winnerId = when {
                     hScore > aScore -> match.homeTeamId
                     aScore > hScore -> match.awayTeamId
-                    else -> null // Hòa
+                    else -> null
                 }
 
-                // 3. Gọi API cập nhật trạng thái kết thúc kèm theo Winner ID
-                // Chúng ta sử dụng hàm updateMatch chung để đảm bảo winner_team_id được gửi đi
                 val updateReq = UpdateMatchRequest(
                     status = "finished",
                     homeScore = hScore,
@@ -590,7 +580,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     fetchMatches()
                     fetchMatchDetail(id)
 
-                    // Làm mới BXH
                     val seasonId = match.seasonId ?: currentSeasonId
                     if (seasonId != -1) {
                         fetchStandings(seasonId)
@@ -657,7 +646,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Sử dụng API thô nhưng đã được nâng cấp đầy đủ thông tin ở Backend
                 val response = apiService.getMatchRawDetail(matchId)
                 if (response.isSuccessful && response.body() != null) {
                     _matchDetail.value = response.body()?.data
@@ -712,7 +700,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Xác định winnerId nếu kết thúc trận đấu
                 var winnerId: Int? = null
                 if (status == "finished") {
                     val match = _matches.value.find { it.id == matchId }
@@ -725,7 +712,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     }
                 }
 
-                // Gửi yêu cầu cập nhật bao gồm winner_team_id
                 val response = apiService.updateMatch(
                     matchId, UpdateMatchRequest(
                         status = status,
@@ -1072,7 +1058,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 if (response.isSuccessful && (response.body()?.success == true || response.body()?.status == "success")) {
                     _message.value = "Đã xếp lịch tự động thành công!"
                     _seasonDetail.value?.season?.id?.let { fetchSeasonDetails(it) }
-                    fetchMatches() // Cập nhật lại danh sách trận đấu tổng thể
+                    fetchMatches() 
                 } else {
                     _message.value = response.body()?.message ?: "Lỗi xếp lịch tự động"
                 }
@@ -1109,7 +1095,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     private var currentSeasonId: Int = -1
 
     fun fetchStandings(seasonId: Int) {
-        _standingList.value = emptyList() // Xóa dữ liệu cũ trước khi tải mới
+        _standingList.value = emptyList() 
         viewModelScope.launch {
             try {
                 val response = apiService.getDetailedStandings(seasonId)
@@ -1126,7 +1112,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // 1. Lấy BXH của vòng đấu nguồn
                 val standingResponse = apiService.getDetailedStandings(seasonId)
                 if (!standingResponse.isSuccessful) {
                     _message.value = "Không thể lấy bảng xếp hạng"
@@ -1141,7 +1126,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     return@launch
                 }
 
-                // 2. Lấy top 2 mỗi bảng và thêm vào vòng tiếp theo
                 var successCount = 0
                 var totalAdvancing = 0
 
@@ -1149,13 +1133,11 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     val topTwo = group.standings.take(2)
                     totalAdvancing += topTwo.size
                     topTwo.forEach { team ->
-                        // 🌟 KIỂM TRA TRÙNG LẶP: Xem đội này đã có trong Phase đích chưa
                         val isAlreadyInTarget = _seasonDetail.value?.phases
                             ?.find { it.id == targetPhaseId }
                             ?.teams?.any { it.team_id == team.id } ?: false
 
                         if (!isAlreadyInTarget) {
-                            // Gọi API add team vào phase Knockout
                             val addResponse = apiService.addTeamToPhase(
                                 targetPhaseId,
                                 AddTeamRequestadmin(teamId = team.id)
@@ -1170,8 +1152,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 val targetPhaseName = if (totalAdvancing == 8) "Tứ Kết" else if (totalAdvancing == 4) "Bán Kết" else "vòng tiếp theo"
                 _message.value = "Đã chuyển thành công $successCount đội vào $targetPhaseName!"
 
-                // 3. Sau khi chuyển xong, Admin có thể nhấn "Auto Xếp Lịch" ở vòng Knockout 
-                // để hệ thống tự động random cặp đấu (bao gồm cả logic 3 đội).
                 fetchSeasonDetails(seasonId)
             } catch (e: Exception) {
                 _message.value = "Lỗi: ${e.localizedMessage}"
@@ -1257,7 +1237,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
             try {
                 _isLoading.value = true
 
-                // Gửi teamItem.team_id (Global ID) để khớp với logic Backend mới
                 val request = AddTeamRequestadmin(
                     teamId = teamItem.team_id,
                     groupId = groupId
@@ -1281,7 +1260,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     }
 
     fun removeTeamFromPhase(phaseId: Int, teamId: Int, seasonId: Int) {
-        // Cập nhật local state tức thì
         val currentDetail = _seasonDetail.value
         if (currentDetail != null) {
             val updatedTeams = currentDetail.teams.map { 
@@ -1311,7 +1289,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     }
 
     fun assignTeamToGroup(phaseId: Int, globalTeamId: Int, groupId: Int?) {
-        // Cập nhật local state tức thì để giao diện mượt mà (Optimistic Update)
         val currentDetail = _seasonDetail.value
         if (currentDetail != null) {
             val updatedTeams = currentDetail.teams.map { 
@@ -1328,15 +1305,15 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
 
                 if (response.isSuccessful && body?.success == true) {
                     _message.value = "Di chuyển đội thành công!"
-                    fetchSeasonDetails(currentSeasonId) // Đồng bộ lại với Server
+                    fetchSeasonDetails(currentSeasonId)
                 } else {
                     val errorMsg = body?.message ?: response.errorBody()?.string() ?: "Lỗi server"
                     _message.value = "Thất bại: $errorMsg"
-                    fetchSeasonDetails(currentSeasonId) // Rollback nếu lỗi
+                    fetchSeasonDetails(currentSeasonId)
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
-                fetchSeasonDetails(currentSeasonId) // Rollback
+                fetchSeasonDetails(currentSeasonId)
             }
         }
     }
@@ -1353,7 +1330,6 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Gọi trực tiếp apiService, không cần context
                 val response = apiService.createRules(request)
 
                 if (response.isSuccessful) {
@@ -1460,4 +1436,3 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 }
-

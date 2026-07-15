@@ -1,4 +1,4 @@
-package com.example.qlbongda
+package com.example.qlbongda.home
 
 import android.util.Log
 import androidx.compose.foundation.*
@@ -14,11 +14,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
-import com.example.qlbongda.data.api.HomeViewModel
+import com.example.qlbongda.viewmodel.HomeViewModel
 import com.example.qlbongda.data.model.*
 import com.example.qlbongda.ui.theme.NeonGreen
 import com.example.qlbongda.utils.DateUtils
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.qlbongda.R
+
 @Composable
 fun HotMatchCard(match: FullMatchDetail) {
     Card(
@@ -65,53 +66,36 @@ fun HotMatchCard(match: FullMatchDetail) {
         }
     }
 }
+
 @Composable
 fun HomeTabContent(
     viewModel: HomeViewModel,
-    seasonList: List<SeasonWithPhases> = emptyList(), // 🌟 THÊM: Danh sách các giải đấu/mùa giải được truyền từ ngoài vào
+    seasonList: List<SeasonWithPhases> = emptyList(),
     phaseList: List<TournamentPhase>,
     standings: List<GroupStanding>,
-    selectedTabIndex: Int,          // Nhận từ HomeScreen
-    onTabSelected: (Int) -> Unit,   // Nhận từ HomeScreen
+    selectedTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
     onNavigateToStandingDetail: () -> Unit,
     onTeamClick: (Int) -> Unit
 ) {
-    // State chọn trận đấu nổi bật
     val hotMatches by viewModel.hotMatchList.collectAsState()
-
-    // 🌟 STATE THÔNG MINH: Quản lý Chọn Giải đấu & Tự động cập nhật Vòng đấu tương ứng
-//    var selectedSeason by remember(seasonList) { mutableStateOf(seasonList.firstOrNull()) }
     val selectedSeason by viewModel.selectedSeason.collectAsState()
-    // Nếu giải đấu có chứa vòng đấu riêng (SeasonWithPhases) thì lấy vòng đấu đó, ngược lại dùng phaseList mặc định
     val currentPhases = remember(selectedSeason, phaseList) {
         selectedSeason?.phases ?: phaseList
     }
 
-
-    // Mỗi khi danh sách vòng đấu thay đổi (do đổi giải đấu), tự động chọn vòng đấu đầu tiên
-    // 1. Dùng remember thông thường (không key là currentPhases)
     var selectedPhase by remember { mutableStateOf<TournamentPhase?>(null) }
 
-    /* 🌟 BỎ QUA: Load matches/seasons ở đây vì HomeViewModel đã tự load trong init block
-    LaunchedEffect(Unit) {
-        viewModel.loadMatches()
-        viewModel.loadSeasons()
-    }
-    */
-    // ĐÚNG: Chỉ chạy lại nếu ID thay đổi
     LaunchedEffect(selectedSeason?.id) {
         val seasonId = selectedSeason?.id
         if (seasonId != null) {
             Log.d("API_DEBUG", "--- BẮT ĐẦU LOAD THẬT --- ID: $seasonId")
             viewModel.loadStandings(seasonId)
-           // viewModel.loadTournamentPhases(seasonId)
         }
     }
 
     LaunchedEffect(currentPhases) {
         if (currentPhases.isNotEmpty()) {
-            // Chỉ chọn phần tử đầu tiên nếu chưa chọn phase nào
-            // HOẶC nếu phase đã chọn không còn nằm trong danh sách mới
             if (selectedPhase == null || !currentPhases.contains(selectedPhase)) {
                 selectedPhase = currentPhases.firstOrNull()
             }
@@ -119,10 +103,8 @@ fun HomeTabContent(
             selectedPhase = null
         }
     }
-    // Khi vòng đấu (Phase) thay đổi, gọi API cập nhật BXH của vòng đó
     LaunchedEffect(selectedPhase) {
         selectedPhase?.let { viewModel.selectPhase(it.id) }
-        //onTabSelected(0) // Reset về Bảng A mặc định khi chuyển vòng/giải
     }
 
 
@@ -131,7 +113,6 @@ fun HomeTabContent(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // 1. HEADER LOGO & APP NAME
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -162,7 +143,6 @@ fun HomeTabContent(
             }
         }
 
-        // DANH SÁCH CUỘN CHÍNH (LAZYCOLUMN)
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -170,7 +150,6 @@ fun HomeTabContent(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            // 0. TRẬN ĐẤU NỔI BẬT (HOT MATCHES)
             if (hotMatches.isNotEmpty()) {
                 item {
                     Text(
@@ -196,7 +175,6 @@ fun HomeTabContent(
                 }
             }
 
-            // 🌟 1A. THANH TAB CHỌN GIẢI ĐẤU / MÙA GIẢI (Mới thêm theo thiết kế)
             if (seasonList.isNotEmpty()) {
                 item {
                     Text(
@@ -234,7 +212,6 @@ fun HomeTabContent(
                 }
             }
 
-            // 🌟 1B. THANH CHỌN VÒNG ĐẤU (Bấm giải nào hiện vòng đó - Ko có vòng thì ẩn hẳn)
             if (currentPhases.isNotEmpty()) {
                 item {
                     LazyRow(
@@ -263,7 +240,6 @@ fun HomeTabContent(
                 }
             }
 
-            // 2. THANH CHỌN BẢNG (BẢNG A, BẢNG B...)
             item {
                 if (standings.isNotEmpty()) {
                     LazyRow(
@@ -296,11 +272,9 @@ fun HomeTabContent(
                 }
             }
 
-            // 3. HIỂN THỊ BẢNG XẾP HẠNG CHI TIẾT
             val currentGroup = standings.getOrNull(selectedTabIndex)
 
             if (currentGroup != null) {
-                // Tiêu đề cột (Header)
                 item {
                     Row(
                         modifier = Modifier
@@ -341,7 +315,6 @@ fun HomeTabContent(
                     HorizontalDivider(color = Color.DarkGray, thickness = 0.5.dp)
                 }
 
-                // Danh sách dòng dữ liệu các đội bóng
                 items(currentGroup.standings) { row ->
                     val rankColor = when (row.rank) {
                         1, 2 -> NeonGreen
@@ -406,7 +379,6 @@ fun HomeTabContent(
                     }
                 }
             } else {
-                // Màn hình trống nếu chưa load xong dữ liệu
                 item {
                     Box(
                         modifier = Modifier
