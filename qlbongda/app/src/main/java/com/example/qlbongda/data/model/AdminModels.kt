@@ -517,3 +517,30 @@ data class PaymentResponse(
     val data: List<PaymentItem>? = null,
     val message: String? = null
 )
+
+// --- ADMIN TEAM ADD/EDIT MODELS ---
+
+data class CreateTeamRequestAdmin(
+    val name: String,
+    @SerializedName("coach_name") val coachName: String?,
+    val description: String?,
+    @SerializedName("user_id") val userId: Int? = null
+)
+
+data class AddPlayerByEmailRequestAdmin(
+    val email: String,
+    @SerializedName("jersey_number") val jerseyNumber: Int,
+    val position: String
+)
+
+data class AdminPlayerRequest(
+    val name: String,
+    val email: String,
+    val phone: String?,
+    val position: String?,
+    @SerializedName("date_of_birth") val dateOfBirth: String?,
+    val nationality: String?,
+    val height: String?,
+    val weight: String?,
+    val userId: Int? = null // Cần thiết khi chỉnh sửa
+)

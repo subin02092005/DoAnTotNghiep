@@ -89,9 +89,11 @@ router.patch('/payments/:id/confirm', async (req, res) => {
 
         if (paymentRows.length > 0) {
             const seasonTeamId = paymentRows[0].season_team_id;
-            // 3. Kích hoạt đội bóng
+            console.log(`[PAYMENT] Đã đóng phí, chuyển trạng thái đội sang 'approved' (Chờ Admin duyệt vào giải)`);
+
+            // 3. Cập nhật trạng thái đội sang 'approved' (Để Admin giải đấu duyệt bước cuối)
             await connection.execute(
-                `UPDATE season_teams SET status = 'active', updated_at = NOW() WHERE id = ?`,
+                `UPDATE season_teams SET status = 'approved', updated_at = NOW() WHERE id = ?`,
                 [seasonTeamId]
             );
         }

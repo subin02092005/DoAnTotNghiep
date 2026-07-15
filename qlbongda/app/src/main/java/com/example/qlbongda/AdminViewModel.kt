@@ -110,7 +110,7 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     type = type,
                     target_team_id = target_team_id,
                     recipient_user_id = recipient_user_id,
-                    source = "admin_panel"
+                    source = "manual"
                 )
                 val response = apiService.createNotification(request)
                 if (response.isSuccessful) {
@@ -243,6 +243,45 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
+    fun createPlayer(request: AdminPlayerRequest) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.createPlayerAdmin(request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Tạo cầu thủ thành công!"
+                    fetchPlayers()
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi tạo cầu thủ"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun updatePlayer(playerId: Int, request: AdminPlayerRequest) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.updatePlayerAdmin(playerId, request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Cập nhật thành công!"
+                    fetchPlayers()
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi cập nhật"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+
     fun approvePlayer(id: Int) {
         viewModelScope.launch {
             try {
@@ -357,6 +396,64 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối: ${e.message}"
+            }
+        }
+    }
+
+    fun createTeam(request: CreateTeamRequestAdmin) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.createTeamAdmin(request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Tạo đội bóng thành công!"
+                    fetchTeams()
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi tạo đội bóng"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun updateTeam(id: Int, request: CreateTeamRequestAdmin) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.updateTeamAdmin(id, request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Cập nhật thành công!"
+                    fetchTeams()
+                    fetchAdminTeamDetail(id)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi cập nhật"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun addPlayerToTeamAdmin(teamId: Int, request: AddPlayerByEmailRequestAdmin) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.addPlayerToTeamAdmin(teamId, request)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _message.value = "Đã thêm cầu thủ vào đội!"
+                    fetchAdminTeamDetail(teamId)
+                } else {
+                    _message.value = response.body()?.message ?: "Lỗi thêm cầu thủ"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.message}"
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -1052,13 +1149,20 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                     val topTwo = group.standings.take(2)
                     totalAdvancing += topTwo.size
                     topTwo.forEach { team ->
-                        // Gọi API add team vào phase Knockout
-                        val addResponse = apiService.addTeamToPhase(
-                            targetPhaseId,
-                            AddTeamRequestadmin(teamId = team.id)
-                        )
-                        if (addResponse.isSuccessful && addResponse.body()?.success == true) {
-                            successCount++
+                        // 🌟 KIỂM TRA TRÙNG LẶP: Xem đội này đã có trong Phase đích chưa
+                        val isAlreadyInTarget = _seasonDetail.value?.phases
+                            ?.find { it.id == targetPhaseId }
+                            ?.teams?.any { it.team_id == team.id } ?: false
+
+                        if (!isAlreadyInTarget) {
+                            // Gọi API add team vào phase Knockout
+                            val addResponse = apiService.addTeamToPhase(
+                                targetPhaseId,
+                                AddTeamRequestadmin(teamId = team.id)
+                            )
+                            if (addResponse.isSuccessful && addResponse.body()?.success == true) {
+                                successCount++
+                            }
                         }
                     }
                 }

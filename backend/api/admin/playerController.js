@@ -180,4 +180,72 @@ router.patch('/team-players/:id/status/injured', async (req, res) => {
     }
 });
 
+// 7. THÊM CẦU THỦ MỚI (Admin)
+// Tạo User account và Player profile đồng thời
+router.post('/players', async (req, res) => {
+    const { name, email, phone, position, date_of_birth, nationality, height, weight } = req.body;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Tạo User (Mật khẩu mặc định là 123456)
+        const [userResult] = await connection.execute(
+            `INSERT INTO users (name, email, password, phone, is_active, created_at)
+             VALUES (?, ?, '$2b$10$7Z2vL0n5h5v2G2.g1.h1.eQ1vL0n5h5v2G2.g1.h1.e', ?, 1, NOW())`,
+            [name, email, phone]
+        );
+        const userId = userResult.insertId;
+
+        // 2. Tạo Player Profile
+        await connection.execute(
+            `INSERT INTO players (user_id, date_of_birth, position, nationality, height, weight, is_active, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
+            [userId, date_of_birth, position, nationality, height, weight]
+        );
+
+        // 3. Gán role 'player' (id=3)
+        await connection.execute('INSERT INTO user_role (user_id, role_id) VALUES (?, 3)', [userId]);
+
+        await connection.commit();
+        res.json({ success: true, message: 'Tạo cầu thủ thành công! Mật khẩu mặc định là 123456.' });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ success: false, message: error.message });
+    } finally {
+        connection.release();
+    }
+});
+
+// 8. CẬP NHẬT THÔNG TIN CẦU THỦ
+router.put('/players/:playerId', async (req, res) => {
+    const { playerId } = req.params;
+    const { name, email, phone, position, date_of_birth, nationality, height, weight, userId } = req.body;
+
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Cập nhật bảng users
+        await connection.execute(
+            `UPDATE users SET name = ?, email = ?, phone = ?, updated_at = NOW() WHERE id = ?`,
+            [name, email, phone, userId]
+        );
+
+        // 2. Cập nhật bảng players
+        await connection.execute(
+            `UPDATE players SET position = ?, date_of_birth = ?, nationality = ?, height = ?, weight = ?, updated_at = NOW()
+             WHERE id = ?`,
+            [position, date_of_birth, nationality, height, weight, playerId]
+        );
+
+        await connection.commit();
+        res.json({ success: true, message: 'Cập nhật thông tin cầu thủ thành công!' });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ success: false, message: error.message });
+    } finally {
+        connection.release();
+    }
+});
+
 module.exports = router;

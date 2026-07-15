@@ -26,6 +26,11 @@ router.put('/match-events/:matchId/score', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Vui lòng cung cấp home_score và away_score.' });
     }
 
+    // 🌟 RÀNG BUỘC: Tỉ số không được âm
+    if (home_score < 0 || away_score < 0) {
+        return res.json({ success: false, message: 'Tỉ số không được là số âm.' });
+    }
+
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();

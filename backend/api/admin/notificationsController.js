@@ -22,47 +22,61 @@ router.get('/all_notifications', async (req, res) => {
     }
 });
 router.post('/create_notification', async (req, res) => {
-    const { title, content, type, target_team_id,    // Lấy đúng tên key từ Android
-        recipient_user_id,source } = req.body;
+    const { title, content, type, target_team_id, recipient_user_id, source } = req.body;
+
+    console.log("[NOTIFY] Nhận yêu cầu tạo thông báo:", { title, type, source });
 
     try {
         // 1. Lưu vào database
-        const query = `INSERT INTO notifications (title, content, type, source, target_team_id, recipient_user_id) VALUES (?, ?, ?, ?, ?, ?)`;
-await pool.query(query, [title, content, type, source || 'manual', target_team_id || null, recipient_user_id || null]);
+        // Đảm bảo source là 'manual' hoặc 'system' để khớp ENUM trong SQL
+        const finalSource = (source === 'system' || source === 'manual') ? source : 'manual';
+        const finalType = type || 'general';
+
+        const query = `INSERT INTO notifications (title, content, type, source, target_team_id, recipient_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())`;
+        const [result] = await pool.query(query, [
+            title,
+            content,
+            finalType,
+            finalSource,
+            target_team_id || null,
+            recipient_user_id || null
+        ]);
+
+        console.log(`[NOTIFY] Đã lưu thông báo vào DB, ID: ${result.insertId}`);
 
         // 2. Lấy token để gửi thông báo đẩy (FCM)
         let fcmTokens = [];
-if (type === 'general') {
-    // Lấy tất cả token của tất cả người dùng
-    const [users] = await pool.query("SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL");
-    fcmTokens = users.map(u => u.fcm_token);
-} else if (recipient_user_id) {
-    const [users] = await pool.query("SELECT fcm_token FROM users WHERE id = ? AND fcm_token IS NOT NULL", [recipient_user_id]);
-    fcmTokens = users.map(u => u.fcm_token);
-} else if (target_team_id) {
-    const query = `
-        SELECT u.fcm_token 
-        FROM users u
-        JOIN players p ON u.id = p.user_id
-        JOIN team_players tp ON p.id = tp.player_id
-        WHERE tp.team_id = ? 
-        AND u.fcm_token IS NOT NULL
-        AND tp.is_active = 1
-    `;
-    const [users] = await pool.query(query, [target_team_id]);
-    fcmTokens = users.map(u => u.fcm_token);
-} 
-
-console.log("Tokens lấy được:", fcmTokens);
-        // 3. Gửi FCM cho từng người
-        for (const token of fcmTokens) {
-            await sendFCMNotification(token, title, content);
+        if (finalType === 'general') {
+            const [users] = await pool.query("SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL");
+            fcmTokens = users.map(u => u.fcm_token);
+        } else if (recipient_user_id) {
+            const [users] = await pool.query("SELECT fcm_token FROM users WHERE id = ? AND fcm_token IS NOT NULL", [recipient_user_id]);
+            fcmTokens = users.map(u => u.fcm_token);
+        } else if (target_team_id) {
+            const query = `
+                SELECT DISTINCT u.fcm_token
+                FROM users u
+                JOIN players p ON u.id = p.user_id
+                JOIN team_players tp ON p.id = tp.player_id
+                WHERE tp.team_id = ?
+                AND u.fcm_token IS NOT NULL
+                AND tp.is_active = 1
+            `;
+            const [users] = await pool.query(query, [target_team_id]);
+            fcmTokens = users.map(u => u.fcm_token);
         }
 
-        res.status(200).json({ status: "success", message: "Đã tạo và gửi thông báo" });
+        console.log(`[NOTIFY] Tìm thấy ${fcmTokens.length} tokens để gửi FCM`);
+
+        // 3. Gửi FCM (không chờ đợi hết để tránh timeout response)
+        fcmTokens.forEach(token => {
+            sendFCMNotification(token, title, content).catch(err => console.error("Lỗi gửi FCM lẻ:", err.message));
+        });
+
+        res.status(200).json({ success: true, message: "Đã tạo và gửi thông báo thành công" });
     } catch (error) {
-        console.error("LỖI INSERT SQL:", error.message);
-        res.status(500).json({ status: "error", message: error.message });
+        console.error("[NOTIFY] LỖI TẠO THÔNG BÁO:", error.message);
+        res.status(500).json({ success: false, message: "Lỗi server: " + error.message });
     }
 });
 router.put('/update_notification/:id', async (req, res) => {

@@ -43,10 +43,10 @@ async function sendFCMNotification(token, title, body) {
 async function dispatchNotification(users, title, content, targetTeamId = null) {
     for (const user of users) {
         try {
-            // A. Lưu vào database
+            // A. Lưu vào database - ĐÃ SỬA: message thành content để khớp Schema
             await pool.query(
-                `INSERT INTO notifications (recipient_user_id, target_team_id, title, message, is_read, created_at) 
-                 VALUES (?, ?, ?, ?, 0, NOW())`,
+                `INSERT INTO notifications (recipient_user_id, target_team_id, title, content, is_read, created_at, source, type)
+                 VALUES (?, ?, ?, ?, 0, NOW(), 'system', 'general')`,
                 [user.id, targetTeamId, title, content]
             );
 

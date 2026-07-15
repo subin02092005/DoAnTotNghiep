@@ -129,6 +129,15 @@
         @PATCH("players/{userId}/unlock")
         suspend fun unlockAccount(@Path("userId") userId: Int): Response<GenericAdminResponse>
 
+        @POST("players")
+        suspend fun createPlayerAdmin(@Body request: AdminPlayerRequest): Response<GenericAdminResponse>
+
+        @PUT("players/{playerId}")
+        suspend fun updatePlayerAdmin(
+            @Path("playerId") playerId: Int,
+            @Body request: AdminPlayerRequest
+        ): Response<GenericAdminResponse>
+
         @POST("users/{userId}/roles")
         suspend fun assignRole(@Path("userId") userId: Int, @Body request: RoleRequest): Response<GenericAdminResponse>
 
@@ -157,6 +166,21 @@
 
         @GET("teams/{id}")
         suspend fun getAdminTeamDetail(@Path("id") id: Int): Response<AdminTeamDetailResponse>
+
+        @POST("teams")
+        suspend fun createTeamAdmin(@Body request: CreateTeamRequestAdmin): Response<GenericAdminResponse>
+
+        @PUT("teams/{id}")
+        suspend fun updateTeamAdmin(
+            @Path("id") id: Int,
+            @Body request: CreateTeamRequestAdmin
+        ): Response<GenericAdminResponse>
+
+        @POST("teams/{teamId}/players/add")
+        suspend fun addPlayerToTeamAdmin(
+            @Path("teamId") teamId: Int,
+            @Body request: AddPlayerByEmailRequestAdmin
+        ): Response<GenericAdminResponse>
 
         // ---- ADMIN MATCHES ----
         @GET("matchesadmin")
