@@ -2,6 +2,7 @@ package com.example.qlbongda.utils
 
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -13,7 +14,9 @@ object DateUtils {
     private val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
     private val dbFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     fun formatTime(isoDate: String): String = try {
-        ZonedDateTime.parse(isoDate).format(timeFormatter)
+        ZonedDateTime.parse(isoDate)
+            .withZoneSameInstant(ZoneId.systemDefault())
+            .format(timeFormatter)
     } catch (e: Exception) {
         "..."
     }

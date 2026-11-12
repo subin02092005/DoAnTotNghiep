@@ -12,8 +12,11 @@ enum class MatchStatus {
 
 data class MatchDto(
     val id: Int,
+    val seasonId: Int?,
     val teamA: String,
     val teamB: String,
+    @SerializedName("home_team_id") val home_team_id: Int?, // 🌟 Thêm dòng này
+    @SerializedName("away_team_id") val away_team_id: Int?,
     @SerializedName("home_final_score") val home_score: Int?,
     @SerializedName("away_final_score") val away_score: Int?,
     val scheduled_at: String?,
@@ -40,6 +43,7 @@ data class MatchResponse(
 
 data class FullMatchDetail(
     val id: Int,
+    val seasonId: Int, // 🌟 Thêm trường này vào đây
     @SerializedName("teamA", alternate = ["home_team_name"]) val teamA: String,
     @SerializedName("teamB", alternate = ["away_team_name"]) val teamB: String,
     @SerializedName("home_team_id") val teamAId: Int = 0,
@@ -51,6 +55,7 @@ data class FullMatchDetail(
     val time: String,
     val date: String,
     @SerializedName("venue_name", alternate = ["stadium"]) val stadium: String?,
+    @SerializedName("format_size") val formatSize: Int = 7, // 🌟 THÊM DÒNG NÀY ĐỂ NHẬN SỐ NGƯỜI TRÊN SÂN (5, 7, 11)
     val events: List<MatchEvent> = emptyList(),
     val lineupA: List<PlayerInfo> = emptyList(),
     val lineupB: List<PlayerInfo> = emptyList(),
@@ -60,15 +65,19 @@ data class FullMatchDetail(
     val PossessionB: String = "0%",
     val ShotsA: String = "0",
     val ShotsB: String = "0",
+    val YellowCardsA: String = "0",
+    val YellowCardsB: String = "0",
+    val RedCardsA: String = "0",
+    val RedCardsB: String = "0",
     val mvp: String = "Chưa xác định",
     val isHot: Boolean = false
 )
 
 data class MatchEvent(
-    val minute: String,
-    val team: String,
-    val type: String,
-    val playerName: String
+    @SerializedName("minute") val minute: Int = 0,
+    @SerializedName("team") val team: String = "",
+    @SerializedName("type") val type: String = "",
+    @SerializedName("playerName", alternate = ["player_name"]) val playerName: String = ""
 )
 
 data class MatchDetailResponse(

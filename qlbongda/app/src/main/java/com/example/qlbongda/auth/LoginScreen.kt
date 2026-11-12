@@ -4,6 +4,8 @@ import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -76,9 +78,9 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {Text(
         text = "NEONBALL PRO",
         color = NeonGreen,
@@ -285,11 +287,13 @@ fun LoginScreen(
                                         errorMessage = "Dữ liệu trả về từ máy chủ trống!"
                                     }
                                 } else {
-                                    // Xử lý khi API trả về lỗi (ví dụ 401 Unauthorized)
-                                    when (response.code()) {
-                                        401 -> errorMessage = "Sai tài khoản hoặc mật khẩu!"
-                                        404 -> errorMessage = "Không tìm thấy người dùng!"
-                                        else -> errorMessage = "Lỗi máy chủ (${response.code()})"
+                                    // Xử lý khi API trả về lỗi
+                                    val errorBody = response.errorBody()?.string()
+                                    errorMessage = when (response.code()) {
+                                        400 -> "Vui lòng nhập đầy đủ email và mật khẩu!"
+                                        401 -> "Sai mật khẩu! Vui lòng kiểm tra lại."
+                                        404 -> "Email không tồn tại trong hệ thống!"
+                                        else -> "Lỗi máy chủ (${response.code()})"
                                     }
                                 }
                             } catch (t: Throwable) {

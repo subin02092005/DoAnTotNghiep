@@ -135,14 +135,22 @@ fun AdminDashboard(onSectionSelect: (AdminSection) -> Unit) {
         AdminMenuItem("Xác nhận Thanh toán", "Phê duyệt lệ phí tham gia của các đội", Icons.Default.Payments, AdminSection.PAYMENTS, Color.Yellow)
     )
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    // Dùng Box hoặc Column với fillMaxSize để lưới tự co giãn cân đối
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
     ) {
-        items(menuItems) { item ->
-            AdminMenuCard(item) { onSectionSelect(item.section) }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            userScrollEnabled = true // Khóa scroll nếu muốn toàn bộ menu cố định vừa khít màn hình không bị trượt
+        ) {
+            items(menuItems) { item ->
+                AdminMenuCard(item) { onSectionSelect(item.section) }
+            }
         }
     }
 }
@@ -152,14 +160,16 @@ fun AdminMenuCard(item: AdminMenuItem, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .aspectRatio(1.1f) // Tự động co giãn chiều cao theo chiều rộng (giữ tỉ lệ đẹp cho mọi màn hình)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
         border = BorderStroke(1.dp, item.color.copy(alpha = 0.5f))
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -167,24 +177,26 @@ fun AdminMenuCard(item: AdminMenuItem, onClick: () -> Unit) {
                 imageVector = item.icon,
                 contentDescription = null,
                 tint = item.color,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(36.dp)
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = item.title,
                 color = Color.White,
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = item.description,
                 color = Color.Gray,
                 fontSize = 10.sp,
                 textAlign = TextAlign.Center,
-                lineHeight = 14.sp
+                lineHeight = 13.sp,
+                maxLines = 2 // Giới hạn dòng để không bị tràn trên màn hình nhỏ
             )
         }
     }
 }
+

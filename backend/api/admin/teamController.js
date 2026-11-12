@@ -169,61 +169,72 @@ router.put('/teams/:id', async (req, res) => {
 });
 
 // Thêm cầu thủ vào đội bằng email (Admin)
+// POST /api/teams/:teamId/players/add
 router.post('/teams/:teamId/players/add', async (req, res) => {
     const { teamId } = req.params;
-    const { email, jersey_number, position } = req.body;
+    // Mặc định isStarter = 0 (dự bị) nếu client không truyền lên
+    const { email, jerseyNumber, position, isStarter = 0 } = req.body;
+
+    let connection;
     try {
-        // Tìm user/player
-        const [users] = await pool.execute(
-            `SELECT u.id as user_id, p.id as player_id
-             FROM users u
-             LEFT JOIN players p ON u.id = p.user_id
-             WHERE u.email = ?`,
-            [email]
-        );
+        connection = await pool.getConnection();
 
+        // 1. Tìm user dựa trên email
+        const [users] = await connection.execute("SELECT id FROM users WHERE email = ?", [email]);
         if (users.length === 0) {
-            return res.status(404).json({ success: false, message: 'Email không tồn tại.' });
+            connection.release();
+            return res.status(404).json({ success: false, message: "Không tìm thấy người dùng với email này." });
+        }
+        const userId = users[0].id;
+
+        // 2. Kiểm tra xem user này đã có hồ sơ trong bảng players chưa
+        const [players] = await connection.execute("SELECT id FROM players WHERE user_id = ?", [userId]);
+        let playerId;
+        
+        if (players.length === 0) {
+            // Nếu chưa có hồ sơ cầu thủ, tự động tạo mới
+            const [pResult] = await connection.execute(
+                "INSERT INTO players (user_id, is_active, created_at) VALUES (?, 1, NOW())", 
+                [userId]
+            );
+            playerId = pResult.insertId;
+        } else {
+            playerId = players[0].id;
         }
 
-        let { user_id, player_id } = users[0];
-        if (!player_id) {
-            const [pResult] = await pool.execute("INSERT INTO players (user_id, is_active, created_at) VALUES (?, 1, NOW())", [user_id]);
-            player_id = pResult.insertId;
-        }
-
-        // 🌟 RÀNG BUỘC: Kiểm tra xem cầu thủ đã có trong đội nào khác chưa
-        const [otherTeam] = await pool.execute(
-            `SELECT t.name
-             FROM team_players tp
-             JOIN teams t ON tp.team_id = t.id
+        // 3. Kiểm tra ràng buộc: Cầu thủ đã thuộc đội bóng active nào khác chưa
+        const [existingTeamPlayer] = await connection.execute(
+            `SELECT t.name FROM team_players tp 
+             JOIN teams t ON tp.team_id = t.id 
              WHERE tp.player_id = ? AND tp.is_active = 1 AND tp.deleted_at IS NULL`,
-            [player_id]
+            [playerId]
         );
-
-        if (otherTeam.length > 0) {
-            return res.json({
-                success: false,
-                message: `Cầu thủ này đã thuộc đội '${otherTeam[0].name}'. Vui lòng xóa khỏi đội cũ trước.`
+        
+        if (existingTeamPlayer.length > 0) {
+            connection.release();
+            return res.status(400).json({ 
+                success: false, 
+                message: `Cầu thủ này đã thuộc đội '${existingTeamPlayer[0].name}'. Vui lòng rời đội cũ trước.` 
             });
         }
 
-        // Đếm số lượng cầu thủ hiện tại để tự động set đá chính cho 11 người đầu
-        const [existingCount] = await pool.execute(
-            "SELECT COUNT(*) as count FROM team_players WHERE team_id = ? AND deleted_at IS NULL",
-            [teamId]
-        );
-        const isStarter = (existingCount[0].count < 11) ? 1 : 0;
-
-        await pool.execute(
-            `INSERT INTO team_players (team_id, player_id, jersey_number, position, role, approval_status, is_starter, is_active, created_at)
-             VALUES (?, ?, ?, ?, 'player', 'approved', ?, 1, NOW())`,
-            [teamId, player_id, jersey_number || 0, position || 'midfielder', isStarter]
+        // 4. Thêm cầu thủ vào đội (Mặc định is_starter = 0 tức là dự bị)
+        await connection.execute(
+            `INSERT INTO team_players (team_id, player_id, user_id, jersey_number, position, is_starter, approval_status, is_active, created_at) 
+             VALUES (?, ?, ?, ?, ?, ?, 'approved', 1, NOW())`,
+            [teamId, playerId, userId, jerseyNumber || 0, position || 'midfielder', isStarter]
         );
 
-        res.json({ success: true, message: 'Đã thêm cầu thủ vào đội thành công!' });
+        connection.release();
+        return res.status(200).json({
+            success: true,
+            message: "Thêm cầu thủ vào đội thành công!"
+        });
+
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        if (connection) connection.release();
+        console.error("Lỗi khi thêm cầu thủ:", error);
+        return res.status(500).json({ success: false, message: "Lỗi server nội bộ: " + error.message });
     }
 });
 

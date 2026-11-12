@@ -15,10 +15,10 @@
         const teamId = req.params.id;
         try {
             // 1. Lấy thông tin đội bóng
-            const [teamRows] = await pool.query(
-                'SELECT id, name, coach_name FROM teams WHERE id = ?', 
-                [teamId]
-            );
+           const [teamRows] = await pool.query(
+    'SELECT id, name, coach_name, field_type FROM teams WHERE id = ?', 
+    [teamId]
+);
 
             if (teamRows.length === 0) {
                 return res.status(404).json({ status: "error", message: "Không tìm thấy đội bóng" });
@@ -52,6 +52,7 @@
             teamName: teamRows[0].name, // Ánh xạ từ cột name trong DB
             coachName: teamRows[0].coach_name,
             captainName: captainRows.length > 0 ? captainRows[0].name : "Chưa cập nhật",
+            field_type: teamRows[0].field_type,
             players: playerRows 
         }
             });

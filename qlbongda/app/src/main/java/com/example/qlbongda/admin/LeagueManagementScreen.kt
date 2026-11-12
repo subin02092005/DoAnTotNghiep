@@ -1,5 +1,5 @@
 package com.example.qlbongda.admin
-
+import android.app.DatePickerDialog
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,13 +36,19 @@ import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import android.content.ClipData
+import androidx.compose.ui.platform.LocalContext
 import com.example.qlbongda.details.KnockoutBracketScreen
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun LeagueManagementScreen(viewModel: AdminViewModel) {
     val tournaments by viewModel.tournaments.collectAsStateWithLifecycle()
     val tournamentDetail by viewModel.tournamentDetail.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
+    val seasonsList by viewModel.seasons.collectAsStateWithLifecycle(initialValue = emptyList())
     
     var showAddTournamentDialog by remember { mutableStateOf(false) }
     var showAddSeasonDialog by remember { mutableStateOf(false) }
@@ -108,11 +114,24 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
                     Text(text = tournamentDetail?.tournament?.name ?: "Mùa giải", color = NeonGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
 
-                IconButton(
-                    onClick = { showAddSeasonDialog = true },
-                    modifier = Modifier.background(NeonGreen, RoundedCornerShape(8.dp))
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Season", tint = Color.Black)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { viewModel.setShowAddRuleDialog(true) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = "Rules", tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Luật giải", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+
+                    IconButton(
+                        onClick = { showAddSeasonDialog = true },
+                        modifier = Modifier.background(NeonGreen, RoundedCornerShape(8.dp))
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Season", tint = Color.Black)
+                    }
                 }
             }
 
@@ -171,6 +190,27 @@ fun LeagueManagementScreen(viewModel: AdminViewModel) {
             seasonId = selectedSeasonId,
             viewModel = viewModel,
             onBack = { selectedSeasonId = -1 }
+        )
+    }
+
+    if (showAddRuleDialog) {
+        AddRuleDialog(
+            seasons = seasonsList,
+            onDismiss = { viewModel.setShowAddRuleDialog(false) },
+            onConfirm = { sId, min, max, win, draw, loss, forfeit, desc ->
+                val request = CreateRuleRequest(
+                    season_id = sId,
+                    min_players = min,
+                    max_players = max,
+                    points_win = win,
+                    points_draw = draw,
+                    points_loss = loss,
+                    forfeit_score = forfeit,
+                    description = desc
+                )
+                viewModel.createRules(request)
+                viewModel.setShowAddRuleDialog(false)
+            }
         )
     }
 }
@@ -539,20 +579,45 @@ fun SeasonStageContent(seasonId: Int, viewModel: AdminViewModel) {
                 Text("Thêm vòng đấu", color = Color.Black, fontWeight = FontWeight.Bold)
             }
             OutlinedButton(
-                onClick = { 
+                onClick = {
+                    val unassignedTeams = allTeams.filter { it.groupId == null && (it.status == "active" || it.status == "approved") }
                     if (unassignedTeams.isNotEmpty()) {
-                        viewModel.updateMessage("Cảnh báo: Còn ${unassignedTeams.size} đội chưa được xếp bảng. Vui lòng xếp tất cả đội vào bảng trước khi xếp lịch!")
+                        viewModel.updateMessage("Cảnh báo: Còn ${unassignedTeams.size} đội chưa được xếp bảng.")
                     } else if (allTeams.isEmpty()) {
                         viewModel.updateMessage("Mùa giải chưa có đội bóng nào tham gia.")
                     } else {
-                        showAutoScheduleDialog = true 
+                        showAutoScheduleDialog = true // Mở dialog cấu hình để chạy Preview
                     }
                 },
-                modifier = Modifier.weight(1f), 
-                border = BorderStroke(1.dp, NeonGreen)
+                modifier = Modifier.weight(1f),
+                border = BorderStroke(1.dp, NeonGreen),
+                contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
-                Text("Auto Xếp Lịch", color = NeonGreen, fontWeight = FontWeight.Bold)
+                Text("Auto (Có xem trước)", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
+
+            // 2. NÚT AUTO XẾP LỊCH NHANH (Lưu thẳng vào DB ngay lập tức bằng API cũ)
+            Button(
+                onClick = {
+                    val unassignedTeams = allTeams.filter { it.groupId == null && (it.status == "active" || it.status == "approved") }
+                    if (unassignedTeams.isNotEmpty()) {
+                        viewModel.updateMessage("Cảnh báo: Còn ${unassignedTeams.size} đội chưa được xếp bảng.")
+                    } else if (allTeams.isEmpty()) {
+                        viewModel.updateMessage("Mùa giải chưa có đội bóng nào tham gia.")
+                    } else {
+                        // Ở đây bạn có thể mở một dialog chọn vòng đấu rồi gọi trực tiếp hàm autoGenerateSchedule cũ lưu thẳng vào DB
+                        // Hoặc làm một hành động tương tự gọi thẳng API cũ
+                        viewModel.updateMessage("Đang chạy auto xếp lịch nhanh...")
+                        // Ví dụ gọi hàm cũ: viewModel.autoGenerateSchedule(phaseId, options)
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                Text("Auto Nhanh (Lưu luôn)", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -806,39 +871,222 @@ fun AddTeamToPhaseDialog(
     )
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSeasonDialog(onDismiss: () -> Unit, onConfirm: (CreateSeasonRequest) -> Unit) {
+    val context = LocalContext.current
+    val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+    val today = remember { Calendar.getInstance() }
+
+    // State form
     var name by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
-    var startDate by remember { mutableStateOf("2025-01-01") }
-    var endDate by remember { mutableStateOf("2025-06-30") }
-    var deadline by remember { mutableStateOf("2024-12-25") }
+    var startDate by remember { mutableStateOf(dateFormatter.format(today.time)) }
+    var endDate by remember { mutableStateOf("") }
+    var deadline by remember { mutableStateOf("") }
     var maxTeams by remember { mutableStateOf("16") }
     var fee by remember { mutableStateOf("0") }
     var isRegOpen by remember { mutableStateOf(true) }
 
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Hàm gọi DatePicker
+    fun showDatePicker(currentDateStr: String, onDateSelected: (String) -> Unit) {
+        val calendar = Calendar.getInstance()
+        try {
+            dateFormatter.parse(currentDateStr)?.let { calendar.time = it }
+        } catch (e: Exception) {}
+
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val selected = Calendar.getInstance().apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, month)
+                    set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                }
+                onDateSelected(dateFormatter.format(selected.time))
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    // Kiểm tra ràng buộc
+    LaunchedEffect(startDate, endDate, deadline) {
+        errorMessage = try {
+            val start = dateFormatter.parse(startDate)
+            val end = if (endDate.isNotBlank()) dateFormatter.parse(endDate) else null
+            val dead = if (deadline.isNotBlank()) dateFormatter.parse(deadline) else null
+
+            val todayDate = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }.time
+
+            when {
+                start != null && start.before(todayDate) -> "Ngày bắt đầu không được nhỏ hơn ngày hiện tại."
+                end != null && start != null && end.before(start) -> "Ngày kết thúc phải sau ngày bắt đầu."
+                dead != null && start != null && !dead.before(start) -> "Hạn đăng ký phải trước ngày bắt đầu."
+                else -> null
+            }
+        } catch (e: Exception) {
+            "Định dạng ngày không hợp lệ."
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Thêm Mùa giải mới") },
+        title = {
+            Text(
+                text = "Thêm Mùa giải mới",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
+                )
+            )
+        },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Tên mùa giải") })
-                OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Mô tả ngắn") })
-                OutlinedTextField(value = startDate, onValueChange = { startDate = it }, label = { Text("Ngày bắt đầu") })
-                OutlinedTextField(value = endDate, onValueChange = { endDate = it }, label = { Text("Ngày kết thúc") })
-                OutlinedTextField(value = deadline, onValueChange = { deadline = it }, label = { Text("Hạn đăng ký") })
-                OutlinedTextField(value = maxTeams, onValueChange = { maxTeams = it }, label = { Text("Số đội tối đa") })
-                OutlinedTextField(value = fee, onValueChange = { fee = it }, label = { Text("Lệ phí đăng ký") })
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp) // Tăng khoảng cách cho thoáng rộng
+            ) {
+                // 1. Tên mùa giải
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Tên mùa giải (*)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // 2. Mô tả
+                OutlinedTextField(
+                    value = desc,
+                    onValueChange = { desc = it },
+                    label = { Text("Mô tả ngắn") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+
+                // 3. Ô chọn Ngày bắt đầu (Đồng bộ thiết kế với TextField)
+                OutlinedTextField(
+                    value = startDate,
+                    onValueChange = {},
+                    label = { Text("Ngày bắt đầu (*)") },
+                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Calendar") },
+                    readOnly = true,
+                    enabled = false, // Vô hiệu hóa nhập liệu tay để bắt buộc click
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showDatePicker(startDate) { startDate = it } }
+                )
+
+                // 4. Ô chọn Hạn đăng ký
+                OutlinedTextField(
+                    value = deadline,
+                    onValueChange = {},
+                    label = { Text("Hạn đăng ký (*)") },
+                    placeholder = { Text("Chọn ngày") },
+                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Calendar") },
+                    readOnly = true,
+                    enabled = false,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val defaultDead = deadline.ifBlank { startDate }
+                            showDatePicker(defaultDead) { deadline = it }
+                        }
+                )
+
+                // 5. Ô chọn Ngày kết thúc
+                OutlinedTextField(
+                    value = endDate,
+                    onValueChange = {},
+                    label = { Text("Ngày kết thúc (*)") },
+                    placeholder = { Text("Chọn ngày") },
+                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Calendar") },
+                    readOnly = true,
+                    enabled = false,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val defaultEnd = endDate.ifBlank { startDate }
+                            showDatePicker(defaultEnd) { endDate = it }
+                        }
+                )
+
+                // 6. Số đội tối đa
+                OutlinedTextField(
+                    value = maxTeams,
+                    onValueChange = { maxTeams = it },
+                    label = { Text("Số đội tối đa") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // 7. Lệ phí
+                OutlinedTextField(
+                    value = fee,
+                    onValueChange = { fee = it },
+                    label = { Text("Lệ phí đăng ký (đ)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // 8. Cổng đăng ký công tắc công khai
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) {
                     Checkbox(checked = isRegOpen, onCheckedChange = { isRegOpen = it })
-                    Text("Mở cổng đăng ký ngay")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Mở cổng đăng ký ngay", style = MaterialTheme.typography.bodyMedium)
+                }
+
+                // Banner lỗi trực quan dạng Text
+                errorMessage?.let {
+                    Text(
+                        text = "⚠ $it",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
                 }
             }
         },
         confirmButton = {
+            val isFormValid = name.isNotBlank() &&
+                    startDate.isNotBlank() &&
+                    endDate.isNotBlank() &&
+                    deadline.isNotBlank() &&
+                    errorMessage == null
+
             Button(
                 onClick = {
-                    if (name.isNotBlank()) {
+                    if (isFormValid) {
                         onConfirm(CreateSeasonRequest(
                             name = name,
                             description = desc.ifBlank { null },
@@ -851,13 +1099,19 @@ fun AddSeasonDialog(onDismiss: () -> Unit, onConfirm: (CreateSeasonRequest) -> U
                         ))
                     }
                 },
-                enabled = name.isNotBlank()
+                enabled = isFormValid,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                )
             ) {
-                Text("Tạo")
+                Text("Tạo", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Hủy") }
+            TextButton(onClick = onDismiss) {
+                Text("Hủy", color = MaterialTheme.colorScheme.outline)
+            }
         }
     )
 }

@@ -13,24 +13,29 @@ router.get('/my_notifications', async (req, res) => {
     const userId = req.query.user_id || req.query.userId;
     const teamId = req.query.team_id || req.query.teamId;
 
-    // 1. Mặc định luôn luôn lấy thông báo Chung (type = 'general')
-    let query = `SELECT * FROM notifications WHERE is_active = 1 AND (type = 'general'`;
+    // 🌟 TỐI ƯU HIỆU NĂNG: 
+    // 1. Chỉ lấy thông báo trong vòng 30 ngày gần nhất (tránh quét toàn bộ bảng cũ)
+    // 2. Thêm LIMIT 50 ở cuối để giới hạn số lượng trả về
+    let query = `SELECT * FROM notifications 
+                 WHERE is_active = 1 
+                 AND created_at >= NOW() - INTERVAL 30 DAY 
+                 AND (type = 'general'`;
     const params = [];
 
-    // 2. Nếu có teamId, lấy đúng thông báo loại Đội (match_schedule) của Team đó
+    // Nếu có teamId, lấy đúng thông báo loại Đội (match_schedule) của Team đó
     if (teamId && teamId !== 'null' && teamId !== 'undefined' && teamId !== '0') {
         query += ` OR (type = 'match_schedule' AND target_team_id = ?)`;
         params.push(teamId);
     }
 
-    // 3. Nếu có userId, lấy đúng thông báo loại Cá nhân (player_approved) của riêng User đó
+    // Nếu có userId, lấy đúng thông báo loại Cá nhân (player_approved) của riêng User đó
     if (userId && userId !== 'null' && userId !== 'undefined' && userId !== '0') {
         query += ` OR (type = 'player_approved' AND recipient_user_id = ?)`;
         params.push(userId);
     }
 
-    // Đóng ngoặc điều kiện và sắp xếp theo thời gian mới nhất
-    query += `) ORDER BY created_at DESC`;
+    // Đóng ngoặc điều kiện, sắp xếp mới nhất và giới hạn tối đa 50 bản ghi
+    query += `) ORDER BY created_at DESC LIMIT 50`;
 
     try {
         const [notifications] = await pool.query(query, params);
@@ -40,4 +45,5 @@ router.get('/my_notifications', async (req, res) => {
         res.status(500).json({ status: "error", message: "Lỗi Server" });
     }
 });
+
 module.exports = router;

@@ -373,18 +373,21 @@ fun EventAdminItem(event: MatchEventDetailed, onDelete: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalDialog(
-    matchDetail: FullMatchDetail, 
+    matchDetail: FullMatchDetail,
     initialIsTeamA: Boolean,
-    onDismiss: () -> Unit, 
-    onConfirm: (Int, Int, Int, String) -> Unit
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int, Int, String) -> Unit // Truyền lên: teamId, jerseyNumber, minute, period
 ) {
     var isTeamASelected by remember(initialIsTeamA) { mutableStateOf(initialIsTeamA) }
-    var jerseyNumber by remember { mutableStateOf("") }
+    var selectedPlayerNumber by remember { mutableStateOf("") }
+    var selectedPlayerName by remember { mutableStateOf("") }
     var minute by remember { mutableStateOf("1") }
     var period by remember { mutableStateOf("first_half") }
     var expandedPeriod by remember { mutableStateOf(false) }
+    var expandedPlayerDropdown by remember { mutableStateOf(false) }
 
     val periods = mapOf(
         "first_half" to "Hiệp 1",
@@ -394,6 +397,13 @@ fun GoalDialog(
         "penalty_shootout" to "Loạt sút luân lưu"
     )
 
+    // Lấy danh sách cầu thủ của đội đang được chọn (kết hợp cả đá chính lineup và dự bị subs nếu cần, hoặc dùng chung một danh sách toàn đội trong trận)
+    val currentTeamPlayers = if (isTeamASelected) {
+        matchDetail.lineupA + matchDetail.subsA
+    } else {
+        matchDetail.lineupB + matchDetail.subsB
+    }
+
     val selectedTeamId = if (isTeamASelected) matchDetail.teamAId else matchDetail.teamBId
 
     AlertDialog(
@@ -402,6 +412,7 @@ fun GoalDialog(
         containerColor = Color(0xFF161616),
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Chọn đội
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
@@ -409,21 +420,74 @@ fun GoalDialog(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { isTeamASelected = true }
+                        modifier = Modifier.clickable {
+                            isTeamASelected = true
+                            selectedPlayerNumber = ""
+                            selectedPlayerName = ""
+                        }
                     ) {
-                        RadioButton(selected = isTeamASelected, onClick = { isTeamASelected = true }, colors = RadioButtonDefaults.colors(selectedColor = NeonGreen))
+                        RadioButton(selected = isTeamASelected, onClick = {
+                            isTeamASelected = true
+                            selectedPlayerNumber = ""
+                            selectedPlayerName = ""
+                        }, colors = RadioButtonDefaults.colors(selectedColor = NeonGreen))
                         Text(matchDetail.teamA, color = Color.White, fontSize = 14.sp)
                     }
                     Spacer(modifier = Modifier.width(24.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { isTeamASelected = false }
+                        modifier = Modifier.clickable {
+                            isTeamASelected = false
+                            selectedPlayerNumber = ""
+                            selectedPlayerName = ""
+                        }
                     ) {
-                        RadioButton(selected = !isTeamASelected, onClick = { isTeamASelected = false }, colors = RadioButtonDefaults.colors(selectedColor = NeonGreen))
+                        RadioButton(selected = !isTeamASelected, onClick = {
+                            isTeamASelected = false
+                            selectedPlayerNumber = ""
+                            selectedPlayerName = ""
+                        }, colors = RadioButtonDefaults.colors(selectedColor = NeonGreen))
                         Text(matchDetail.teamB, color = Color.White, fontSize = 14.sp)
                     }
                 }
 
+                // 🌟 DROPDOWN CHỌN CẦU THỦ (Thay vì gõ số áo)
+                ExposedDropdownMenuBox(
+                    expanded = expandedPlayerDropdown,
+                    onExpandedChange = { expandedPlayerDropdown = !expandedPlayerDropdown }
+                ) {
+                    OutlinedTextField(
+                        value = if (selectedPlayerName.isNotEmpty()) "#$selectedPlayerNumber - $selectedPlayerName" else "Chọn cầu thủ ghi bàn",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPlayerDropdown) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = Color.Gray
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedPlayerDropdown,
+                        onDismissRequest = { expandedPlayerDropdown = false },
+                        modifier = Modifier.background(Color(0xFF161616))
+                    ) {
+                        currentTeamPlayers.forEach { player ->
+                            DropdownMenuItem(
+                                text = { Text("#${player.number} - ${player.name}", color = Color.White) },
+                                onClick = {
+                                    selectedPlayerNumber = player.number
+                                    selectedPlayerName = player.name
+                                    expandedPlayerDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Chọn Hiệp
                 Box {
                     OutlinedButton(
                         onClick = { expandedPeriod = true },
@@ -450,30 +514,30 @@ fun GoalDialog(
                     }
                 }
 
-                OutlinedTextField(
-                    value = jerseyNumber,
-                    onValueChange = { jerseyNumber = it.filter { it.isDigit() } },
-                    label = { Text("Số áo cầu thủ ghi bàn") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Nhập phút
                 OutlinedTextField(
                     value = minute,
-                    onValueChange = { minute = it.filter { it.isDigit() } },
+                    onValueChange = { minute = it.filter { char -> char.isDigit() } },
                     label = { Text("Phút ghi bàn") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = NeonGreen,
+                        unfocusedBorderColor = Color.Gray
+                    )
                 )
             }
         },
         confirmButton = {
             Button(
-                onClick = { 
-                    if (jerseyNumber.isNotBlank()) {
-                        onConfirm(selectedTeamId, jerseyNumber.toIntOrNull() ?: 0, minute.toIntOrNull() ?: 0, period) 
+                onClick = {
+                    if (selectedPlayerNumber.isNotBlank()) {
+                        onConfirm(selectedTeamId, selectedPlayerNumber.toIntOrNull() ?: 0, minute.toIntOrNull() ?: 0, period)
                     }
                 },
-                enabled = jerseyNumber.isNotBlank(),
+                enabled = selectedPlayerNumber.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
             ) {
                 Text("Xác nhận", color = Color.Black, fontWeight = FontWeight.Bold)
@@ -484,7 +548,6 @@ fun GoalDialog(
         }
     )
 }
-
 @Composable
 fun UpdateScoreDialog(currentScoreA: Int, currentScoreB: Int, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
     var scoreA by remember { mutableStateOf(currentScoreA.toString()) }
@@ -615,13 +678,16 @@ fun SubstitutionDialog(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (Int, Int, Int, String, Boolean) -> Unit) {
     var isTeamASelected by remember { mutableStateOf(true) }
-    var jerseyNumber by remember { mutableStateOf("") }
+    var selectedPlayerNumber by remember { mutableStateOf("") }
+    var selectedPlayerName by remember { mutableStateOf("") }
     var minute by remember { mutableStateOf("45") }
     var period by remember { mutableStateOf("first_half") }
     var expandedPeriod by remember { mutableStateOf(false) }
+    var expandedPlayerDropdown by remember { mutableStateOf(false) }
     var isRed by remember { mutableStateOf(false) }
 
     val periods = mapOf(
@@ -632,6 +698,7 @@ fun CardDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (
         "penalty_shootout" to "Loạt sút luân lưu"
     )
 
+    val currentTeamPlayers = if (isTeamASelected) matchDetail.lineupA + matchDetail.subsA else matchDetail.lineupB + matchDetail.subsB
     val selectedTeamId = if (isTeamASelected) matchDetail.teamAId else matchDetail.teamBId
 
     AlertDialog(
@@ -645,30 +712,50 @@ fun CardDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { isTeamASelected = true }
-                    ) {
-                        RadioButton(
-                            selected = isTeamASelected,
-                            onClick = { isTeamASelected = true },
-                            colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { isTeamASelected = true; selectedPlayerNumber = ""; selectedPlayerName = "" }) {
+                        RadioButton(selected = isTeamASelected, onClick = { isTeamASelected = true; selectedPlayerNumber = ""; selectedPlayerName = "" }, colors = RadioButtonDefaults.colors(selectedColor = NeonGreen))
                         Text(matchDetail.teamA, color = Color.White, fontSize = 14.sp)
                     }
-
                     Spacer(modifier = Modifier.width(24.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { isTeamASelected = false }
-                    ) {
-                        RadioButton(
-                            selected = !isTeamASelected,
-                            onClick = { isTeamASelected = false },
-                            colors = RadioButtonDefaults.colors(selectedColor = NeonGreen)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { isTeamASelected = false; selectedPlayerNumber = ""; selectedPlayerName = "" }) {
+                        RadioButton(selected = !isTeamASelected, onClick = { isTeamASelected = false; selectedPlayerNumber = ""; selectedPlayerName = "" }, colors = RadioButtonDefaults.colors(selectedColor = NeonGreen))
                         Text(matchDetail.teamB, color = Color.White, fontSize = 14.sp)
+                    }
+                }
+
+                // Dropdown chọn cầu thủ nhận thẻ
+                ExposedDropdownMenuBox(
+                    expanded = expandedPlayerDropdown,
+                    onExpandedChange = { expandedPlayerDropdown = !expandedPlayerDropdown }
+                ) {
+                    OutlinedTextField(
+                        value = if (selectedPlayerName.isNotEmpty()) "#$selectedPlayerNumber - $selectedPlayerName" else "Chọn cầu thủ nhận thẻ",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPlayerDropdown) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = Color.Gray
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedPlayerDropdown,
+                        onDismissRequest = { expandedPlayerDropdown = false },
+                        modifier = Modifier.background(Color(0xFF161616))
+                    ) {
+                        currentTeamPlayers.forEach { player ->
+                            DropdownMenuItem(
+                                text = { Text("#${player.number} - ${player.name}", color = Color.White) },
+                                onClick = {
+                                    selectedPlayerNumber = player.number
+                                    selectedPlayerName = player.name
+                                    expandedPlayerDropdown = false
+                                }
+                            )
+                        }
                     }
                 }
 
@@ -689,22 +776,12 @@ fun CardDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (
                         periods.forEach { (key, label) ->
                             DropdownMenuItem(
                                 text = { Text(label, color = Color.White) },
-                                onClick = {
-                                    period = key
-                                    expandedPeriod = false
-                                }
+                                onClick = { period = key; expandedPeriod = false }
                             )
                         }
                     }
                 }
 
-                OutlinedTextField(
-                    value = jerseyNumber,
-                    onValueChange = { jerseyNumber = it.filter { char -> char.isDigit() } },
-                    label = { Text("Số áo cầu thủ") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
                 OutlinedTextField(
                     value = minute,
                     onValueChange = { minute = it.filter { char -> char.isDigit() } },
@@ -712,6 +789,7 @@ fun CardDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { isRed = !isRed }
@@ -728,11 +806,11 @@ fun CardDialog(matchDetail: FullMatchDetail, onDismiss: () -> Unit, onConfirm: (
         confirmButton = {
             Button(
                 onClick = {
-                    if (jerseyNumber.isNotBlank()) {
-                        onConfirm(selectedTeamId, jerseyNumber.toIntOrNull() ?: 0, minute.toIntOrNull() ?: 0, period, isRed)
+                    if (selectedPlayerNumber.isNotBlank()) {
+                        onConfirm(selectedTeamId, selectedPlayerNumber.toIntOrNull() ?: 0, minute.toIntOrNull() ?: 0, period, isRed)
                     }
                 },
-                enabled = jerseyNumber.isNotBlank(),
+                enabled = selectedPlayerNumber.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
             ) {
                 Text("Thêm", color = Color.Black, fontWeight = FontWeight.Bold)

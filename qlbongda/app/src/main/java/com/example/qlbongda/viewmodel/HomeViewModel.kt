@@ -20,6 +20,8 @@ import com.example.qlbongda.data.model.*
         val hotMatchList = MutableStateFlow<List<FullMatchDetail>>(emptyList())
         val standingList = MutableStateFlow<List<GroupStanding>>(emptyList())
 
+        val allMatchesList = MutableStateFlow<List<FullMatchDetail>>(emptyList())
+
         private val _isLoading = MutableStateFlow(false)
         val isLoading: StateFlow<Boolean> = _isLoading
         private val _selectedSeason = MutableStateFlow<SeasonWithPhases?>(null)
@@ -35,13 +37,32 @@ import com.example.qlbongda.data.model.*
             loadGlobalRules()
             loadSeasons()
         }
+
         fun selectSeason(season: SeasonWithPhases) {
-            // Thêm check kỹ ở đây:
             if (_selectedSeason.value?.id != season.id) {
                 _selectedSeason.value = season
+                season.id?.let { seasonId ->
+                    // Tải bảng xếp hạng của giải này
+                    loadStandings(seasonId)
+
+                    // 🌟 Lọc danh sách trận đấu từ danh sách gốc đã lưu sẵn trong máy
+                    // Giải nào không có trận thì matchList nhận danh sách rỗng để UI báo "Chưa có lịch",
+                    // nhưng danh sách gốc `allMatchesList` vẫn còn nguyên để khi bấm sang giải khác vẫn hiện bình thường!
+                    matchList.value = allMatchesList.value.filter { it.seasonId == seasonId }
+                }
             }
         }
+        private val _selectedPhase = MutableStateFlow<TournamentPhase?>(null)
+        val selectedPhase: StateFlow<TournamentPhase?> = _selectedPhase.asStateFlow()
 
+        // Hàm cập nhật khi người dùng bấm chọn vòng đấu mới
+        fun selectPhase(phase: TournamentPhase?) {
+            _selectedPhase.value = phase
+            phase?.let {
+                // Thực hiện logic load API standings hoặc xử lý logic theo phase id của bạn tại đây
+                selectPhase(it.id)
+            }
+        }
         // --- CÁC HÀM GỌI API ---
 
         private var lastSuccessfullyLoadedPhasesId: Int? = null
@@ -76,33 +97,44 @@ import com.example.qlbongda.data.model.*
         }
 
         fun loadMatches() {
-
             viewModelScope.launch {
                 try {
                     val response = apiService.getMatches()
                     if (response.isSuccessful) {
                         val listDto = response.body()?.data ?: emptyList()
 
-                        // Map từ DTO sang Model hiển thị
-                        matchList.value = listDto.map { dto ->android.util.Log.d("DEBUG_HOT", "ID: ${dto.id}, isFeatured: ${dto.isHot}")
+                        val mappedMatches = listDto.map { dto ->
                             FullMatchDetail(
                                 id = dto.id,
-                                teamA = dto.teamA, // Lấy từ MatchDto
-                                teamB = dto.teamB, // Lấy từ MatchDto
-                                status = dto.status, // <--- THÊM DÒNG NÀY VÀO ĐỂ TRUYỀN DỮ LIỆU
+                                seasonId = dto.seasonId ?: 0,
+                                teamA = dto.teamA,
+                                teamB = dto.teamB,
+                                teamAId = dto.home_team_id ?: 0, // 🌟 Map đúng ID đội nhà ở đây
+                                teamBId = dto.away_team_id ?: 0, // 🌟 Map đúng ID đội khách ở đây
+                                status = dto.status,
                                 scoreA = dto.home_score ?: 0,
                                 scoreB = dto.away_score ?: 0,
                                 time = dto.scheduled_at ?: "",
                                 date = dto.scheduled_at ?: "",
                                 stadium = "Chưa cập nhật",
                                 isStarted = dto.isStarted,
-                                // Các trường mặc định để hiển thị UI
-
                                 events = emptyList(), lineupA = emptyList(), lineupB = emptyList(),
                                 subsA = emptyList(), subsB = emptyList(), PossessionA = "0%",
                                 PossessionB = "0%", ShotsA = "0", ShotsB = "0", mvp = "",
                                 isHot = dto.isHot
                             )
+                        }
+
+                        // 🌟 1. Lưu vào danh sách gốc an toàn
+                        allMatchesList.value = mappedMatches // Lưu danh sách gốc
+                        matchList.value = mappedMatches
+
+                        // 🌟 2. Lọc hiển thị cho mùa giải đang chọn (nếu có)
+                        val currentSeasonId = _selectedSeason.value?.id
+                        if (currentSeasonId != null) {
+                            matchList.value = mappedMatches.filter { it.seasonId == currentSeasonId }
+                        } else {
+                            matchList.value = mappedMatches
                         }
                     }
                 } catch (e: Exception) {
@@ -110,6 +142,7 @@ import com.example.qlbongda.data.model.*
                 }
             }
         }
+
         // Trong HomeViewModel.kt
         private val _tournamentRules = MutableStateFlow<TournamentRules?>(null)
         val tournamentRules: StateFlow<TournamentRules?> = _tournamentRules.asStateFlow()
@@ -141,6 +174,7 @@ import com.example.qlbongda.data.model.*
                             hotMatchList.value = listDto.map { dto ->
                                 FullMatchDetail(
                                     id = dto.id,
+                                    seasonId = dto.seasonId ?: 0,
                                     teamA = dto.homeTeamName ?: "TBD", // Tránh lỗi null nếu tên đội trống
                                     teamB = dto.awayTeamName ?: "TBD",
                                     status = dto.status ?: "scheduled",
@@ -177,10 +211,19 @@ import com.example.qlbongda.data.model.*
             }
         }
 
+        // 1. Thêm StateFlow quản lý trạng thái loading
+
+
         private val _selectedMatchDetail = MutableStateFlow<FullMatchDetail?>(null)
         val selectedMatchDetail: StateFlow<FullMatchDetail?> = _selectedMatchDetail
+
+        fun setSelectedMatch(match: FullMatchDetail) {
+            _selectedMatchDetail.value = match
+        }
+
         fun fetchMatchDetail(matchId: Int) {
             viewModelScope.launch {
+                _isLoading.value = true // Bật trạng thái loading trước khi gọi API
                 try {
                     val response = apiService.getMatchDetail(matchId)
                     Log.d("API_CHECK_FULL", "Raw Body: ${response.body()}")
@@ -190,13 +233,20 @@ import com.example.qlbongda.data.model.*
                     Log.d("API_CHECK", "Data nhận được: ${response.body()?.data}")
                 } catch (e: Exception) {
                     e.printStackTrace()
+                } finally {
+                    _isLoading.value = false // LUÔN TẮT loading dù thành công hay thất bại
                 }
             }
         }
+
         private val _teamDetail = MutableStateFlow<TeamDetailData?>(null)
         val teamDetail = _teamDetail.asStateFlow()
         fun fetchTeamDetail(teamId: Int) {
             Log.d("TeamViewModel", "Đang gọi API chi tiết với teamId: $teamId")
+
+            // 🌟 1. THÊM DÒNG NÀY: Reset dữ liệu cũ về null ngay lập tức
+            // Giúp màn hình chi tiết không bị hiện dính thông tin của đội vừa xem trước đó
+            _teamDetail.value = null
 
             // Kiểm tra nhanh: Nếu ID bằng 0, không gọi API nữa để tránh lỗi server
             if (teamId <= 0) {
@@ -257,46 +307,112 @@ import com.example.qlbongda.data.model.*
                 finally { _isLoading.value = false }
             }
         }
-        val teamPlayers = MutableStateFlow<List<PlayerInfo>>(emptyList()) // Danh sách cầu thủ của đội
-        // Gọi API lấy chi tiết đội (đã có từ trước)
-        fun loadTeamDetails(teamId: Int) {
-            viewModelScope.launch {
-                try {
-                    val response = apiService.getTeamDetail(teamId)
-                    if (response.isSuccessful) {
-                        teamPlayers.value = response.body()?.data?.players ?: emptyList()
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-        fun addPlayer(teamId: Int, player: PlayerInfo) {
-            viewModelScope.launch {
-                try {
-                    val response = apiService.addPlayerToTeam(teamId, player)
-                    if (response.isSuccessful) {
-                        loadTeamDetails(teamId) // Cập nhật lại list sau khi thêm
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
+        // Danh sách cầu thủ StateFlow để UI (Jetpack Compose) quan sát và hiển thị
+        private val _players = MutableStateFlow<List<PlayerInfo>>(emptyList())
+        val players: StateFlow<List<PlayerInfo>> = _players
 
-        // Hàm xóa cầu thủ
-        fun removePlayer(teamId: Int, playerId: Int) {
+        // Hàm gọi API đồng bộ dữ liệu cầu thủ và thẻ phạt
+        // Hàm gọi API đồng bộ dữ liệu cầu thủ và thẻ phạt
+        fun fetchTeamDataAndCardStatus(teamId: Int, seasonId: Int) {
             viewModelScope.launch {
                 try {
-                    val response = apiService.removePlayerFromTeam(teamId, playerId)
-                    if (response.isSuccessful) {
-                        loadTeamDetails(teamId) // Cập nhật lại list sau khi xóa
+                    // 1. Gọi API lấy chi tiết đội (bao gồm danh sách cầu thủ)
+                    val teamResponse = apiService.getTeamDetail(teamId)
+
+                    if (teamResponse.isSuccessful) {
+                        val originalPlayers = teamResponse.body()?.data?.players ?: emptyList()
+
+                        // 2. Gọi API lấy trạng thái thẻ phạt / treo giò
+                        val cardStatusResponse = apiService.getPlayerCardStatus(teamId, seasonId)
+
+                        if (cardStatusResponse.isSuccessful) {
+                            val cardStatusList = cardStatusResponse.body()?.data ?: emptyList()
+
+                            // 3. Gộp (merge) thông tin thẻ phạt vào PlayerInfo
+                            val updatedPlayers = originalPlayers.map { player ->
+                                val cardInfo = cardStatusList.find { it.playerId == player.id }
+
+                                player.copy(
+                                    yellowCards = cardInfo?.yellowCards ?: 0,
+                                    redCards = cardInfo?.redCards ?: 0,
+                                    isSuspended = cardInfo?.isSuspended == 1 // Chuyển từ Int (0/1) sang Boolean
+                                )
+                            }
+
+                            // 4. Cập nhật lại danh sách mới vào StateFlow để UI hiển thị
+                            _players.value = updatedPlayers
+                        } else {
+                            // Trường hợp API thẻ phạt lỗi -> Vẫn hiển thị danh sách cầu thủ ban đầu
+                            _players.value = originalPlayers
+                        }
+                    } else {
+                        Log.e("HomeViewModel", "Lỗi lấy chi tiết đội: ${teamResponse.code()}")
                     }
+
                 } catch (e: Exception) {
+                    Log.e("HomeViewModel", "Lỗi fetchTeamDataAndCardStatus: ${e.message}")
                     e.printStackTrace()
                 }
             }
         }
+        // Hàm phụ trợ tính số thẻ phát sinh trong trận đấu dựa trên events của trận đó
+        fun getPlayerCardsInThisMatch(player: PlayerInfo, matchEvents: List<MatchEvent>): Pair<Int, Int> {
+            var yellowCount = 0
+            var redCount = 0
+
+            matchEvents.forEach { event ->
+                // Kiểm tra xem tên cầu thủ trong sự kiện có khớp với cầu thủ hiện tại không
+                if (event.playerName.equals(player.name, ignoreCase = true)) {
+                    val typeLower = event.type.lowercase()
+                    if (typeLower.contains("vàng") || typeLower.contains("yellow")) {
+                        yellowCount++
+                    } else if (typeLower.contains("đỏ") || typeLower.contains("red")) {
+                        redCount++
+                    }
+                }
+            }
+            return Pair(yellowCount, redCount)
+        }
+//        val teamPlayers = MutableStateFlow<List<PlayerInfo>>(emptyList()) // Danh sách cầu thủ của đội
+//        // Gọi API lấy chi tiết đội (đã có từ trước)
+//        fun loadTeamDetails(teamId: Int) {
+//            viewModelScope.launch {
+//                try {
+//                    val response = apiService.getTeamDetail(teamId)
+//                    if (response.isSuccessful) {
+//                        teamPlayers.value = response.body()?.data?.players ?: emptyList()
+//                    }
+//                } catch (e: Exception) {
+//                    e.printStackTrace()
+//                }
+//            }
+//        }
+//        fun addPlayer(teamId: Int, player: PlayerInfo) {
+//            viewModelScope.launch {
+//                try {
+//                    val response = apiService.addPlayerToTeam(teamId, player)
+//                    if (response.isSuccessful) {
+//                        loadTeamDetails(teamId) // Cập nhật lại list sau khi thêm
+//                    }
+//                } catch (e: Exception) {
+//                    e.printStackTrace()
+//                }
+//            }
+//        }
+
+//        // Hàm xóa cầu thủ
+//        fun removePlayer(teamId: Int, playerId: Int) {
+//            viewModelScope.launch {
+//                try {
+//                    val response = apiService.removePlayerFromTeam(teamId, playerId)
+//                    if (response.isSuccessful) {
+//                        loadTeamDetails(teamId) // Cập nhật lại list sau khi xóa
+//                    }
+//                } catch (e: Exception) {
+//                    e.printStackTrace()
+//                }
+//            }
+//        }
 
 
 

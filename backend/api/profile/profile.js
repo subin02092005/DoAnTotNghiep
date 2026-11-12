@@ -24,15 +24,15 @@ router.get('/profile/get-info', async (req, res) => {
 
         // 🌟 Sửa query: Join thêm bảng players
         const query = `
-            SELECT u.name, u.email, u.phone, u.email_verified, r.name as role_name, 
-                   p.date_of_birth
-            FROM users u
-            LEFT JOIN user_role ur ON u.id = ur.user_id
-            LEFT JOIN roles r ON ur.role_id = r.id
-            LEFT JOIN players p ON u.id = p.user_id
-            WHERE u.email = ? 
-            LIMIT 1
-        `;
+    SELECT u.name, u.email, u.phone, u.email_verified, r.name as role_name, 
+           p.date_of_birth, p.height, p.weight, p.nationality, p.position, p.avatar
+    FROM users u
+    LEFT JOIN user_role ur ON u.id = ur.user_id
+    LEFT JOIN roles r ON ur.role_id = r.id
+    LEFT JOIN players p ON u.id = p.user_id
+    WHERE u.email = ? 
+    LIMIT 1
+`;
         
         const [rows] = await connection.execute(query, [email]);
         await connection.end();
@@ -146,12 +146,16 @@ if (date_of_birth) {
 }
 
 const sql = `
-    INSERT INTO players (user_id, date_of_birth) 
-    VALUES (?, ?) 
-    ON DUPLICATE KEY UPDATE date_of_birth = ?
+    INSERT INTO players (user_id, date_of_birth, height, weight, position, nationality) 
+    VALUES (?, ?, ?, ?, ?, ?) 
+    ON DUPLICATE KEY UPDATE 
+        date_of_birth = VALUES(date_of_birth),
+        height = VALUES(height),
+        weight = VALUES(weight),
+        position = VALUES(position),
+        nationality = VALUES(nationality)
 `;
-// TRUYỀN formattedDob VÀO THAY VÌ date_of_birth
-await connection.execute(sql, [userId, formattedDob, formattedDob]);
+await connection.execute(sql, [userId, formattedDob, height, weight, position, nationality]);
 
         await connection.end();
 
@@ -211,6 +215,48 @@ router.post('/profile/change-password', async (req, res) => {
         console.error("Lỗi đổi mật khẩu:", error);
         if (connection) await connection.end();
         return res.status(500).json({ success: false, message: 'Lỗi hệ thống khi đổi mật khẩu!' });
+    }
+});
+router.get('/overview', async (req, res) => {
+    try {
+        const { email } = req.query;
+        
+        // 1. Tìm user_id từ email
+        const [users] = await db.execute('SELECT id FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
+        }
+        const userId = users[0].id;
+
+        // 2. Truy vấn danh sách đội bóng
+        const teamQuery = `
+            SELECT t.name as team_name, tp.jersey_number, tp.position, tp.role, tp.status
+            FROM team_players tp
+            JOIN teams t ON tp.team_id = t.id
+            WHERE tp.user_id = ?
+        `;
+        const [teams] = await db.execute(teamQuery, [userId]);
+
+        // 3. Truy vấn thống kê sự nghiệp
+        const statQuery = `
+            SELECT s.name as season_name, ps.matches_played, ps.goals_scored, 
+                   ps.assists, ps.yellow_cards, ps.red_cards, ps.minutes_played
+            FROM player_statistics ps
+            JOIN players p ON ps.player_id = p.id
+            JOIN seasons s ON ps.season_id = s.id
+            WHERE p.user_id = ?
+        `;
+        const [stats] = await db.execute(statQuery, [userId]);
+
+        // 4. Trả về chung một JSON chứa cả 2 danh sách
+        res.json({ 
+            success: true, 
+            teams: teams, 
+            statistics: stats 
+        });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 module.exports = router;

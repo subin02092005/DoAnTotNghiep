@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,6 +41,9 @@ fun NewsTabContent() {
     }
     val userId = sharedPref.getInt("USER_ID", -1)
     val teamId = sharedPref.getInt("TEAM_ID", 0)
+
+
+    val listState = rememberLazyListState()
     LaunchedEffect(refreshTrigger) { // Chạy lại khi refreshTrigger thay đổi
         isLoading = true
         try {
@@ -88,7 +92,7 @@ fun NewsTabContent() {
                     Text("Không có thông báo mới.", color = Color.Gray, fontSize = 14.sp)
                 }
             } else {
-                LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LazyColumn(state = listState,modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(newsList) { item ->
                         NewsItemRow(news = item, onClick = { activeDetailNews = item })
                     }

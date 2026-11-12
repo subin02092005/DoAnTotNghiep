@@ -4,7 +4,12 @@ import android.util.Log
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.EmojiEvents
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
 import com.example.qlbongda.viewmodel.HomeViewModel
 import com.example.qlbongda.data.model.*
@@ -76,15 +82,18 @@ fun HomeTabContent(
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
     onNavigateToStandingDetail: () -> Unit,
-    onTeamClick: (Int) -> Unit
+    onTeamClick: (Int) -> Unit,
+    onNavigateToDetail: (SeasonWithPhases) -> Unit,
+    listState: LazyListState = rememberLazyListState()// 👈 THÊM THAM SỐ NÀY
 ) {
     val hotMatches by viewModel.hotMatchList.collectAsState()
     val selectedSeason by viewModel.selectedSeason.collectAsState()
     val currentPhases = remember(selectedSeason, phaseList) {
         selectedSeason?.phases ?: phaseList
     }
+    val selectedPhase by viewModel.selectedPhase.collectAsState()
 
-    var selectedPhase by remember { mutableStateOf<TournamentPhase?>(null) }
+
 
     LaunchedEffect(selectedSeason?.id) {
         val seasonId = selectedSeason?.id
@@ -97,10 +106,10 @@ fun HomeTabContent(
     LaunchedEffect(currentPhases) {
         if (currentPhases.isNotEmpty()) {
             if (selectedPhase == null || !currentPhases.contains(selectedPhase)) {
-                selectedPhase = currentPhases.firstOrNull()
+                viewModel.selectPhase(currentPhases.firstOrNull()) // Lưu trực tiếp vào ViewModel
             }
         } else {
-            selectedPhase = null
+            viewModel.selectPhase(null)
         }
     }
     LaunchedEffect(selectedPhase) {
@@ -143,7 +152,7 @@ fun HomeTabContent(
             }
         }
 
-        LazyColumn(
+        LazyColumn(state = listState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -168,7 +177,7 @@ fun HomeTabContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
-                        items(hotMatches) { match ->
+                        items(hotMatches,key = { it.id }) { match ->
                             HotMatchCard(match)
                         }
                     }
@@ -178,35 +187,79 @@ fun HomeTabContent(
             if (seasonList.isNotEmpty()) {
                 item {
                     Text(
-                        text = "GIẢI ĐẤU ĐANG DIỄN RA",
+                        text = "DANH SÁCH GIẢI ĐẤU",
                         color = Color.Gray,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+                        fontSize= 11.sp,
+                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
                     )
-                    LazyRow(
+                }
+
+                // Hiển thị danh sách các giải đấu dưới dạng các ô card bấm được
+                items(seasonList,key = { it.id ?: it.name}) { season ->
+                    val isSelected = selectedSeason?.id == season.id
+
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                // 1. Cập nhật giải đấu trong ViewModel
+                                viewModel.selectSeason(season)
+                                // 2. Chuyển sang trang chi tiết
+                                onNavigateToDetail(season)
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) Color(0xFF1B2E1B) else Color(0xFF161616)
+                        ),
+                        border = BorderStroke(1.dp, if (isSelected) NeonGreen else Color.DarkGray)
                     ) {
-                        items(seasonList) { season ->
-                            val isSelected = selectedSeason?.id == season.id
-                            Button(
-                                onClick = { viewModel.selectSeason(season) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSelected) NeonGreen else Color(0xFF1E1E1E)
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                border = if (!isSelected) BorderStroke(1.dp, Color.DarkGray) else null
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Text(
-                                    text = season.name.uppercase(),
-                                    color = if (isSelected) Color.Black else Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(if (isSelected) NeonGreen else Color(0xFF252525), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.EmojiEvents,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.Black else NeonGreen,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = season.name.uppercase(),
+                                        color = if (isSelected) NeonGreen else Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Nhấn để xem lịch đấu, kết quả & bảng xếp hạng",
+                                        color = Color.Gray,
+                                        fontSize = 11.sp
+                                    )
+                                }
                             }
+
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = if (isSelected) NeonGreen else Color.Gray
+                            )
                         }
                     }
                 }
@@ -223,7 +276,7 @@ fun HomeTabContent(
                         items(currentPhases) { phase ->
                             val isSelected = selectedPhase?.id == phase.id
                             Button(
-                                onClick = { selectedPhase = phase },
+                                onClick = { viewModel.selectPhase(phase) },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isSelected) NeonGreen else Color(0xFF2C2C2C)
                                 ),
@@ -315,7 +368,7 @@ fun HomeTabContent(
                     HorizontalDivider(color = Color.DarkGray, thickness = 0.5.dp)
                 }
 
-                items(currentGroup.standings) { row ->
+                items(currentGroup.standings, key = { it.id}) { row ->
                     val rankColor = when (row.rank) {
                         1, 2 -> NeonGreen
                         3 -> Color.White
@@ -388,6 +441,139 @@ fun HomeTabContent(
                     ) {
                         Text("Chưa có dữ liệu bảng xếp hạng", color = Color.Gray)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000, name = "Giao diện Trang Chủ (HomeTab)")
+@Composable
+fun HomeTabContentPreview() {
+    // Dữ liệu giả lập các giải đấu để hiển thị trong Preview
+    val sampleSeasons = listOf(
+        SeasonWithPhases(
+            id = 1,
+            name = "V-LEAGUE MÙA HÈ 2026",
+            phases = emptyList()
+        ),
+        SeasonWithPhases(
+            id = 2,
+            name = "CÚP VÀNG MÙA THU 2026",
+            phases = emptyList()
+        )
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(16.dp)
+    ) {
+        // Header Logo & Tiêu đề ứng dụng
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .background(Color(0xFF1E2E1E), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = NeonGreen,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "NEONBALL PRO",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = "Cập nhật giải đấu mới nhất",
+                    color = Color.Gray,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Tiêu đề mục danh sách giải đấu
+        Text(
+            text = "DANH SÁCH GIẢI ĐẤU",
+            color = Color.Gray,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // Hiển thị danh sách các giải đấu dưới dạng ô Card bấm được
+        sampleSeasons.forEachIndexed { index, season ->
+            val isSelected = index == 0 // Giả lập giải đầu tiên đang được chọn
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSelected) Color(0xFF1B2E1B) else Color(0xFF161616)
+                ),
+                border = BorderStroke(1.dp, if (isSelected) NeonGreen else Color.DarkGray)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(if (isSelected) NeonGreen else Color(0xFF252525), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = null,
+                                tint = if (isSelected) Color.Black else NeonGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = season.name.uppercase(),
+                                color = if (isSelected) NeonGreen else Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Nhấn để xem lịch đấu, kết quả & bảng xếp hạng",
+                                color = Color.Gray,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = if (isSelected) NeonGreen else Color.Gray
+                    )
                 }
             }
         }

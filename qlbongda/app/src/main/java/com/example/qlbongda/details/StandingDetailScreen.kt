@@ -28,7 +28,7 @@ fun StandingDetailScreen(
     standings: List<GroupStanding>,
     initialTabIndex: Int,
     onBack: () -> Unit,
-    onTeamClick: (String) -> Unit
+    onTeamClick: (Int) -> Unit // 🌟 Sửa từ (String) -> Unit thành (Int) -> Unit
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(initialTabIndex) }
     val sharedScrollState = rememberScrollState()
@@ -113,13 +113,18 @@ fun StandingDetailScreen(
                     ) {
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(row.rank.toString(), color = rankColor, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(30.dp), textAlign = TextAlign.Center)
+
+                            // 🌟 SỬA TẠI ĐÂY: Bấm vào tên đội sẽ truyền chính xác `row.id` (ID của đội bóng)
                             Text(
                                 text = row.teamName,
                                 color = if (row.rank <= 3) rankColor else Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.width(100.dp).clickable { onTeamClick(row.teamName) },
-                                maxLines = 1, overflow = TextOverflow.Ellipsis
+                                modifier = Modifier
+                                    .width(100.dp)
+                                    .clickable { onTeamClick(row.id) }, // 🌟 Truyền row.id
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
 
                             Row(modifier = Modifier.horizontalScroll(sharedScrollState)) {

@@ -23,7 +23,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.qlbongda.viewmodel.AdminViewModel
 import com.example.qlbongda.data.model.*
 import com.example.qlbongda.ui.theme.NeonGreen
-
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 val NeonBlack = Color(0xFF0A0A0A)      // Đen sâu
 val NeonSurface = Color(0xFF161616)    // Xám rất tối (cho Card & Tab)
 val NeonGray = Color(0xFF666666)       // Xám cho chữ phụ
@@ -39,46 +40,11 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
     val generalList by viewModel.generalNotifications.collectAsStateWithLifecycle()
     val teamList by viewModel.teamNotifications.collectAsStateWithLifecycle()
     val personalList by viewModel.personalNotifications.collectAsStateWithLifecycle()
-    val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
-
-    // 🌟 1. THÊM STATE NÀY ĐỂ QUẢN LÝ DIALOG SỬA LUẬT
-    var editingRuleSeasonId by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) { viewModel.fetchNotifications() }
 
     val displayList = remember(selectedTab, generalList, teamList, personalList) {
         when (selectedTab) { 0 -> generalList; 1 -> teamList; else -> personalList }
-    }
-
-    if (showAddRuleDialog) {
-        AddRuleDialog(
-            onDismiss = { viewModel.setShowAddRuleDialog(false) },
-            onConfirm = { sId, min, max, win, draw, loss, forfeit, desc ->
-                val request = CreateRuleRequest(season_id = sId, min_players = min, max_players = max, points_win = win, points_draw = draw, points_loss = loss, forfeit_score = forfeit, description = desc)
-                viewModel.createRules(request)
-                viewModel.setShowAddRuleDialog(false)
-            }
-        )
-    }
-
-    if (editingRuleSeasonId != null) {
-        AddRuleDialog(
-            onDismiss = { editingRuleSeasonId = null },
-            onConfirm = { sId, min, max, win, draw, loss, forfeit, desc ->
-                val request = CreateRuleRequest(
-                    season_id = sId, 
-                    min_players = min,
-                    max_players = max,
-                    points_win = win,
-                    points_draw = draw,
-                    points_loss = loss,
-                    forfeit_score = forfeit,
-                    description = desc
-                )
-                viewModel.createRules(request) 
-                editingRuleSeasonId = null 
-            }
-        )
     }
 
     if (showAddDialog) {
@@ -96,8 +62,6 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
         floatingActionButton = {
             Column {
                 FloatingActionButton(onClick = { viewModel.setShowCleanupDialog(true) }, containerColor = NeonRed, contentColor = Color.Black) { Icon(Icons.Default.Delete, contentDescription = "Dọn dẹp") }
-                Spacer(modifier = Modifier.height(16.dp))
-                FloatingActionButton(onClick = { viewModel.setShowAddRuleDialog(true) }, containerColor = Color.Yellow) { Icon(Icons.Default.Settings, contentDescription = "Luật") }
                 Spacer(modifier = Modifier.height(16.dp))
                 FloatingActionButton(onClick = { viewModel.setShowAddDialog(true) }, containerColor = NeonGreen, contentColor = Color.Black) { Icon(Icons.Default.Add, contentDescription = "Thêm") }
             }
@@ -120,8 +84,6 @@ fun NotificationManagementScreen(viewModel: AdminViewModel) {
                         onEdit = { item ->
                             if (item.source == "manual") {
                                 viewModel.setSelectedNotification(item)
-                            } else if (item.ref_entity_type == "tournament_rules") {
-                                editingRuleSeasonId = item.season_id
                             }
                         }
                     )
@@ -188,9 +150,23 @@ fun AddNotificationDialog(onDismiss: () -> Unit, onConfirm: (String, String, Str
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddRuleDialog(onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, Int, Int, Int, String) -> Unit) {
-    var seasonId by remember { mutableStateOf("") }
+fun AddRuleDialog(
+    seasons: List<SeasonWithPhases>,
+    initialSeasonId: Int? = null,
+    initialRule: NotificationItem? = null, // 🌟 THÊM DÒNG NÀY: Nhận thông tin luật hiện tại khi sửa
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int, Int, Int, Int, Int, Int, String) -> Unit
+) {
+    var selectedSeason by remember {
+        mutableStateOf(
+            if (initialSeasonId != null) seasons.find { it.id == initialSeasonId } else seasons.firstOrNull()
+        )
+    }
+    var expanded by remember { mutableStateOf(false) }
+
+    // Tạo các state với giá trị mặc định ban đầu
     var minPlayers by remember { mutableStateOf("7") }
     var maxPlayers by remember { mutableStateOf("11") }
     var ptsWin by remember { mutableStateOf("3") }
@@ -199,16 +175,108 @@ fun AddRuleDialog(onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, Int, In
     var forfeitScore by remember { mutableStateOf("3") }
     var description by remember { mutableStateOf("") }
 
+    // 🌟 THÊM ĐOẠN NÀY: Tự động đổ dữ liệu từ API/Thông báo cũ vào khi mở chế độ Sửa luật
+    // 🌟 Đổi key truyền vào thành selectedSeason để kích hoạt lại mỗi khi chọn giải khác
+    LaunchedEffect(selectedSeason) {
+        // 🌟 TẠO BIẾN CỤC BỘ: Gán vào một biến thường để Kotlin có thể Smart cast mượt mà
+        val season = selectedSeason
+
+        if (season != null) {
+            // Sử dụng biến 'season' (đã được smart cast thành SeasonWithPhases) thay vì 'selectedSeason'
+            if (initialRule != null && season.id == initialSeasonId) {
+                val text = initialRule.content
+                description = text
+
+                // Regex trích xuất số cầu thủ
+                val playerRegex = Regex("""Đội hình\s+(\d+)-(\d+)\s+cầu thủ""")
+                val playerMatch = playerRegex.find(text)
+                if (playerMatch != null) {
+                    minPlayers = playerMatch.groupValues[1]
+                    maxPlayers = playerMatch.groupValues[2]
+                }
+
+                // Regex trích xuất điểm số
+                val pointsRegex = Regex("""Thắng\s*\((\d+)\)\s*-\s*Hòa\s*\((\d+)\)\s*-\s*Thua\s*\((\d+)\)""")
+                val pointsMatch = pointsRegex.find(text)
+                if (pointsMatch != null) {
+                    ptsWin = pointsMatch.groupValues[1]
+                    ptsDraw = pointsMatch.groupValues[2]
+                    ptsLoss = pointsMatch.groupValues[3]
+                }
+            }
+            // Nếu chuyển sang mùa giải khác thì reset về mặc định
+            else {
+                minPlayers = "7"
+                maxPlayers = "11"
+                ptsWin = "3"
+                ptsDraw = "1"
+                ptsLoss = "0"
+                forfeitScore = "3"
+                description = ""
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = NeonSurface,
-        title = { Text("Thêm Luật Giải Đấu", color = NeonWhite) },
+        title = { Text(if (initialRule != null) "Sửa Luật Giải Đấu" else "Thêm Luật Giải Đấu", color = NeonWhite, fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+
+                // 🌟 DROPDOWN MENU CHỌN MÙA GIẢI
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = selectedSeason?.name ?: "Đang tải mùa giải...",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Mùa giải áp dụng luật", color = NeonGray) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = NeonWhite,
+                            unfocusedTextColor = NeonWhite,
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = NeonGray,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.background(NeonSurface)
+                    ) {
+                        if (seasons.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("Không có dữ liệu", color = NeonGray) },
+                                onClick = { expanded = false }
+                            )
+                        } else {
+                            seasons.forEach { season ->
+                                DropdownMenuItem(
+                                    text = { Text(season.name, color = NeonWhite) },
+                                    onClick = {
+                                        selectedSeason = season
+                                        expanded = false
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // CÁC Ô NHẬP LIỆU CÒN LẠI
                 val fields = listOf(
-                    "ID Mùa giải" to seasonId, "Tối thiểu cầu thủ" to minPlayers,
-                    "Tối đa cầu thủ" to maxPlayers, "Điểm thắng" to ptsWin,
-                    "Điểm hòa" to ptsDraw, "Điểm thua" to ptsLoss, "Điểm xử thua" to forfeitScore,
+                    "Tối thiểu cầu thủ" to minPlayers, "Tối đa cầu thủ" to maxPlayers,
+                    "Điểm thắng" to ptsWin, "Điểm hòa" to ptsDraw,
+                    "Điểm thua" to ptsLoss, "Điểm xử thua" to forfeitScore,
                     "Mô tả" to description
                 )
 
@@ -219,7 +287,6 @@ fun AddRuleDialog(onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, Int, In
                             val filteredValue = if (label != "Mô tả") newValue.filter { it.isDigit() } else newValue
 
                             when(label) {
-                                "ID Mùa giải" -> seasonId = filteredValue
                                 "Tối thiểu cầu thủ" -> minPlayers = filteredValue
                                 "Tối đa cầu thủ" -> maxPlayers = filteredValue
                                 "Điểm thắng" -> ptsWin = filteredValue
@@ -230,6 +297,12 @@ fun AddRuleDialog(onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, Int, In
                             }
                         },
                         label = { Text(label, color = NeonGray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = NeonWhite,
+                            unfocusedTextColor = NeonWhite,
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = NeonGray
+                        ),
                         keyboardOptions = KeyboardOptions(keyboardType = if (label == "Mô tả") KeyboardType.Text else KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     )
@@ -237,25 +310,28 @@ fun AddRuleDialog(onDismiss: () -> Unit, onConfirm: (Int, Int, Int, Int, Int, In
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                onConfirm(
-                    seasonId.toIntOrNull() ?: 0,
-                    minPlayers.toIntOrNull() ?: 7,
-                    maxPlayers.toIntOrNull() ?: 11,
-                    ptsWin.toIntOrNull() ?: 3,
-                    ptsDraw.toIntOrNull() ?: 1,
-                    ptsLoss.toIntOrNull() ?: 0,
-                    forfeitScore.toIntOrNull() ?: 3,
-                    description
-                )
-            }) {
-                Text("Lưu Luật", color = NeonGreen)
+            TextButton(
+                onClick = {
+                    selectedSeason?.let { season ->
+                        onConfirm(
+                            season.id,
+                            minPlayers.toIntOrNull() ?: 7,
+                            maxPlayers.toIntOrNull() ?: 11,
+                            ptsWin.toIntOrNull() ?: 3,
+                            ptsDraw.toIntOrNull() ?: 1,
+                            ptsLoss.toIntOrNull() ?: 0,
+                            forfeitScore.toIntOrNull() ?: 3,
+                            description
+                        )
+                    }
+                },
+                enabled = selectedSeason != null
+            ) {
+                Text("Lưu Luật", color = if (selectedSeason != null) NeonGreen else NeonGray)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Hủy", color = NeonGray)
-            }
+            TextButton(onClick = onDismiss) { Text("Hủy", color = NeonGray) }
         }
     )
 }

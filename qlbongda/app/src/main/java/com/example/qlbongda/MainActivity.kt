@@ -31,6 +31,8 @@ import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.core.app.ActivityCompat
 
 class MainActivity : ComponentActivity() {
@@ -65,9 +67,17 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             QlbongdaTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
 
-                    var currentScreen by remember { mutableStateOf("admin") }
+                    var currentScreen by remember { mutableStateOf("login") }
+
+
+                    var selectedSeasonForDetail by remember { mutableStateOf<SeasonWithPhases?>(null) } // 🌟 Lưu giải đấu đang chọn
+                    var standingDetailSource by remember { mutableStateOf("home") } // Lưu nơi gọi bảng xếp hạng chi tiết
+                    var teamDetailSource by remember { mutableStateOf("home") }     // Lưu nơi gọi chi tiết đội bóng
                     var previousScreen by remember { mutableStateOf("home") }
                     var selectedTab by remember { mutableIntStateOf(0) }
                     var currentStandingTabIndex by remember { mutableIntStateOf(0) }
@@ -90,149 +100,208 @@ class MainActivity : ComponentActivity() {
                     var isLeagueRegistered by remember { mutableStateOf(false) }
 
                     val playerList = remember { mutableStateListOf<PlayerInfo>() }
+                    var selectedTournamentTab by remember { mutableIntStateOf(0) }
+                    val homeListState = rememberLazyListState()
+                        when (currentScreen) {
+                            "admin" -> {
+                                AdminScreen(
+                                    onLogout = {
+                                        Toast.makeText(this, "Đã đăng xuất!", Toast.LENGTH_SHORT)
+                                            .show()
+                                        currentScreen = "login"
+                                    },
+                                    adminViewModel = adminViewModel
+                                )
+                            }
 
-                    when (currentScreen) {
-                        "admin" -> {
-                            AdminScreen(
-                                onLogout = {
-                                    Toast.makeText(this, "Đã đăng xuất!", Toast.LENGTH_SHORT).show()
-                                    currentScreen = "login"
-                                },
-                                adminViewModel = adminViewModel
-                            )
-                        }
+                            "login" -> {
+                                LoginScreen(
+                                    onLoginSuccess = { role -> // 🌟 Nhận role từ LoginScreen
+                                        currentUserRole =
+                                            role // 🌟 Cập nhật vào state để Compose re-render
+                                        selectedTab = 0
+                                        currentScreen = "home"
+                                    },
+                                    onLoginAdminSuccess = { currentScreen = "admin" },
+                                    onNavigateToRegister = { currentScreen = "register" },
+                                    onForgotPasswordClick = { currentScreen = "forgot_password" }
+                                )
+                            }
 
-                        "login" -> {
-                            LoginScreen(
-                                onLoginSuccess = {role -> // 🌟 Nhận role từ LoginScreen
-                                    currentUserRole = role // 🌟 Cập nhật vào state để Compose re-render
-                                    selectedTab = 0
-                                    currentScreen = "home" },
-                                onLoginAdminSuccess = { currentScreen = "admin" },
-                                onNavigateToRegister = { currentScreen = "register" },
-                                onForgotPasswordClick = { currentScreen = "forgot_password" }
-                            )
-                        }
+                            "register" -> {
+                                RegisterScreen(
+                                    onRegisterSuccess = { currentScreen = "login" },
+                                    onBackToLogin = { currentScreen = "login" }
+                                )
+                            }
 
-                        "register" -> {
-                            RegisterScreen(
-                                onRegisterSuccess = { currentScreen = "login" },
-                                onBackToLogin = { currentScreen = "login" }
-                            )
-                        }
+                            "forgot_password" -> {
+                                ForgotPasswordScreen(
+                                    onResetSuccess = { currentScreen = "login" },
+                                    onBackToLogin = { currentScreen = "login" }
+                                )
+                            }
 
-                        "forgot_password" -> {
-                            ForgotPasswordScreen(
-                                onResetSuccess = { currentScreen = "login" },
-                                onBackToLogin = { currentScreen = "login" }
-                            )
-                        }
+                            "home" -> {
+                                HomeScreen(
+                                    homeViewModel = homeViewModel,
+                                    selectedTab = selectedTab,
+                                    onTabSelected = { selectedTab = it },
+                                    seasonList = seasonList, // 🌟 TRUYỀN THAM SỐ GIẢI ĐẤU XUỐNG ĐÂY
+                                    phaseList = phaseList,
+                                    matchList = matchList,
+                                    // 🌟 TRUYỀN DÒNG NÀY
+                                    onNavigateToMatchDetail = { match ->
+                                        homeViewModel.setSelectedMatch(match)
+                                        homeViewModel.fetchMatchDetail(match.id)
+                                        currentScreen = "match_detail"
+                                    },
+                                    standingList = standingList,
+                                    selectedStandingTab = currentStandingTabIndex,
+                                    onStandingTabSelected = { currentStandingTabIndex = it },
+                                    onNavigateToStandingDetail = {
+                                        standingDetailSource = "home"
+                                        currentScreen = "standing_detail"
+                                    },
+                                    onLogout = {
+                                        currentScreen = "login"
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            "Đã đăng xuất thành công!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
+                                    onTeamClick = { teamIdClicked ->
+                                        currentTeamId = teamIdClicked
+                                        teamDetailSource =
+                                            "home" // Đánh dấu đi từ home sang chi tiết đội
+                                        currentScreen = "team_detail"
 
-                        "home" -> {
-                            HomeScreen(
-                                homeViewModel = homeViewModel,
-                                selectedTab = selectedTab,
-                                onTabSelected = { selectedTab = it },
-                                seasonList = seasonList, // 🌟 TRUYỀN THAM SỐ GIẢI ĐẤU XUỐNG ĐÂY
-                                phaseList = phaseList,
-                                matchList = matchList,
-                                // 🌟 TRUYỀN DÒNG NÀY
-                                onNavigateToMatchDetail = { match ->
-                                    homeViewModel.fetchMatchDetail(match.id)
-                                    currentScreen = "match_detail"
-                                },
-                                standingList = standingList,
-                                selectedStandingTab = currentStandingTabIndex,
-                                onStandingTabSelected = { currentStandingTabIndex = it },
-                                onNavigateToStandingDetail = {
-                                    previousScreen = "home"
-                                    currentScreen = "standing_detail"
-                                },
-                                onLogout = {
-                                    currentScreen = "login"
-                                    Toast.makeText(this@MainActivity, "Đã đăng xuất thành công!", Toast.LENGTH_SHORT).show()
-                                },
-                                onTeamClick = { teamIdClicked ->
-                                    Log.d("DEBUG_MA", "Đã nhận ID: $teamIdClicked")
+                                    },
+                                    isTeamRegistered = isTeamRegistered,
+                                    onTeamRegisteredChange = { isTeamRegistered = it },
+                                    teamName = teamName,
+                                    onTeamNameChange = { teamName = it },
+                                    leaderName = leaderName,
+                                    onLeaderNameChange = { leaderName = it },
+                                    coachName = coachName,
+                                    onCoachNameChange = { coachName = it },
+                                    isLeagueRegistered = isLeagueRegistered,
+                                    onLeagueRegisteredChange = { isLeagueRegistered = it },
+                                    currentUserRole = currentUserRole, // 🌟 Truyền xuống
+                                    playerList = playerList,
+                                    onNavigateToDetail = { season ->
+                                        // 1. Lưu giải đấu được chọn
+                                        selectedSeasonForDetail = season
+                                        // 2. Gọi ViewModel load dữ liệu của giải này (bảng xếp hạng, v.v.)
+                                        homeViewModel.selectSeason(season)
+                                        // 3. Chuyển sang màn hình chi tiết giải đấu
+                                        currentScreen = "tournament_detail"
+                                    },homeListState = homeListState
+                                )
 
-                                    // Cập nhật ID trực tiếp vào state
-                                    currentTeamId = teamIdClicked
-                                    previousScreen = "home"
-                                    currentScreen = "team_detail"
+                                // Chỉ hiện overlay nếu đang load lần đầu hoặc đang chuyển đổi quan trọng
+                                if (isLoading && (seasonList.isEmpty() || standingList.isEmpty())) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.5f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(color = Color(0xFF00FF66))
+                                    }
+                                }
+                            }
 
-                                },
-                                isTeamRegistered = isTeamRegistered,
-                                onTeamRegisteredChange = { isTeamRegistered = it },
-                                teamName = teamName,
-                                onTeamNameChange = { teamName = it },
-                                leaderName = leaderName,
-                                onLeaderNameChange = { leaderName = it },
-                                coachName = coachName,
-                                onCoachNameChange = { coachName = it },
-                                isLeagueRegistered = isLeagueRegistered,
-                                onLeagueRegisteredChange = { isLeagueRegistered = it },
-                                currentUserRole = currentUserRole, // 🌟 Truyền xuống
-                                playerList = playerList
-                            )
+                            "tournament_detail" -> {
+                                selectedSeasonForDetail?.let { season ->
+                                    TournamentDetailScreen(
+                                        seasonName = season.name,
+                                        isKnockout = false,
+                                        viewModel = homeViewModel,
+                                        currentTab = selectedTournamentTab, // 🌟 Truyền tab hiện tại vào
+                                        onTabSelected = {
+                                            selectedTournamentTab = it
+                                        }, // 🌟 Cập nhật lại khi người dùng đổi tab
+                                        onBack = {
+                                            currentScreen = "home"
+                                            selectedTournamentTab =
+                                                0 // Reset về tab đầu nếu thoát hẳn ra ngoài màn hình chính (tuỳ chọn)
+                                        },
+                                        onTeamClick = { teamId ->
+                                            homeViewModel.fetchTeamDetail(teamId)
+                                            currentTeamId = teamId
+                                            teamDetailSource =
+                                                "tournament_detail" // Đánh dấu đi từ tournament_detail sang chi tiết đội
+                                            currentScreen = "team_detail"
+                                        },
+                                        onNavigateToStandingDetail = {
+                                            standingDetailSource = "tournament_detail"
+                                            currentScreen = "standing_detail"
+                                        }
+                                    )
+                                } ?: run {
+                                    currentScreen = "home"
+                                }
+                            }
 
-                            // Chỉ hiện overlay nếu đang load lần đầu hoặc đang chuyển đổi quan trọng
-                            if (isLoading && (seasonList.isEmpty() || standingList.isEmpty())) {
-                                Box(
+
+                            "match_detail" -> {
+                                selectedMatch?.let { match ->
+                                    MatchDetailScreen(
+                                        match = match,
+                                        onBack = { currentScreen = "home" },
+                                        onTeamClick = { teamIdClicked ->
+                                            // 🌟 Gọi API lấy dữ liệu đội bóng trước, sau đó chuyển màn hình
+                                            homeViewModel.fetchTeamDetail(teamIdClicked)
+                                            currentTeamId = teamIdClicked
+                                            teamDetailSource = "match_detail" // Lưu lại nguồn để nút back quay lại đúng chỗ
+                                            currentScreen = "team_detail"
+                                        }
+                                    )
+                                } ?: Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                        .background(Color.Black),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     CircularProgressIndicator(color = Color(0xFF00FF66))
                                 }
                             }
-                        }
 
-                        "match_detail" -> {
-                            selectedMatch?.let { match ->
-                                MatchDetailScreen(
-                                    match = match,
-                                    onBack = { currentScreen = "home" }
-                                )
-                            } ?: Box(modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(color = Color(0xFF00FF66))
-                            }
-                        }
-
-                        "standing_detail" -> {
-                            StandingDetailScreen(
-                                standings = standingList,
-                                initialTabIndex = currentStandingTabIndex,
-                                onBack = { currentScreen = "home" },
-                                onTeamClick = { teamName ->
-                                    val clickedTeam = standingList.flatMap { it.standings }
-                                        .find { it.teamName.equals(teamName, ignoreCase = true) }
-                                    if (clickedTeam != null) {
-                                        selectedTeamObjectForDetail = StandingItem(clickedTeam.id, clickedTeam.teamName,  clickedTeam.goalDifference,  "Đang cập nhật", emptyList())
-                                        previousScreen = "standing_detail"
+                            "standing_detail" -> {
+                                StandingDetailScreen(
+                                    standings = standingList,
+                                    initialTabIndex = currentStandingTabIndex,
+                                    onBack = {
+                                        currentScreen = standingDetailSource
+                                    }, // Quay về đúng màn hình đã gọi nó (home hoặc tournament_detail)
+                                    onTeamClick = { teamIdClicked ->
+                                        homeViewModel.fetchTeamDetail(teamIdClicked)
+                                        currentTeamId = teamIdClicked
+                                        teamDetailSource =
+                                            "standing_detail" // Đánh dấu là đi từ bảng xếp hạng chi tiết sang chi tiết đội
                                         currentScreen = "team_detail"
                                     }
-                                }
-                            )
-                        }
-
-                        "team_detail" -> {
-                            if (currentTeamId != 0) {
-                                TeamDetailContainer(
-                                    teamId = currentTeamId,
-                                    viewModel = homeViewModel,
-                                    onBackClick = { currentScreen = previousScreen }
                                 )
-                            } else {
-                                // Nếu ID là 0, đừng gọi Container mà hãy quay lại hoặc hiện lỗi
-                                currentScreen = "home"
+                            }
+
+                            "team_detail" -> {
+                                if (currentTeamId != 0) {
+                                    TeamDetailContainer(
+                                        teamId = currentTeamId,
+                                        viewModel = homeViewModel,
+                                        onBackClick = {
+                                            currentScreen = teamDetailSource
+                                        } // Quay lại đúng màn hình trước đó (có thể là home, tournament_detail hoặc standing_detail)
+                                    )
+                                } else {
+                                    currentScreen = "home"
+                                }
                             }
                         }
                     }
                 }
-            }
         }
     }
     private fun askNotificationPermission() {

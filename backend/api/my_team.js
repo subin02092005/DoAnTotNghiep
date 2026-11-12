@@ -25,37 +25,20 @@ router.get('/my_team', async (req, res) => {
         COALESCE(tl.team_id, tp.team_id) AS team_id, 
         t.name AS team_name,
         t.coach_name,
+        t.field_type, -- 🌟 Thêm dòng này để lấy loại sân
         CASE 
             WHEN tl.user_id IS NOT NULL THEN 'coach'
             WHEN tp.role = 'captain' THEN 'captain'
             ELSE 'player'
         END AS currentUserRole
     FROM teams t
-    -- Kiểm tra trực tiếp bảng team_leaders mà không qua bảng players
     LEFT JOIN team_leaders tl ON t.id = tl.team_id AND tl.user_id = ? AND tl.is_active = 1
-    -- Kiểm tra bảng players và team_players để tìm cầu thủ
     LEFT JOIN players p ON p.user_id = ?
     LEFT JOIN team_players tp ON t.id = tp.team_id AND tp.player_id = p.id AND tp.is_active = 1
     WHERE tl.user_id IS NOT NULL OR tp.user_id IS NOT NULL
     LIMIT 1
 `;
-    /*    const query = `
-           SELECT 
-    tp.team_id, 
-    t.name AS team_name,
-    t.coach_name,
-    CASE 
-        WHEN tl.user_id IS NOT NULL THEN 'coach' 
-        WHEN tp.role = 'captain' THEN 'captain'  
-        ELSE 'player'                            
-    END AS currentUserRole
-FROM team_players tp
-JOIN players p ON tp.player_id = p.id
-JOIN teams t ON tp.team_id = t.id
-LEFT JOIN team_leaders tl ON tp.team_id = tl.team_id AND tl.user_id = p.user_id
-WHERE p.user_id = ? AND tp.is_active = 1
-LIMIT 1
-        `;*/
+   
         
         const [rows] = await pool.query(query, [userId, userId]);
 
@@ -90,8 +73,9 @@ return res.status(200).json({
         teamId: teamId,
         teamName: rows[0].team_name,
         coachName: rows[0].coach_name,
-        captainName: captain ? captain.name : "Chưa xác định", // 🌟 Lấy tên đội trưởng
+        captainName: captain ? captain.name : "Chưa xác định", 
         currentUserRole: rows[0].currentUserRole,
+        field_type: rows[0].field_type, // 🌟 Trả về field_type để App nhận diện
         players: players
     }
 });
@@ -108,7 +92,164 @@ if (!user.date_of_birth) {
         return res.status(500).json({ status: "error", message: "Lỗi Server nội bộ" });
     }
 });
+// 1. API Cập nhật danh sách đá chính
+router.post('/update_starters', async (req, res) => {
+    const { team_id, field_type, starter_player_ids } = req.body; 
+    // starter_player_ids là mảng các ID cầu thủ, ví dụ: [1, 2, 3, 4, 5]
 
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // Bước 1: Lưu hoặc cập nhật vào bảng team_formations (UPSERT)
+        await connection.query(
+            `INSERT INTO team_formations (team_id, field_type, starter_player_ids) 
+             VALUES (?, ?, ?) 
+             ON DUPLICATE KEY UPDATE starter_player_ids = ?`,
+            [team_id, field_type, JSON.stringify(starter_player_ids), JSON.stringify(starter_player_ids)]
+        );
+
+        // Bước 2: Reset tất cả cầu thủ của đội này về is_starter = 0
+        await connection.query(
+            `UPDATE team_players SET is_starter = 0 WHERE team_id = ?`,
+            [team_id]
+        );
+
+        // Bước 3: Cập nhật is_starter = 1 cho những cầu thủ nằm trong danh sách đá chính
+        if (starter_player_ids && starter_player_ids.length > 0) {
+            await connection.query(
+                `UPDATE team_players SET is_starter = 1 WHERE team_id = ? AND player_id IN (?)`,
+                [team_id, starter_player_ids]
+            );
+        }
+
+        await connection.commit();
+        connection.release();
+
+        res.json({ status: "success", message: "Đã lưu đội hình và cập nhật danh sách đá chính thành công!" });
+    } catch (error) {
+        await connection.rollback();
+        connection.release();
+        res.status(500).json({ status: "error", message: error.message });
+    }
+});
+
+// 2. API Lấy danh sách cầu thủ đá chính (kèm thông tin chi tiết từ bảng players và team_players)
+router.get('/get_starters', async (req, res) => {
+    const { team_id, field_type } = req.query;
+
+    try {
+        const [rows] = await pool.query(
+            "SELECT starter_player_ids FROM team_formations WHERE team_id = ? AND field_type = ?",
+            [team_id, field_type]
+        );
+        
+        let starterIds = [];
+        if (rows.length > 0 && rows[0].starter_player_ids) {
+            // Đảm bảo dữ liệu lấy ra từ DB (nếu là string) được chuyển thành mảng
+            starterIds = typeof rows[0].starter_player_ids === 'string' 
+                ? JSON.parse(rows[0].starter_player_ids) 
+                : rows[0].starter_player_ids;
+        }
+
+        res.json({ status: "success", starter_player_ids: starterIds });
+    } catch (error) {
+        res.status(500).json({ status: "error", message: error.message });
+    }
+});
+// API cập nhật loại sân (Sân 5, 7, hoặc 11)
+router.post('/update_field_type', async (req, res) => {
+    const { team_id, field_type } = req.body;
+
+    if (!team_id || !field_type) {
+        return res.status(400).json({ status: "error", message: "Thiếu dữ liệu team_id hoặc field_type" });
+    }
+
+    try {
+        const [result] = await pool.query(
+            "UPDATE teams SET field_type = ? WHERE id = ?",
+            [field_type, team_id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ status: "error", message: "Không tìm thấy đội bóng!" });
+        }
+
+        res.status(200).json({ status: "success", message: "Đã cập nhật loại sân thành công!" });
+    } catch (error) {
+        console.error("Lỗi cập nhật field_type:", error);
+        res.status(500).json({ status: "error", message: "Lỗi hệ thống" });
+    }
+});
+// API lấy danh sách cầu thủ từng ghi bàn hoặc kiến tạo của đội (còn hoặc không còn trong đội)
+router.get('/team_scorers_assisters', async (routerReq, res) => {
+    const { team_id } = routerReq.query;
+    if (!team_id) {
+        return res.status(400).json({ status: "error", message: "Thiếu team_id" });
+    }
+
+    try {
+        const query = `
+            SELECT 
+                p.id AS player_id,
+                u.name AS player_name,
+                COALESCE(tp.jersey_number, 'N/A') AS jersey_number,
+                COALESCE(tp.position, 'Player') AS position,
+                IF(tp.is_active = 1 AND tp.deleted_at IS NULL, 1, 0) AS is_still_in_team,
+                COALESCE(ps.goals_scored, 0) AS total_goals,
+                COALESCE(ps.assists, 0) AS total_assists
+            FROM players p
+            JOIN users u ON p.user_id = u.id
+            JOIN player_statistics ps ON ps.player_id = p.id AND ps.team_id = ?
+            LEFT JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = ?
+            WHERE ps.team_id = ?
+            GROUP BY p.id, u.name, tp.jersey_number, tp.position, tp.is_active, tp.deleted_at, ps.goals_scored, ps.assists
+            HAVING total_goals > 0 OR total_assists > 0
+            ORDER BY total_goals DESC, total_assists DESC;
+        `;
+
+        // Truyền team_id vào các tham số (?, ?, ?)
+        const [rows] = await pool.query(query, [team_id, team_id, team_id]);
+
+        return res.status(200).json({
+            status: "success",
+            data: rows
+        });
+    } catch (error) {
+        console.error("Lỗi lấy danh sách ghi bàn/kiến tạo:", error);
+        return res.status(500).json({ status: "error", message: "Lỗi Server nội bộ" });
+    }
+});
+// API kiểm tra trạng thái thẻ phạt / treo giò của cầu thủ trong đội
+// API lấy trạng thái thẻ phạt / treo giò của toàn bộ cầu thủ trong đội
+router.get('/player_card_status', async (req, res) => {
+    const { team_id, season_id } = req.query;
+    if (!team_id || !season_id) {
+        return res.status(400).json({ status: "error", message: "Thiếu team_id hoặc season_id" });
+    }
+
+    try {
+        const query = `
+            SELECT 
+                PS.player_id, 
+                PS.accumulated_yellow_cards, 
+                PS.red_cards, 
+                PS.is_suspended
+            FROM player_statistics PS
+            WHERE PS.team_id = ? AND PS.season_id = ?
+        `;
+        const [rows] = await pool.query(query, [team_id, season_id]);
+        
+        return res.status(200).json({
+            status: "success",
+            data: rows
+        });
+    } catch (error) {
+        console.error("Lỗi lấy trạng thái thẻ:", error);
+        return res.status(500).json({ status: "error", message: "Lỗi hệ thống" });
+    }
+});
+// API cập nhật danh sách cầu thủ đá chính (Starters)
 
 ///////////////////////////////////
 router.post('/update_player', async (req, res) => {
@@ -569,25 +710,24 @@ const [result] = await pool.query(
 router.post('/confirm_payment', async (req, res) => {
     const { transaction_ref, season_team_id } = req.body;
     
-    // Bắt đầu Transaction để đảm bảo tính toàn vẹn
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
-        // 1. Cập nhật bảng payments
+        // 1. Cập nhật bảng payments sang trạng thái 'pending_approval' (Đang chờ admin duyệt)
         await connection.query(
-            "UPDATE payments SET status = 'confirmed', paid_at = NOW(), transaction_ref = ? WHERE season_team_id = ?",
+            "UPDATE payments SET status = 'pending_approval', transaction_ref = ? WHERE season_team_id = ?",
             [transaction_ref, season_team_id]
         );
 
-        // 2. Cập nhật bảng season_teams (nếu cần đổi trạng thái đội)
+        // 2. Cập nhật bảng season_teams sang trạng thái 'pending_payment_approval' hoặc giữ 'pending'
         await connection.query(
-            "UPDATE season_teams SET status = 'approved' WHERE id = ?",
+            "UPDATE season_teams SET status = 'pending_approval' WHERE id = ?",
             [season_team_id]
         );
 
         await connection.commit();
-        res.status(200).json({ message: "Thanh toán thành công" });
+        res.status(200).json({ message: "Đã gửi thông tin thanh toán, vui lòng chờ Admin xác nhận!" });
     } catch (error) {
         await connection.rollback();
         res.status(500).json({ message: "Lỗi xử lý thanh toán" });
@@ -600,7 +740,7 @@ router.get('/rules/global', async (req, res) => {
         const query = `
             SELECT * FROM tournament_rules 
             WHERE is_active = 1 AND deleted_at IS NULL 
-            ORDER BY id DESC LIMIT 1
+            
         `; // Thêm ORDER BY id DESC để chắc chắn lấy luật mới nhất
         
         const [rows] = await pool.query(query);

@@ -2,6 +2,8 @@ package com.example.qlbongda.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
@@ -52,7 +54,9 @@ fun HomeScreen(
     isLeagueRegistered: Boolean,
     onLeagueRegisteredChange: (Boolean) -> Unit,
     currentUserRole: String,
-    playerList: SnapshotStateList<PlayerInfo>
+    playerList: SnapshotStateList<PlayerInfo>,
+    onNavigateToDetail: (SeasonWithPhases) -> Unit,
+    homeListState: LazyListState
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -96,6 +100,7 @@ fun HomeScreen(
             }
         }
     ) { innerPadding ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -111,7 +116,9 @@ fun HomeScreen(
                 onTabSelected = onStandingTabSelected,
                 onNavigateToStandingDetail = onNavigateToStandingDetail,
                 onTeamClick ={ teamId: Int ->
-                    onTeamClick(teamId)}
+                    onTeamClick(teamId)},
+                onNavigateToDetail = onNavigateToDetail ,
+                listState = homeListState// 👈 Truyền xuống đây
             )
             1 -> ScheduleTabContent(
                 viewModel = homeViewModel,

@@ -1,7 +1,29 @@
 package com.example.qlbongda.data.model
 
 import com.google.gson.annotations.SerializedName
+data class Season(
+    val id: Int,
+    val name: String
+)
+data class PreviewMatch(
+    val round_number: Int,
+    val home_team_id: Int,
+    val home_team_name: String,
+    val away_team_id: Int,
+    val away_team_name: String,
+    var match_date: String, // Cho phép chỉnh sửa trực tiếp
+    var match_time: String, // Cho phép chỉnh sửa trực tiếp
+    val venue_id: Int?
+)
 
+data class ConfirmScheduleRequest(
+    val matches: List<PreviewMatch>
+)
+data class PreviewMatchResponse(
+    val success: Boolean,
+    val message: String?,
+    val data: List<PreviewMatch>?
+)
 data class CreateRuleRequest(
     val season_id: Int,
     val min_players: Int,

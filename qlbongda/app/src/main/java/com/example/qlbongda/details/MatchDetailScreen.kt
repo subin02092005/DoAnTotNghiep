@@ -1,7 +1,9 @@
 package com.example.qlbongda.details
 
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,16 +28,28 @@ import com.example.qlbongda.utils.DateUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
+fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit, onTeamClick: (Int) -> Unit) {
     var selectedSubTab by remember { mutableIntStateOf(0) }
-
+    LaunchedEffect(match) {
+        Log.d("MatchDetailScreen_Debug", "Dữ liệu nhận được: $match")
+    }
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Chi Tiết Trận Đấu", color = NeonGreen, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "Chi Tiết Trận Đấu",
+                        color = NeonGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = NeonGreen)
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Quay lại",
+                            tint = NeonGreen
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Black)
@@ -55,14 +69,27 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                 border = BorderStroke(1.dp, NeonGreen),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF121212))
             ) {
-                Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = match.teamA, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.4f), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-
+                        Text(
+                            text = match.teamA,
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .weight(0.4f)
+                                .clickable { onTeamClick(match.teamAId) },
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Box(modifier = Modifier.weight(0.2f), contentAlignment = Alignment.Center) {
                             when (match.status.lowercase()) {
                                 "ongoing" -> {
@@ -74,35 +101,111 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                                             fontWeight = FontWeight.Black
                                         )
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(text = match.scoreA.toString(), color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Black)
-                                            Text(text = ":", color = Color.Gray, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 4.dp))
-                                            Text(text = match.scoreB.toString(), color = NeonGreen, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                            Text(
+                                                text = match.scoreA.toString(),
+                                                color = NeonGreen,
+                                                fontSize = 24.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                            Text(
+                                                text = ":",
+                                                color = Color.Gray,
+                                                fontSize = 20.sp,
+                                                modifier = Modifier.padding(horizontal = 4.dp)
+                                            )
+                                            Text(
+                                                text = match.scoreB.toString(),
+                                                color = NeonGreen,
+                                                fontSize = 24.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
                                         }
                                     }
                                 }
+
                                 "finished" -> {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = match.scoreA.toString(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
-                                        Text(text = ":", color = Color.Gray, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 4.dp))
-                                        Text(text = match.scoreB.toString(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                        Text(
+                                            text = match.scoreA.toString(),
+                                            color = Color.White,
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.Black
+                                        )
+                                        Text(
+                                            text = ":",
+                                            color = Color.Gray,
+                                            fontSize = 20.sp,
+                                            modifier = Modifier.padding(horizontal = 4.dp)
+                                        )
+                                        Text(
+                                            text = match.scoreB.toString(),
+                                            color = Color.White,
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.Black
+                                        )
                                     }
                                 }
+
                                 else -> {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 80.dp)) {
-                                        Text(text = DateUtils.formatTime(match.time), color = NeonGreen, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center, maxLines = 1)
-                                        Text(text = DateUtils.formatDate(match.date), color = Color.LightGray, fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 1)
-                                        Surface(color = Color(0xFF333333), shape = RoundedCornerShape(4.dp), modifier = Modifier.padding(top = 4.dp)) {
-                                            Text("SẮP ĐÁ", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.widthIn(max = 80.dp)
+                                    ) {
+                                        Text(
+                                            text = DateUtils.formatTime(match.time),
+                                            color = NeonGreen,
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = DateUtils.formatDate(match.date),
+                                            color = Color.LightGray,
+                                            fontSize = 9.sp,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1
+                                        )
+                                        Surface(
+                                            color = Color(0xFF333333),
+                                            shape = RoundedCornerShape(4.dp),
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        ) {
+                                            Text(
+                                                "SẮP ĐÁ",
+                                                color = Color.White,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(
+                                                    horizontal = 6.dp,
+                                                    vertical = 2.dp
+                                                )
+                                            )
                                         }
                                     }
                                 }
                             }
                         }
-
-                        Text(text = match.teamB, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.4f), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = match.teamB,
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .weight(0.4f)
+                                .clickable { onTeamClick(match.teamBId) },
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = "Sân: ${match.stadium ?: "Chưa xác định"}", color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center)
+                    Text(
+                        text = "Sân: ${match.stadium ?: "Chưa xác định"}",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
 
@@ -113,12 +216,45 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
                 containerColor = Color(0xFF121212),
                 contentColor = NeonGreen,
                 indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(tabPositions[selectedSubTab]), color = NeonGreen)
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[selectedSubTab]),
+                        color = NeonGreen
+                    )
                 }
             ) {
-                Tab(selected = selectedSubTab == 0, onClick = { selectedSubTab = 0 }, text = { Text("Diễn biến", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if(selectedSubTab==0) NeonGreen else Color.Gray) })
-                Tab(selected = selectedSubTab == 1, onClick = { selectedSubTab = 1 }, text = { Text("Đội hình", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if(selectedSubTab==1) NeonGreen else Color.Gray) })
-                Tab(selected = selectedSubTab == 2, onClick = { selectedSubTab = 2 }, text = { Text("Thống kê", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if(selectedSubTab==2) NeonGreen else Color.Gray) })
+                Tab(
+                    selected = selectedSubTab == 0,
+                    onClick = { selectedSubTab = 0 },
+                    text = {
+                        Text(
+                            "Diễn biến",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedSubTab == 0) NeonGreen else Color.Gray
+                        )
+                    })
+                Tab(
+                    selected = selectedSubTab == 1,
+                    onClick = { selectedSubTab = 1 },
+                    text = {
+                        Text(
+                            "Đội hình",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedSubTab == 1) NeonGreen else Color.Gray
+                        )
+                    })
+                Tab(
+                    selected = selectedSubTab == 2,
+                    onClick = { selectedSubTab = 2 },
+                    text = {
+                        Text(
+                            "Thống kê",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedSubTab == 2) NeonGreen else Color.Gray
+                        )
+                    })
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -126,7 +262,7 @@ fun MatchDetailScreen(match: FullMatchDetail, onBack: () -> Unit) {
             Box(modifier = Modifier.fillMaxSize().weight(1f)) {
                 when (selectedSubTab) {
                     0 -> TagDiEnBien(match)
-                    1 -> TagDoiHinh(match)
+                    1 -> TagDoiHinh(match, formatSize = match.formatSize)
                     2 -> TagThongKe(match)
                 }
             }
@@ -158,9 +294,48 @@ fun TagDiEnBien(match: FullMatchDetail) {
     }
 }
 
+// 🌟 HÀM PHỤ TRỢ: Đếm số thẻ vàng/đỏ phát sinh riêng trong trận đấu này dựa trên events
+fun getPlayerCardsInThisMatch(player: PlayerInfo, matchEvents: List<MatchEvent>): Pair<Int, Int> {
+    var yellowCount = 0
+    var redCount = 0
+
+    matchEvents.forEach { event ->
+        if (event.playerName.equals(player.name, ignoreCase = true)) {
+            val typeLower = event.type.lowercase()
+            if (typeLower.contains("vàng") || typeLower.contains("yellow")) {
+                yellowCount++
+            } else if (typeLower.contains("đỏ") || typeLower.contains("red")) {
+                redCount++
+            }
+        }
+    }
+    return Pair(yellowCount, redCount)
+}
+
 @Composable
-fun TagDoiHinh(match: FullMatchDetail) {
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+fun TagDoiHinh(match: FullMatchDetail, formatSize: Int = 7) {
+    var showFieldDialog by remember { mutableStateOf(false) }
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize().padding(vertical = 8.dp)
+    ) {
+        item {
+            Button(
+                onClick = { showFieldDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "⚽ XEM SƠ ĐỒ CHIẾN THUẬT (SÂN $formatSize NGƯỜI)",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
+        }
+
         item { Text("ĐỘI HÌNH RA SÂN CHÍNH THỨC", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
 
         item {
@@ -198,15 +373,97 @@ fun TagDoiHinh(match: FullMatchDetail) {
             }
         }
     }
+
+    if (showFieldDialog) {
+        AlertDialog(
+            onDismissRequest = { showFieldDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showFieldDialog = false }) {
+                    Text("Đóng", color = NeonGreen)
+                }
+            },
+            containerColor = Color(0xFF121212),
+            title = {
+                Text("Sơ đồ chiến thuật (Quy định: Sân $formatSize người)", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth().heightIn(max = 450.dp)) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        item {
+                            Text("Đội: ${match.teamA}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            FormationBoard(
+                                currentFieldType = formatSize,
+                                // 🌟 Map số thẻ phát sinh trong trận cho đội nhà (Team A)
+                                players = match.lineupA.map { player ->
+                                    val (yellowInMatch, redInMatch) = getPlayerCardsInThisMatch(player, match.events)
+                                    player.copy(
+                                        yellowCards = yellowInMatch,
+                                        redCards = redInMatch,
+                                        isSuspended = player.isSuspended
+                                    )
+                                } + match.subsA.map { player ->
+                                    val (yellowInMatch, redInMatch) = getPlayerCardsInThisMatch(player, match.events)
+                                    player.copy(
+                                        yellowCards = yellowInMatch,
+                                        redCards = redInMatch,
+                                        isSuspended = player.isSuspended
+                                    )
+                                },
+                                isEditable = false
+                            )
+                        }
+                        item {
+                            Text("Đội: ${match.teamB}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            FormationBoard(
+                                currentFieldType = formatSize,
+                                // 🌟 Map số thẻ phát sinh trong trận cho đội khách (Team B)
+                                players = match.lineupB.map { player ->
+                                    val (yellowInMatch, redInMatch) = getPlayerCardsInThisMatch(player, match.events)
+                                    player.copy(
+                                        yellowCards = yellowInMatch,
+                                        redCards = redInMatch,
+                                        isSuspended = player.isSuspended
+                                    )
+                                } + match.subsB.map { player ->
+                                    val (yellowInMatch, redInMatch) = getPlayerCardsInThisMatch(player, match.events)
+                                    player.copy(
+                                        yellowCards = yellowInMatch,
+                                        redCards = redInMatch,
+                                        isSuspended = player.isSuspended
+                                    )
+                                },
+                                isEditable = false,
+                                canChangeFieldType = false
+                            )
+                        }
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun TagThongKe(match: FullMatchDetail) {
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.fillMaxWidth()) {
-        Text("BIỂU ĐỒ THỐNG KÊ TRẬN ĐẤU", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Text(
+            "THỐNG KÊ CHI TIẾT TRẬN ĐẤU",
+            color = NeonGreen,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
 
         ThongKeRow(title = "Kiểm soát bóng", valA = match.PossessionA, valB = match.PossessionB)
         ThongKeRow(title = "Tổng cú sút", valA = match.ShotsA, valB = match.ShotsB)
+        ThongKeRow(title = "Thẻ vàng", valA = match.YellowCardsA, valB = match.YellowCardsB)
+        ThongKeRow(title = "Thẻ đỏ", valA = match.RedCardsA, valB = match.RedCardsB)
 
         HorizontalDivider(color = Color.DarkGray)
 
@@ -215,10 +472,23 @@ fun TagThongKe(match: FullMatchDetail) {
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
             border = BorderStroke(1.dp, NeonGreen)
         ) {
-            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("CẦU THỦ XUẤT SẮC NHẤT (MVP)", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Black)
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "CẦU THỦ XUẤT SẮC NHẤT (MVP)",
+                    color = NeonGreen,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Black
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = match.mvp, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = match.mvp,
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -245,13 +515,16 @@ fun ThongKeRow(title: String, valA: String, valB: String) {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 fun MatchDetailScreenStartedPreview() {
     val dummyMatchStarted = FullMatchDetail(
         id = 1,
+        seasonId = 0,
         teamA = "Arsenal",
         teamB = "Man City",
+        teamAId = 101,
+        teamBId = 102,
         status = "finished",
         isStarted = true,
         scoreA = 2,
@@ -259,36 +532,49 @@ fun MatchDetailScreenStartedPreview() {
         time = "22:00",
         date = "07/06/2026",
         stadium = "Emirates Stadium",
+        formatSize = 7,
         events = listOf(
-            MatchEvent("15", "Arsenal", "Ghi bàn", "Bukayo Saka"),
-            MatchEvent("42", "Man City", "Thẻ Vàng", "Ruben Dias"),
-            MatchEvent("55", "Man City", "Ghi bàn", "Erling Haaland"),
-            MatchEvent("89", "Arsenal", "Ghi bàn", "Martin Odegaard")
+            MatchEvent(15, "Arsenal", "Ghi bàn", "Bukayo Saka"),
+            MatchEvent(42, "Man City", "Thẻ Vàng", "Ruben Dias"),
+            MatchEvent(55, "Man City", "Ghi bàn", "Erling Haaland"),
+            MatchEvent(89, "Arsenal", "Ghi bàn", "Martin Odegaard")
         ),
         lineupA = listOf(
-            PlayerInfo(1,"22", "Raya", "GK"),
-            PlayerInfo(2,"2", "Saliba", "DF"),
-            PlayerInfo(3,"6", "Gabriel", "DF"),
-            PlayerInfo(4,"4", "White", "DF"),
-            PlayerInfo(5,"41", "Rice", "MF"),
-            PlayerInfo(6,"8", "Odegaard", "MF"),
-            PlayerInfo(7,"7", "Saka", "FW")
+            PlayerInfo(1, "22", "Raya", "GK", isStarter = true),
+            PlayerInfo(2, "2", "Saliba", "DF", isStarter = true),
+            PlayerInfo(3, "6", "Gabriel", "DF", isStarter = true),
+            PlayerInfo(4, "4", "White", "DF", isStarter = true),
+            PlayerInfo(5, "41", "Rice", "MF", isStarter = true),
+            PlayerInfo(6, "8", "Odegaard", "MF", isStarter = true),
+            PlayerInfo(7, "7", "Saka", "FW", isStarter = true)
         ),
         lineupB = listOf(
-            PlayerInfo(8,"31", "Ederson", "GK"),
-            PlayerInfo(9,"3", "Dias", "DF"),
-            PlayerInfo(10,"25", "Akanji", "DF"),
-            PlayerInfo(11,"16", "Rodri", "MF"),
-            PlayerInfo(12,"17", "De Bruyne", "MF"),
-            PlayerInfo(13,"47", "Foden", "FW"),
-            PlayerInfo(14,"9", "Haaland", "FW")
+            PlayerInfo(8, "31", "Ederson", "GK", isStarter = true),
+            PlayerInfo(9, "3", "Dias", "DF", isStarter = true),
+            PlayerInfo(10, "25", "Akanji", "DF", isStarter = true),
+            PlayerInfo(11, "16", "Rodri", "MF", isStarter = true),
+            PlayerInfo(12, "17", "De Bruyne", "MF", isStarter = true),
+            PlayerInfo(13, "47", "Foden", "FW", isStarter = true),
+            PlayerInfo(14, "9", "Haaland", "FW", isStarter = true)
         ),
-        subsA = listOf(PlayerInfo(15,"29", "Havertz", "FW"), PlayerInfo(16,"11", "Martinelli", "FW")),
-        subsB = listOf(PlayerInfo(17,"10", "Grealish", "FW"), PlayerInfo(18,"19", "Alvarez", "FW")),
-        PossessionA = "45%", PossessionB = "55%",
-        ShotsA = "12", ShotsB = "14",
-        mvp = "Martin Odegaard (Arsenal)",
+        subsA = listOf(
+            PlayerInfo(15, "29", "Havertz", "FW", isStarter = false),
+            PlayerInfo(16, "11", "Martinelli", "FW", isStarter = false)
+        ),
+        subsB = listOf(
+            PlayerInfo(17, "10", "Grealish", "FW", isStarter = false),
+            PlayerInfo(18, "19", "Alvarez", "FW", isStarter = false)
+        ),
+        PossessionA = "45%",
+        PossessionB = "55%",
+        ShotsA = "12",
+        ShotsB = "14",
+        mvp = "Martin Odegaard (Arsenal)"
     )
 
-    MatchDetailScreen(match = dummyMatchStarted, onBack = {})
+    MatchDetailScreen(
+        match = dummyMatchStarted,
+        onBack = {},
+        onTeamClick = {}
+    )
 }

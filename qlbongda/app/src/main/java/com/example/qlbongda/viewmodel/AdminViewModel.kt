@@ -1,6 +1,8 @@
 package com.example.qlbongda.viewmodel
 
 import android.util.Log
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.qlbongda.data.api.ApiService
@@ -1374,10 +1376,34 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
     private val _showAddRuleDialog = MutableStateFlow(false)
     val showAddRuleDialog = _showAddRuleDialog.asStateFlow()
 
+
     fun setShowAddRuleDialog(show: Boolean) {
         _showAddRuleDialog.value = show
+        if (show && _seasons.value.isEmpty()) {
+            fetchSeasons() // Tự động load danh sách mùa giải khi mở hộp thoại
+        }
     }
 
+    private val _seasons = MutableStateFlow<List<SeasonWithPhases>>(emptyList())
+    val seasons: StateFlow<List<SeasonWithPhases>> = _seasons.asStateFlow()
+
+    fun fetchSeasons() {
+        viewModelScope.launch {
+            try {
+                // 2. Gọi đúng hàm API bạn đang có
+                val response = apiService.getAllData()
+                if (response.isSuccessful && response.body() != null) {
+                    // Lấy data từ cấu trúc ApiResponse của bạn
+                    _seasons.value = response.body()?.data ?: emptyList()
+                } else {
+                    _message.value = "Không thể tải danh sách mùa giải"
+                }
+            } catch (e: Exception) {
+                Log.e("API_ERROR", "Lỗi tải mùa giải: ", e)
+                _message.value = "Lỗi kết nối khi tải mùa giải"
+            }
+        }
+    }
     fun createRules(request: CreateRuleRequest) {
         Log.d("DEBUG_REQUEST", "Đang gửi: $request")
         viewModelScope.launch {
@@ -1487,5 +1513,63 @@ class AdminViewModel(private val apiService: ApiService) : ViewModel() {
                 _message.value = "Lỗi kết nối: ${e.message}"
             }
         }
+    }
+    // --- THÊM VÀO ADMIN VIEWMODEL ---
+
+    // Trạng thái lưu danh sách trận đấu nháp để hiển thị Dialog Preview
+    // --- BỔ SUNG TÍNH NĂNG PREVIEW & XÁC NHẬN LỊCH THI ĐẤU ---
+
+    var previewMatchesState = mutableStateOf<List<PreviewMatch>?>(null)
+        private set
+
+    var currentPreviewPhaseId = mutableIntStateOf(-1)
+        private set
+
+    // 1. Gọi API Preview lịch đấu (Thay vì tạo trận ngay)
+    fun previewAutoSchedule(phaseId: Int, options: ScheduleOptionsRequest) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.previewSchedule(phaseId, options)
+                if (response.isSuccessful && response.body() != null) {
+                    previewMatchesState.value = response.body()!!.data
+                    currentPreviewPhaseId.intValue = phaseId
+                } else {
+                    _message.value = "Không thể tạo bản xem trước lịch đấu."
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    // 2. Xác nhận lưu chính thức danh sách trận đấu đã chỉnh sửa vào DB
+    fun confirmAndSaveSchedule(phaseId: Int, matches: List<PreviewMatch>, seasonId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = apiService.confirmSchedule(phaseId, ConfirmScheduleRequest(matches))
+                if (response.isSuccessful && response.body() != null) {
+                    _message.value = "Đã tạo lịch thi đấu chính thức thành công!"
+                    previewMatchesState.value = null // Đóng dialog
+                    fetchMatches() // Tải lại danh sách trận đấu chung
+                    if (seasonId != -1) {
+                        fetchStandings(seasonId) // Cập nhật lại BXH nếu cần
+                    }
+                } else {
+                    _message.value = "Lưu lịch đấu thất bại."
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi kết nối: ${e.localizedMessage}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun dismissPreview() {
+        previewMatchesState.value = null
     }
 }

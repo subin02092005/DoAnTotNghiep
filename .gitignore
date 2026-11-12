@@ -19,3 +19,8 @@ Thumbs.db
 
 # Bỏ qua file cấu hình Firebase chứa khóa bí mật
 backend/config/service-account.json
+qlbongda/caches/
+qlbongda/.idea/
+qlbongda/build/
+qlbongda/app/build/
+backend/node_modules/
